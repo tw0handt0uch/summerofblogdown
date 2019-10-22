@@ -252,7 +252,7 @@ hd_long_fact_tbl %>%
 
 ```
 
-I prefer boxplots for evaluating the continuous variables.  
+I prefer boxplots for evaluating the numeric variables.  
 
 ```{r}
 #Must gather() data first in order to facet wrap by key 
