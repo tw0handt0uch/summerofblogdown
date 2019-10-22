@@ -1,31 +1,27 @@
 ---
-date: "2014-04-09"
-description: About me and this site
+date: "2019-08-06"
+description: "[R]eliability"
 sidemenu: "true"
-title: About
+title: "About"
 ---
 
-Hugo is a static site engine written in Go.
+<style>
+body {
+text-align: justify}
+</style>
 
 
-It makes use of a variety of open source projects including:
+Hi! I'm Riley and I have been designing and developing Class III medical devices for over 13 years. My comfort zone is stents and stent grafts but my current project is an ablation catheter for treating chronic hypertension.  Recently I've become interested in coding and predictive modeling and have been teaching myself the basics of the R programming language.  My hope is to use this site to share tools, concepts, and stray thoughts related to device development. Thanks for taking a look!
 
-* [Cobra](https://github.com/spf13/cobra)
-* [Viper](https://github.com/spf13/viper)
-* [J Walter Weatherman](https://github.com/spf13/jWalterWeatherman)
-* [Cast](https://github.com/spf13/cast)
+Unless otherwise stated, data sets are simulated, publicly available, or fictitious.  
 
-Learn more and contribute on [GitHub](https://github.com/spf13).
+__Any opinions expressed here are my own and do not necessarily represent those of my employer.__
 
-## Setup
+Devices that are near and dear to my heart:
 
-Some fun facts about [Hugo](http://gohugo.io/):
+![plz_upload_img](/./img/muh_devices.png)
 
-* Built in [Go](http://golang.org/)
-* Loosely inspired by [Jekyll](http://jekyllrb.com/)
-* Primarily developed by [spf13](http://spf13.com/) on the train while commuting to and from Manhattan.
-* Coded in [Vim](http://vim.org) using [spf13-vim](http://vim.spf13.com/)
+Tiny humans that are near and dear to my heart:
 
-Have questions or suggestions? Feel free to [open an issue on GitHub](https://github.com/spf13/hugo/issues/new) or [ask me on Twitter](https://twitter.com/spf13).
+<img src="/./img/lil_1.jpg" width="830">
 
-Thanks for reading!
