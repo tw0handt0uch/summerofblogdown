@@ -1,0 +1,458 @@
+---
+title: Permutation Test for NHST of 2 Samples in R
+author: Riley King
+date: '2019-08-10'
+slug: permutation-test-for-nhst-of-2-samples-in-R
+categories:
+  - Frequentist
+  - R
+  - Stats
+tags:
+  - R
+  - Stats
+  - Simulation
+description: ''
+topics: []
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    number_sections: yes
+    theme: flatly
+    toc: yes
+    toc_depth: 2
+---
+
+
+
+<p>As engineers, it is not uncommon to be asked to determine whether or not two different configurations of a product perform the same. Perhaps we are asked to compare the durability of a next-generation prototype to the current generation. Sometimes we are testing the flexibility of our device versus a competitor for marketing purposes. Maybe we identify a new vendor for a raw material but must first understand whether the resultant finished product will perform any differently than when built using material from the standard supplier. All of these situations call for a comparison between two groups culminating in a statistically supported recommendation.</p>
+<p>There are a lot of interesting ways to do this: regions of practical equivalence, Bayes Factors, etc. The most common method is still null hypothesis significance testing (NHST) and that’s what I want to explore in this first post. Frequentist methods yield the least useful inferences but have the advantage of a long usage history. Most medical device professionals will be looking for a p-value, so a p-value we must provide.</p>
+<p>In NHST, the plan is usually to calculate a test statistic from our data and use a table of reference values or a statistical program to tell us how surprising our derived statistic would be in a world where the null hypothesis was true. We generally do this by comparing our statistic to a reference distribution or table of tabulated values. Unfortunately, whenever our benchtop data violates an assumption of the reference model, we are no longer comparing apples-to-apples. We must make tweaks and adjustments to try to compensate. It is easy to get overwhelmed in a decision tree of test names and use cases.</p>
+<p>A more robust and intuitive approach to NHST is to replace the off-the-shelf distributions and tables with a simulation built right from our dataset. The workflow any such test is shown below. <a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a></p>
+<p><img src="/./img/workflow.png" width="75%" height="75%" style="display: block; margin: auto;" /></p>
+<p>The main difference here is that we create the distribution of the data under the null hypothesis using simulation instead of relying on a reference distribution. It’s intuitive, powerful, and fun.</p>
+<p>Imagine we have just designed a benchtop experiment in which we intend to measure the pressure (in mm Hg) at which a pair of overlapped stent grafts started to migrate or disconnect when deployed in a large thoracic aneurysm. <a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a></p>
+<p><img src="/./img/migration_model.png" width="100%" height="500px" /></p>
+<p>A common null hypothesis for comparing groups is that there is no difference between them. Under this model, <strong>we can treat all the experimental data as one big group instead of 2 different groups</strong>. We therefore pool the data from our completed experiment into one big group, shuffle it, and randomly assign data points into two groups of the original size. This is our generative model. After each round of permutation and assignment, we calculate and store the test statistic for the observed effect (difference in means between the two groups). Once many simulations have been completed, we’ll see where our true data falls relative to the virtual data.</p>
+<p>One way to setup and execute a simulation-based NHST for comparing two groups in R is as follows (note: there are quicker shortcuts to executing this type of testing but the long version below allows for customization, visualization, and adjust-ability):</p>
+<p>First, we read in the libraries and transcribe the benchtop data into R and evaluate sample size</p>
+<pre class="r"><code>library(tidyverse)
+library(cowplot)
+library(knitr)
+library(kableExtra)</code></pre>
+<pre class="r"><code>#Migration pressure for predicate device
+predicate &lt;-  c(186, 188, 189, 189, 192, 193, 194, 194, 194, 195, 195, 196, 196, 197, 197, 198, 198, 199, 199, 201, 206, 207, 210, 213, 216, 218)
+
+#Migration pressure for next_gen device
+next_gen &lt;-  c(189, 190, 192, 193, 193, 196, 199, 199, 199, 202, 203, 204, 205, 206, 206, 207, 208, 208, 210, 210, 212, 214, 216, 216, 217, 218)</code></pre>
+<table>
+<tbody>
+<tr>
+<td style="text-align:center;">
+Sample Size of Predicate Device Data: 26
+</td>
+</tr>
+</tbody>
+</table>
+<table>
+<tbody>
+<tr>
+<td style="text-align:center;">
+Sample Size of Next-Gen Device Data: 26
+</td>
+</tr>
+</tbody>
+</table>
+<p>So we have slightly uneven groups and relatively small sample sizes. No problem - assign each group to a variable and convert to tibble format:</p>
+<pre class="r"><code>#Assign variables for each group and convert to tibble
+predicate_tbl &lt;- tibble(Device = &quot;Predicate&quot;,
+                        Pressure = predicate)
+
+next_gen_tbl &lt;- tibble(Device = &quot;Next_Gen&quot;,
+                        Pressure = next_gen)</code></pre>
+<p>Combine predicate and next_gen data into a single, pooled group called results_tbl. Taking a look at the first few and last few rows in the pooled tibble confirm it was combined appropriately.</p>
+<pre class="r"><code>#Combine in tibble
+results_tbl &lt;- bind_rows(predicate_tbl, next_gen_tbl)
+results_tbl %&gt;% 
+  head() %&gt;% 
+  kable(align = rep(&quot;c&quot;,2))</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+Device
+</th>
+<th style="text-align:center;">
+Pressure
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+Predicate
+</td>
+<td style="text-align:center;">
+186
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Predicate
+</td>
+<td style="text-align:center;">
+188
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Predicate
+</td>
+<td style="text-align:center;">
+189
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Predicate
+</td>
+<td style="text-align:center;">
+189
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Predicate
+</td>
+<td style="text-align:center;">
+192
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Predicate
+</td>
+<td style="text-align:center;">
+193
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>results_tbl %&gt;% tail() %&gt;% 
+  head() %&gt;% 
+  kable(align = rep(&quot;c&quot;,2))</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+Device
+</th>
+<th style="text-align:center;">
+Pressure
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+Next_Gen
+</td>
+<td style="text-align:center;">
+212
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Next_Gen
+</td>
+<td style="text-align:center;">
+214
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Next_Gen
+</td>
+<td style="text-align:center;">
+216
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Next_Gen
+</td>
+<td style="text-align:center;">
+216
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Next_Gen
+</td>
+<td style="text-align:center;">
+217
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Next_Gen
+</td>
+<td style="text-align:center;">
+218
+</td>
+</tr>
+</tbody>
+</table>
+<p>Now we do some exploratory data analysis to identify general shape and distribution.</p>
+<pre class="r"><code># Visualize w/ basic boxplot
+boxplot_eda &lt;- results_tbl %&gt;% 
+    ggplot(aes(x=Device, y=Pressure)) +
+    geom_boxplot(
+        alpha  = .6,
+        width  = .4,
+        size   = .8,
+        fatten = .5,
+        fill   = c(&quot;#FDE725FF&quot;,&quot;#20A486FF&quot;)) +
+    labs(
+        y        = &quot;Pressure (mm Hg)&quot;,
+        title    = &quot;Predicate and Next-Gen Data&quot;,
+        subtitle = &quot;Modular Disconnect Pressure&quot;
+    )
+
+boxplot_eda</code></pre>
+<p><img src="/post/2019-08-10-simple-permutation-test-for-nhst-of-2-samples_files/figure-html/unnamed-chunk-7-1.png" width="100%" height="500px" /></p>
+<pre class="r"><code>#Visualize with density plot
+density_eda &lt;- results_tbl %&gt;% 
+    ggplot(aes(x = Pressure)) +
+    geom_density(aes(fill = Device),
+        color = &quot;black&quot;,
+        alpha = 0.6
+        ) +
+    scale_fill_manual(values = c(&quot;#FDE725FF&quot;,&quot;#20A486FF&quot;)) +
+    labs(
+        x        = &quot;Pressure (mm Hg)&quot;,
+        title    = &quot;Predicate and Next-Gen Data&quot;,
+        subtitle = &quot;Modular Disconnect Pressure&quot;
+    )
+
+density_eda</code></pre>
+<p><img src="/post/2019-08-10-simple-permutation-test-for-nhst-of-2-samples_files/figure-html/unnamed-chunk-7-2.png" width="100%" height="500px" /></p>
+<p>Yikes! These data do not look normal. Fortunately, the permutation test does not need the data to take on any particular distribution. The main assumption is exchangability, meaning it must be reasonable that the labels could be arbitrarily permuted under the null hypothesis. Provided the sample size is approximately equal, the permutation test is robust against unequal variances.<a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a> This gives us an attractive option for data shaped as shown above.</p>
+<p>To get started with our permutation test we create a function that accepts 3 arguments: the pooled data from all trials in our benchtop experiment (x), the number of observations taken from Group 1 (n1), and the number of observations taken from Group 2 (n2). The function creates an object containing indices 1:n, then randomly assigns indices into two Groups A and B with sizes to match the original group sizes. It then uses the randomly assigned indices to splice the dataset x producing 2 “shuffled” groups from the original data. Finally, it computes and returns the mean between the 2 randomly assigned groups.</p>
+<pre class="r"><code>#Function to permute vector indices and then compute difference in group means
+perm_fun &lt;- function(x, n1, n2){
+  n &lt;- n1 + n2
+  group_B &lt;- sample(1:n, n1)
+  group_A &lt;- setdiff(1:n, group_B)
+  mean_diff &lt;- mean(x[group_B] - mean(x[group_A]))
+  return(mean_diff)
+}</code></pre>
+<p>Here we initialize an dummy vector called perm_diffs to hold the results of the loop we are about to use. It’ll have all 0’s to start and then we’ll assign values from each iteration of the for loop.</p>
+<pre class="r"><code>#Set number of simulations to run
+n_sims &lt;- 10000
+
+#Initialize empty vector
+perm_diffs &lt;- rep(0,n_sims)
+perm_diffs %&gt;% head()  %&gt;% 
+  kable(align = &quot;c&quot;, col.names = NULL)</code></pre>
+<table>
+<tbody>
+<tr>
+<td style="text-align:center;">
+0
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0
+</td>
+</tr>
+</tbody>
+</table>
+<p>Set up a simple for loop to execute the same evaluation using perm_fun() 10,000 times. On each iteration, we’ll store the results into the corresponding index within perm_diffs that we initialized above.</p>
+<pre class="r"><code>#Set seed for reproducibility
+set.seed(2015)
+
+#Iterate over desired number of simulations using permutation function
+for (i in 1:n_sims)
+  perm_diffs[i] = perm_fun(results_tbl$Pressure, 26, 26)</code></pre>
+<p>Now we have 10,000 replicates of our permutation test stored in perm_diffs. We want to visualize the data with ggplot so we convert it into a tibble frame using tibble().</p>
+<pre class="r"><code>#Convert results to a tibble and look at it
+perm_diffs_df &lt;- tibble(perm_diffs)
+perm_diffs_df %&gt;% head()  %&gt;% 
+  kable(align = &quot;c&quot;)</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+perm_diffs
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+-0.6153846
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+-3.3076923
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.6923077
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+-2.3846154
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+-0.3076923
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+3.1538462
+</td>
+</tr>
+</tbody>
+</table>
+<p>Visualize the difference in means as a histogram and density plot:</p>
+<pre class="r"><code>#Visualize difference in means as a histogram
+diffs_histogram_plot &lt;- perm_diffs_df %&gt;% ggplot(aes(perm_diffs)) +
+  geom_histogram(fill = &quot;#2c3e50&quot;, color = &quot;white&quot;, binwidth = .3, alpha = 0.8) +
+    labs(
+        x = &quot;Pressure (mm Hg)&quot;,
+        title = &quot;Histogram of Difference in Means&quot;,
+        subtitle = &quot;Generated Under Null Hypothesis&quot;
+    )
+
+#Visualize difference in means as a density plot
+diffs_density_plot &lt;-  perm_diffs_df %&gt;% ggplot(aes(perm_diffs)) +
+  geom_density(fill = &quot;#2c3e50&quot;, color = &quot;white&quot;, alpha = 0.8) +
+     labs(
+        x = &quot;Pressure (mm Hg)&quot;,
+        title = &quot;Density Plot of Difference in Means&quot;,
+        subtitle = &quot;Generated Under Null Hypothesis&quot;
+    )
+
+plot_grid(diffs_histogram_plot, diffs_density_plot)</code></pre>
+<p><img src="/post/2019-08-10-simple-permutation-test-for-nhst-of-2-samples_files/figure-html/unnamed-chunk-12-1.png" width="100%" height="500px" /></p>
+<p>We just simulated many tests from the null hypothesis. These virtual data give us a good understanding of what sort of difference in means we might observe if there truly was no difference between the groups. As expected, most of the time the difference is around 0. But occasionally there is a noticeable difference in means just due to chance.</p>
+<p>But how big was the difference in means from our real world dataset? We’ll call this “baseline difference”.</p>
+<pre class="r"><code>#Evaluate difference in means from true data set
+predicate_pressure_mean &lt;- mean(predicate_tbl$Pressure)
+next_gen_pressure_mean &lt;- mean(next_gen_tbl$Pressure)
+
+baseline_difference &lt;- predicate_pressure_mean - next_gen_pressure_mean
+baseline_difference  %&gt;% 
+  signif(digits = 3) %&gt;%
+  kable(align = &quot;c&quot;, col.names = NULL)</code></pre>
+<table>
+<tbody>
+<tr>
+<td style="text-align:center;">
+-5.85
+</td>
+</tr>
+</tbody>
+</table>
+<p>So our real, observed data show a difference in means of -5.85. Is this large or small? With the context of the shuffle testing we already performed, we know exactly how extreme our observed data is and can visualize it with a vertical line.</p>
+<pre class="r"><code>#Visualize real data in context of simulations
+g1 &lt;- diffs_histogram_plot + 
+  geom_vline(xintercept = baseline_difference, 
+             linetype   = &quot;dotted&quot;, 
+             color      = &quot;#2c3e50&quot;, 
+             size       = 1
+             ) 
+
+g2 &lt;- diffs_density_plot + 
+  geom_vline(xintercept = baseline_difference, 
+             linetype   =&quot;dotted&quot;, 
+             color      = &quot;#2c3e50&quot;, 
+             size       = 1
+             ) 
+
+plot_grid(g1,g2)</code></pre>
+<p><img src="/post/2019-08-10-simple-permutation-test-for-nhst-of-2-samples_files/figure-html/unnamed-chunk-14-1.png" width="100%" height="500px" /></p>
+<p>It looks like the our benchtop data was pretty extreme relative to the null. We should start to consider the possibility that this effect was not due solely to chance alone. 0.05 is a commonly used threshold for declaring statistical significance. Let’s see if our data is more or less extreme than 0.05 (solid line).</p>
+<pre class="r"><code>#Calculate the 5% quantile of the simulated distribution for difference in means
+the_five_percent_quantile &lt;- quantile(perm_diffs_df$perm_diffs, probs = 0.05)
+the_five_percent_quantile</code></pre>
+<pre><code>##        5% 
+## -4.153846</code></pre>
+<pre class="r"><code>#Visualize the 5% quantile on the histogram and density plots
+g3 &lt;- g1 +
+         geom_vline(xintercept = the_five_percent_quantile, 
+             color      = &quot;#2c3e50&quot;, 
+             size       = 1
+             )
+
+g4 &lt;- g2 +
+        geom_vline(xintercept = the_five_percent_quantile, 
+             color      = &quot;#2c3e50&quot;, 
+             size       = 1
+             )
+
+plot_grid(g3,g4)</code></pre>
+<p><img src="/post/2019-08-10-simple-permutation-test-for-nhst-of-2-samples_files/figure-html/unnamed-chunk-15-1.png" width="100%" height="500px" /></p>
+<p>We can see here that our data is more extreme than the 5% quantile which means our p-value is less than 0.05. This satisfies the traditional, frequentist definition of statistically significant. If we want to actual p-value, we have to determine the percentage of simulated data that are as extreme or more extreme than our observed data.</p>
+<pre class="r"><code>#Calculate percentage of simulations as extreme or more extreme than the observed data (p-value)
+p_value &lt;- perm_diffs_df %&gt;% 
+    filter(perm_diffs &lt;= baseline_difference) %&gt;%
+    nrow() / n_sims
+
+paste(&quot;The empirical p-value is: &quot;, p_value)  %&gt;% 
+  kable(align = &quot;c&quot;, col.names = NULL)</code></pre>
+<table>
+<tbody>
+<tr>
+<td style="text-align:center;">
+The empirical p-value is: 0.0096
+</td>
+</tr>
+</tbody>
+</table>
+<p>Our p-value is well below 0.05. This is likely enough evidence for us to claim that there was a statistically significant difference observed between the Next Gen device and the predicate device.</p>
+<p>Our marketing team will be thrilled, but we should always be wary that statistically significant does not mean practically important. Domain knowledge should provide the context to interpret the relevance of the observed difference. A difference in mean Pressure of a few mm Hg seems to be enough to claim a statistically significant improvement in our new device vs. the predicate, but is it enough for our marketing team to make a meaningful campaign? In reality, a few mm Hg is noticeable on the bench but is likely lost in the noise of anatomical variation within real patient anatomies.</p>
+<style>
+body {
+text-align: justify}
+</style>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Probably Overthinking It, <a href="http://allendowney.blogspot.com/2016/06/there-is-still-only-one-test.html" class="uri">http://allendowney.blogspot.com/2016/06/there-is-still-only-one-test.html</a><a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>J ENDOVASC THER 2011;18:559-568, open access <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3163409/" class="uri">https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3163409/</a><a href="#fnref2">↩</a></p></li>
+<li id="fn3"><p>Simulations and Explanation of Unequal Variance and Sample Sizes, <a href="https://stats.stackexchange.com/questions/87215/does-a-big-difference-in-sample-sizes-together-with-a-difference-in-variances-ma" class="uri">https://stats.stackexchange.com/questions/87215/does-a-big-difference-in-sample-sizes-together-with-a-difference-in-variances-ma</a><a href="#fnref3">↩</a></p></li>
+</ol>
+</div>
