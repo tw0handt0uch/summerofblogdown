@@ -320,7 +320,7 @@ hd_long_fact_tbl %&amp;gt;%
          name   = &amp;quot;Heart\nDisease&amp;quot;,
          labels = c(&amp;quot;No HD&amp;quot;, &amp;quot;Yes HD&amp;quot;))&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;&lt;img src=&#34;/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
-&lt;p&gt;I prefer boxplots for evaluating the continuous variables.&lt;/p&gt;
+&lt;p&gt;I prefer boxplots for evaluating the numeric variables.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Must gather() data first in order to facet wrap by key 
 #(default gather call puts all var names into new key col)
 hd_long_cont_tbl &amp;lt;- heart_dataset_clean_tbl  %&amp;gt;%
