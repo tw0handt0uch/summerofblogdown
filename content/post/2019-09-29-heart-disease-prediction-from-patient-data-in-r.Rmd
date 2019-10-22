@@ -34,7 +34,7 @@ knitr::opts_chunk$set(
     fig.pos = "center",
     dpi = 300)
 ```
-Test 1. In this post I'll be attempting to leverage the parsnip package in R to run through some straightforward predictive analytics/machine learning.  Parsnip provides a flexible and consistent interface to apply common regression and classification algorithms in R.  I'll be working with the Cleveland Clinic Heart Disease dataset which contains 13 variables related to patient diagnostics and one outcome variable indicating the presence or absence of heart disease.^[Image Credit: Shutterstock/Crevis] The data was accessed from the UCI Machine Learning Repository in September 2019.^[UCI Machine Learning Repository, https://archive.ics.uci.edu/ml/datasets/Heart+Disease].  The goal is to be able to accurately classify as having or not having heart disease based on diagnostic test data.
+In this post I'll be attempting to leverage the parsnip package in R to run through some straightforward predictive analytics/machine learning.  Parsnip provides a flexible and consistent interface to apply common regression and classification algorithms in R.  I'll be working with the Cleveland Clinic Heart Disease dataset which contains 13 variables related to patient diagnostics and one outcome variable indicating the presence or absence of heart disease.^[Image Credit: Shutterstock/Crevis] The data was accessed from the UCI Machine Learning Repository in September 2019.^[UCI Machine Learning Repository, https://archive.ics.uci.edu/ml/datasets/Heart+Disease].  The goal is to be able to accurately classify as having or not having heart disease based on diagnostic test data.
 
 
 ```{r, out.width = '100%', out.height = "100%", echo=FALSE, fig.align="center"}
