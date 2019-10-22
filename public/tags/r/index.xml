@@ -1,0 +1,4158 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+  <title>R on [R]eliability</title>
+  <link>/tags/r/</link>
+  <description>Recent content in R on [R]eliability</description>
+  <generator>Hugo -- gohugo.io</generator>
+<language>en-us</language>
+<copyright>&amp;copy; 2019. All rights reserved.</copyright>
+<lastBuildDate>Sun, 29 Sep 2019 00:00:00 +0000</lastBuildDate>
+
+<atom:link href="/tags/r/index.xml" rel="self" type="application/rss+xml" />
+
+
+<item>
+  <title>Heart Disease Prediction From Patient Data in R</title>
+  <link>/post/heart-disease-prediction-from-patient-data-in-r/</link>
+  <pubDate>Sun, 29 Sep 2019 00:00:00 +0000</pubDate>
+  
+<guid>/post/heart-disease-prediction-from-patient-data-in-r/</guid>
+  <description>
+&lt;script src=&#34;/rmarkdown-libs/kePrint/kePrint.js&#34;&gt;&lt;/script&gt;
+
+
+&lt;p&gt;Test 1. In this post I’ll be attempting to leverage the parsnip package in R to run through some straightforward predictive analytics/machine learning. Parsnip provides a flexible and consistent interface to apply common regression and classification algorithms in R. I’ll be working with the Cleveland Clinic Heart Disease dataset which contains 13 variables related to patient diagnostics and one outcome variable indicating the presence or absence of heart disease.&lt;a href=&#34;#fn1&#34; class=&#34;footnoteRef&#34; id=&#34;fnref1&#34;&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt; The data was accessed from the UCI Machine Learning Repository in September 2019.&lt;a href=&#34;#fn2&#34; class=&#34;footnoteRef&#34; id=&#34;fnref2&#34;&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt;. The goal is to be able to accurately classify as having or not having heart disease based on diagnostic test data.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/./img/cda.jpg&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Load the libraries to be used.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Load libraries
+library(tidyverse)
+library(kableExtra)
+library(rsample)
+library(recipes)
+library(parsnip)
+library(yardstick)
+library(viridisLite)
+library(GGally)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The first part of the analysis is to read in the data set and clean the column names up a bit.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Read in data
+heart_disease_dataset &amp;lt;- read.csv(file = &amp;quot;processed.cleveland.data&amp;quot;, header = F)
+
+#Prepare column names
+names &amp;lt;- c(&amp;quot;Age&amp;quot;,
+           &amp;quot;Sex&amp;quot;,
+           &amp;quot;Chest_Pain_Type&amp;quot;,
+           &amp;quot;Resting_Blood_Pressure&amp;quot;,
+           &amp;quot;Serum_Cholesterol&amp;quot;,
+           &amp;quot;Fasting_Blood_Sugar&amp;quot;,
+           &amp;quot;Resting_ECG&amp;quot;,
+           &amp;quot;Max_Heart_Rate_Achieved&amp;quot;,
+           &amp;quot;Exercise_Induced_Angina&amp;quot;,
+           &amp;quot;ST_Depression_Exercise&amp;quot;,
+           &amp;quot;Peak_Exercise_ST_Segment&amp;quot;,
+           &amp;quot;Num_Major_Vessels_Flouro&amp;quot;,
+           &amp;quot;Thalassemia&amp;quot;,
+           &amp;quot;Diagnosis_Heart_Disease&amp;quot;)
+
+#Apply column names to the dataframe
+colnames(heart_disease_dataset) &amp;lt;- names
+
+#Glimpse data to verify new column names are in place
+heart_disease_dataset %&amp;gt;% glimpse()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Observations: 303
+## Variables: 14
+## $ Age                      &amp;lt;dbl&amp;gt; 63, 67, 67, 37, 41, 56, 62, 57, 63, 5...
+## $ Sex                      &amp;lt;dbl&amp;gt; 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1...
+## $ Chest_Pain_Type          &amp;lt;dbl&amp;gt; 1, 4, 4, 3, 2, 2, 4, 4, 4, 4, 4, 2, 3...
+## $ Resting_Blood_Pressure   &amp;lt;dbl&amp;gt; 145, 160, 120, 130, 130, 120, 140, 12...
+## $ Serum_Cholesterol        &amp;lt;dbl&amp;gt; 233, 286, 229, 250, 204, 236, 268, 35...
+## $ Fasting_Blood_Sugar      &amp;lt;dbl&amp;gt; 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1...
+## $ Resting_ECG              &amp;lt;dbl&amp;gt; 2, 2, 2, 0, 2, 0, 2, 0, 2, 2, 0, 2, 2...
+## $ Max_Heart_Rate_Achieved  &amp;lt;dbl&amp;gt; 150, 108, 129, 187, 172, 178, 160, 16...
+## $ Exercise_Induced_Angina  &amp;lt;dbl&amp;gt; 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1...
+## $ ST_Depression_Exercise   &amp;lt;dbl&amp;gt; 2.3, 1.5, 2.6, 3.5, 1.4, 0.8, 3.6, 0....
+## $ Peak_Exercise_ST_Segment &amp;lt;dbl&amp;gt; 3, 2, 2, 3, 1, 1, 3, 1, 2, 3, 2, 2, 2...
+## $ Num_Major_Vessels_Flouro &amp;lt;fct&amp;gt; 0.0, 3.0, 2.0, 0.0, 0.0, 0.0, 2.0, 0....
+## $ Thalassemia              &amp;lt;fct&amp;gt; 6.0, 3.0, 7.0, 3.0, 3.0, 3.0, 3.0, 3....
+## $ Diagnosis_Heart_Disease  &amp;lt;int&amp;gt; 0, 2, 1, 0, 0, 0, 3, 0, 2, 1, 0, 0, 2...&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;There are 14 variables provided in the data set and the last one is the dependent variable that we want to be able to predict. Here is a summary of what the other variables mean:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Age&lt;/strong&gt;: Age of subject&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Sex&lt;/strong&gt;: Gender of subject:&lt;br /&gt;
+0 = female 1 = male&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Chest-pain type&lt;/strong&gt;: Type of chest-pain experienced by the individual:&lt;br /&gt;
+1 = typical angina&lt;br /&gt;
+2 = atypical angina&lt;br /&gt;
+3 = non-angina pain&lt;br /&gt;
+4 = asymptomatic angina&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Resting Blood Pressure&lt;/strong&gt;: Resting blood pressure in mm Hg&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Serum Cholesterol&lt;/strong&gt;: Serum cholesterol in mg/dl&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Fasting Blood Sugar&lt;/strong&gt;: Fasting blood sugar level relative to 120 mg/dl: 0 = fasting blood sugar &amp;lt;= 120 mg/dl&lt;br /&gt;
+1 = fasting blood sugar &amp;gt; 120 mg/dl&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Resting ECG&lt;/strong&gt;: Resting electrocardiographic results&lt;br /&gt;
+0 = normal&lt;br /&gt;
+1 = ST-T wave abnormality&lt;br /&gt;
+2 = left ventricle hyperthrophy&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Max Heart Rate Achieved&lt;/strong&gt;: Max heart rate of subject&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Exercise Induced Angina&lt;/strong&gt;:&lt;br /&gt;
+0 = no 1 = yes&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;ST Depression Induced by Exercise Relative to Rest&lt;/strong&gt;: ST Depression of subject&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Peak Exercise ST Segment&lt;/strong&gt;:&lt;br /&gt;
+1 = Up-sloaping&lt;br /&gt;
+2 = Flat&lt;br /&gt;
+3 = Down-sloaping&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Number of Major Vessels (0-3) Visible on Flouroscopy&lt;/strong&gt;: Number of visible vessels under flouro&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Thal&lt;/strong&gt;: Form of thalassemia: &lt;a href=&#34;#fn3&#34; class=&#34;footnoteRef&#34; id=&#34;fnref3&#34;&gt;&lt;sup&gt;3&lt;/sup&gt;&lt;/a&gt;&lt;br /&gt;
+3 = normal&lt;br /&gt;
+6 = fixed defect&lt;br /&gt;
+7 = reversible defect&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Diagnosis of Heart Disease&lt;/strong&gt;: Indicates whether subject is suffering from heart disease or not:&lt;br /&gt;
+0 = absence&lt;br /&gt;
+1, 2, 3, 4 = heart disease present&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;A closer look at the data identifies some NA and “?” values that will need to be addressed in the cleaning step. We also want to know the number of observations in the dependent variable column to understand if the dataset is relatively balanced.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Determine the number of values in each level of dependent variable
+heart_disease_dataset %&amp;gt;% 
+  drop_na() %&amp;gt;%
+  group_by(Diagnosis_Heart_Disease) %&amp;gt;%
+  count() %&amp;gt;% 
+  ungroup() %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 2)) %&amp;gt;% kable_styling(&amp;quot;full_width&amp;quot; = F)&lt;/code&gt;&lt;/pre&gt;
+&lt;table class=&#34;table&#34; style=&#34;width: auto !important; margin-left: auto; margin-right: auto;&#34;&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+Diagnosis_Heart_Disease
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+n
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+164
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+55
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+36
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+35
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+4
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+13
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Identify the different levels of Thalassemia
+heart_disease_dataset %&amp;gt;% 
+  drop_na() %&amp;gt;%
+  group_by(Thalassemia) %&amp;gt;%
+  count() %&amp;gt;% 
+  ungroup() %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 2)) %&amp;gt;% kable_styling(&amp;quot;full_width&amp;quot; = F)&lt;/code&gt;&lt;/pre&gt;
+&lt;table class=&#34;table&#34; style=&#34;width: auto !important; margin-left: auto; margin-right: auto;&#34;&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+Thalassemia
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+n
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+?
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3.0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+166
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+6.0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+18
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+7.0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+117
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Since any value above 0 in ‘Diagnosis_Heart_Disease’ (column 14) indicates the presence of heart disease, we can lump all levels &amp;gt; 0 together so the classification predictions are binary - Yes or No (1 or 0). The total count of positive heart disease results is less than the number of negative results so the fct_lump() call with default arguments will convert that variable from 4 levels to 2.&lt;/p&gt;
+&lt;p&gt;The data cleaning pipeline below deals with NA values, converts some variables to factors, lumps the dependent variable into two buckets, removes the rows that had “?” for observations, and reorders the variables within the dataframe:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Drop NA&amp;#39;s, convert to factors, lump target variable to 2 levels, remove &amp;quot;?&amp;quot;, reorder variables
+heart_dataset_clean_tbl &amp;lt;- heart_disease_dataset %&amp;gt;% 
+    drop_na() %&amp;gt;%
+    mutate_at(c(&amp;quot;Resting_ECG&amp;quot;, 
+                &amp;quot;Fasting_Blood_Sugar&amp;quot;, 
+                &amp;quot;Sex&amp;quot;, 
+                &amp;quot;Diagnosis_Heart_Disease&amp;quot;, 
+                &amp;quot;Exercise_Induced_Angina&amp;quot;,
+                &amp;quot;Peak_Exercise_ST_Segment&amp;quot;, 
+                &amp;quot;Chest_Pain_Type&amp;quot;), as_factor) %&amp;gt;%
+    mutate(Num_Major_Vessels_Flouro = as.numeric(Num_Major_Vessels_Flouro)) %&amp;gt;%
+    mutate(Diagnosis_Heart_Disease = fct_lump(Diagnosis_Heart_Disease, other_level = &amp;quot;1&amp;quot;)) %&amp;gt;% 
+    filter(Thalassemia != &amp;quot;?&amp;quot;) %&amp;gt;%
+    select(Age, 
+           Resting_Blood_Pressure, 
+           Serum_Cholesterol, 
+           Max_Heart_Rate_Achieved, 
+           ST_Depression_Exercise,
+           Num_Major_Vessels_Flouro,
+           everything())
+
+#Glimpse data
+heart_dataset_clean_tbl %&amp;gt;%
+  glimpse()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Observations: 301
+## Variables: 14
+## $ Age                      &amp;lt;dbl&amp;gt; 63, 67, 67, 37, 41, 56, 62, 57, 63, 5...
+## $ Resting_Blood_Pressure   &amp;lt;dbl&amp;gt; 145, 160, 120, 130, 130, 120, 140, 12...
+## $ Serum_Cholesterol        &amp;lt;dbl&amp;gt; 233, 286, 229, 250, 204, 236, 268, 35...
+## $ Max_Heart_Rate_Achieved  &amp;lt;dbl&amp;gt; 150, 108, 129, 187, 172, 178, 160, 16...
+## $ ST_Depression_Exercise   &amp;lt;dbl&amp;gt; 2.3, 1.5, 2.6, 3.5, 1.4, 0.8, 3.6, 0....
+## $ Num_Major_Vessels_Flouro &amp;lt;dbl&amp;gt; 2, 5, 4, 2, 2, 2, 4, 2, 3, 2, 2, 2, 3...
+## $ Sex                      &amp;lt;fct&amp;gt; 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1...
+## $ Chest_Pain_Type          &amp;lt;fct&amp;gt; 1, 4, 4, 3, 2, 2, 4, 4, 4, 4, 4, 2, 3...
+## $ Fasting_Blood_Sugar      &amp;lt;fct&amp;gt; 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1...
+## $ Resting_ECG              &amp;lt;fct&amp;gt; 2, 2, 2, 0, 2, 0, 2, 0, 2, 2, 0, 2, 2...
+## $ Exercise_Induced_Angina  &amp;lt;fct&amp;gt; 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1...
+## $ Peak_Exercise_ST_Segment &amp;lt;fct&amp;gt; 3, 2, 2, 3, 1, 1, 3, 1, 2, 3, 2, 2, 2...
+## $ Thalassemia              &amp;lt;fct&amp;gt; 6.0, 3.0, 7.0, 3.0, 3.0, 3.0, 3.0, 3....
+## $ Diagnosis_Heart_Disease  &amp;lt;fct&amp;gt; 0, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 1...&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Time for some basic exploratory data analysis. The workflow below breaks out the categorical variables and visualizes them on a faceted bar plot. I’m recoding the factors levels from numeric back to text-based so the labels are easy to interpret on the plots and stripping the y-axis labels since the relative differences are what matters.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Select categorical vars, recode them to their character values, convert to long format
+hd_long_fact_tbl &amp;lt;- heart_dataset_clean_tbl  %&amp;gt;%
+  select(Sex,
+         Chest_Pain_Type,
+         Fasting_Blood_Sugar,
+         Resting_ECG,
+         Exercise_Induced_Angina,
+         Peak_Exercise_ST_Segment,
+         Thalassemia,
+         Diagnosis_Heart_Disease) %&amp;gt;%
+  mutate(Sex = recode_factor(Sex, `0` = &amp;quot;female&amp;quot;, 
+                                  `1` = &amp;quot;male&amp;quot; ),
+         Chest_Pain_Type = recode_factor(Chest_Pain_Type, `1` = &amp;quot;typical&amp;quot;,   
+                                                          `2` = &amp;quot;atypical&amp;quot;,
+                                                          `3` = &amp;quot;non-angina&amp;quot;, 
+                                                          `4` = &amp;quot;asymptomatic&amp;quot;),
+         Fasting_Blood_Sugar = recode_factor(Fasting_Blood_Sugar, `0` = &amp;quot;&amp;lt;= 120 mg/dl&amp;quot;, 
+                                                                  `1` = &amp;quot;&amp;gt; 120 mg/dl&amp;quot;),
+         Resting_ECG = recode_factor(Resting_ECG, `0` = &amp;quot;normal&amp;quot;,
+                                                  `1` = &amp;quot;ST-T abnormality&amp;quot;,
+                                                  `2` = &amp;quot;LV hypertrophy&amp;quot;),
+         Exercise_Induced_Angina = recode_factor(Exercise_Induced_Angina, `0` = &amp;quot;no&amp;quot;,
+                                                                          `1` = &amp;quot;yes&amp;quot;),
+         Peak_Exercise_ST_Segment = recode_factor(Peak_Exercise_ST_Segment, `1` = &amp;quot;up-sloaping&amp;quot;,
+                                                                            `2` = &amp;quot;flat&amp;quot;,
+                                                                            `3` = &amp;quot;down-sloaping&amp;quot;),
+         Thalassemia = recode_factor(Thalassemia, `3` = &amp;quot;normal&amp;quot;,
+                                                  `6` = &amp;quot;fixed defect&amp;quot;,
+                                                  `7` = &amp;quot;reversible defect&amp;quot;)) %&amp;gt;%
+  gather(key = &amp;quot;key&amp;quot;, value = &amp;quot;value&amp;quot;, -Diagnosis_Heart_Disease)
+
+#Visualize with bar plot
+hd_long_fact_tbl %&amp;gt;% 
+  ggplot(aes(value)) +
+    geom_bar(aes(x        = value, 
+                 fill     = Diagnosis_Heart_Disease), 
+                 alpha    = .6, 
+                 position = &amp;quot;dodge&amp;quot;, 
+                 color    = &amp;quot;black&amp;quot;,
+                 width    = .8
+             ) +
+    labs(x = &amp;quot;&amp;quot;,
+         y = &amp;quot;&amp;quot;,
+         title = &amp;quot;Scaled Effect of Categorical Variables&amp;quot;) +
+    theme(
+         axis.text.y  = element_blank(),
+         axis.ticks.y = element_blank()) +
+    facet_wrap(~ key, scales = &amp;quot;free&amp;quot;, nrow = 4) +
+    scale_fill_manual(
+         values = c(&amp;quot;#fde725ff&amp;quot;, &amp;quot;#20a486ff&amp;quot;),
+         name   = &amp;quot;Heart\nDisease&amp;quot;,
+         labels = c(&amp;quot;No HD&amp;quot;, &amp;quot;Yes HD&amp;quot;))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;I prefer boxplots for evaluating the continuous variables.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Must gather() data first in order to facet wrap by key 
+#(default gather call puts all var names into new key col)
+hd_long_cont_tbl &amp;lt;- heart_dataset_clean_tbl  %&amp;gt;%
+  select(Age,
+         Resting_Blood_Pressure,
+         Serum_Cholesterol,
+         Max_Heart_Rate_Achieved,
+         ST_Depression_Exercise,
+         Num_Major_Vessels_Flouro,
+         Diagnosis_Heart_Disease) %&amp;gt;% 
+  gather(key   = &amp;quot;key&amp;quot;, 
+         value = &amp;quot;value&amp;quot;,
+         -Diagnosis_Heart_Disease)
+
+#Visualize continuous variables as boxplots
+hd_long_cont_tbl %&amp;gt;% 
+  ggplot(aes(y = value)) +
+       geom_boxplot(aes(fill = Diagnosis_Heart_Disease),
+                      alpha  = .6,
+                      fatten = .7) +
+        labs(x = &amp;quot;&amp;quot;,
+             y = &amp;quot;&amp;quot;,
+             title = &amp;quot;Boxplots for Continuous Variables&amp;quot;) +
+      scale_fill_manual(
+            values = c(&amp;quot;#fde725ff&amp;quot;, &amp;quot;#20a486ff&amp;quot;),
+            name   = &amp;quot;Heart\nDisease&amp;quot;,
+            labels = c(&amp;quot;No HD&amp;quot;, &amp;quot;Yes HD&amp;quot;)) +
+      theme(
+         axis.text.x  = element_blank(),
+         axis.ticks.x = element_blank()) +
+      facet_wrap(~ key, 
+                 scales = &amp;quot;free&amp;quot;, 
+                 ncol   = 2) &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-7-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt; The faceted plots for categorical and continuous variables suggest the following conditions are associated with increased prevalence of heart disease (note: this does not mean the relationship is causal).&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Asymptomatic angina chest pain (relative to typical angina chest pain, atypical angina pain, or non-angina pain)&lt;/li&gt;
+&lt;li&gt;Presence of exercise induced angina&lt;/li&gt;
+&lt;li&gt;Lower fasting blood sugar&lt;/li&gt;
+&lt;li&gt;Flat or down-sloaping peak exercise ST segment&lt;/li&gt;
+&lt;li&gt;Presence of left ventricle hypertrophy&lt;/li&gt;
+&lt;li&gt;Male&lt;/li&gt;
+&lt;li&gt;Higher thelassemia score&lt;/li&gt;
+&lt;li&gt;Higher age&lt;/li&gt;
+&lt;li&gt;Lower max heart rate achieved&lt;/li&gt;
+&lt;li&gt;Higher resting blood pressure&lt;/li&gt;
+&lt;li&gt;Higher cholesterol&lt;/li&gt;
+&lt;li&gt;Higher ST depression induced by exercise relative to rest&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;We can’t all be cardiologists but these do seem to pass the eye check. Particularly: age, blood pressure, cholesterol, and sex all point in the right direction based on what we generally know about the world around us. This provides a nice phase gate to let us proceed with the analysis.&lt;/p&gt;
+&lt;p&gt;Highly correlated variables can lead to overly complicated models or wonky predictions. The ggcorr() function from GGally package provides a nice, clean correlation matrix of the numeric variables. The default method is Pearson which I use here first. Pearson isn’t ideal if the data is skewed or has a lot of outliers so I’ll check using the rank-based Kendall method as well.&lt;a href=&#34;#fn4&#34; class=&#34;footnoteRef&#34; id=&#34;fnref4&#34;&gt;&lt;sup&gt;4&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Correlation matrix using Pearson method, default method is Pearson
+heart_dataset_clean_tbl %&amp;gt;% ggcorr(high       = &amp;quot;#20a486ff&amp;quot;,
+                                   low        = &amp;quot;#fde725ff&amp;quot;,
+                                   label      = TRUE, 
+                                   hjust      = .75, 
+                                   size       = 3, 
+                                   label_size = 3,
+                                   nbreaks    = 5
+                                              ) +
+  labs(title = &amp;quot;Correlation Matrix&amp;quot;,
+  subtitle = &amp;quot;Pearson Method Using Pairwise Obervations&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-8-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Correlation matrix using Kendall method
+heart_dataset_clean_tbl %&amp;gt;% ggcorr(method     = c(&amp;quot;pairwise&amp;quot;, &amp;quot;kendall&amp;quot;),
+                                   high       = &amp;quot;#20a486ff&amp;quot;,
+                                   low        = &amp;quot;#fde725ff&amp;quot;,
+                                   label      = TRUE, 
+                                   hjust      = .75, 
+                                   size       = 3, 
+                                   label_size = 3,
+                                   nbreaks    = 5
+                                   ) +
+  labs(title = &amp;quot;Correlation Matrix&amp;quot;,
+  subtitle = &amp;quot;Kendall Method Using Pairwise Observations&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-8-2.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;There are very minor differences between the Pearson and Kendall results. No variables appear to be highly correlated. As such, it seems reasonable to stay with the original 14 variables as we proceed into the modeling section.&lt;/p&gt;
+&lt;p&gt;The plan is to split up the original data set to form a training group and testing group. The training group will be used to fit the model while the testing group will be used to evaluate predictions. The initial_split() function creates a split object which is just an efficient way to store both the training and testing sets. The training() and testing() functions are used to extract the appropriate dataframes out of the split object when needed.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#set seed for repeatability
+set.seed(1333)
+
+#create split object 
+train_test_split &amp;lt;- heart_dataset_clean_tbl %&amp;gt;% initial_split(prop = .8, strata = &amp;quot;Diagnosis_Heart_Disease&amp;quot;)
+
+#pipe split obj to training() fcn to create training set
+train_tbl &amp;lt;- train_test_split %&amp;gt;% training()
+
+#pipe split obj to testing() fcn to create test set
+test_tbl &amp;lt;- train_test_split %&amp;gt;% testing()&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We chose to do our data preparation early on during the cleaning phase. For more complicated modeling operations it may be desirable to set up a recipe to do the pre-processing in a repeatable and reversible fashion and I chose here to leave some placeholder lines commented out and available for future work. The recipe is the spot to transform, scale, or binarize the data. We have to tell the recipe() function what we want to model: Diagnosis_Heart_Disease as a function of all the other variables (not needed here since we took care of the necessary conversions). The training data should be used exclusively to train the recipe to avoid data leakage. After giving the model syntax to the recipe, the data is piped into the prep() function which will extract all the processing parameters (if we had implemented processing steps here). The trained recipe is stored as an object and bake function is used to apply the trained recipe to a new (test) data set.&lt;/p&gt;
+&lt;p&gt;Juice() is a shortcut to extract the finalized training set which is already embedded in the recipe by default. Calling the bake() function and proving the recipe and a new data set will apply the processing steps to that dataframe.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Set up recipe (use training data here to avoid leakage)
+the_recipe &amp;lt;- recipe(Diagnosis_Heart_Disease ~ . , data = train_tbl) %&amp;gt;%
+              #[Processing Step 1]
+              #[Processing Step 2]
+              prep(train_tbl, retain = TRUE)
+
+#Apply recipe to training data to create processed training_data_obj (already populated in the recipe object)
+train_processed_data &amp;lt;- juice(the_recipe)
+
+#Apply recipe to test data to create processed test_data_obj
+test_processed_data &amp;lt;- bake(the_recipe, new_data = test_tbl)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Once the training and testing data have been processed and stored, the logistic regression model can be set up using the parsnip workflow. Parsnip uses a 3-step process:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;specify the model and its arguments&lt;/li&gt;
+&lt;li&gt;set the engine (how the model is created)&lt;/li&gt;
+&lt;li&gt;fit the model to the processed training data&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Logistic regression is a convenient first model to work with since it is relatively easy to implement and yields results that have intuitive meaning. It can be easily interpreted when the odds ratio is calculated from the model structure. &lt;a href=&#34;#fn5&#34; class=&#34;footnoteRef&#34; id=&#34;fnref5&#34;&gt;&lt;sup&gt;5&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Set up and train the model using processed training_data_obj
+set.seed(100)
+log_regr_hd_model &amp;lt;- logistic_reg(mode = &amp;quot;classification&amp;quot;) %&amp;gt;%
+                     set_engine(&amp;quot;glm&amp;quot;) %&amp;gt;% 
+                     fit(Diagnosis_Heart_Disease ~ ., data = train_processed_data)
+
+#Take a look at model coefficients and add odds ratio for interpretability
+broom::tidy(log_regr_hd_model$fit) %&amp;gt;%
+  arrange(desc(estimate)) %&amp;gt;% 
+  mutate(odds_ratio = exp(estimate)) %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 5), digits = 3)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+term
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+estimate
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+std.error
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+statistic
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+p.value
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+odds_ratio
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Thalassemia7.0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.932
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.519
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3.726
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.000
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+6.906
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Chest_Pain_Type4
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.694
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.770
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2.201
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.028
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+5.443
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Sex1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.473
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.648
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2.274
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.023
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+4.364
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Num_Major_Vessels_Flouro
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.264
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.307
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+4.119
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.000
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3.538
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Chest_Pain_Type2
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.255
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.874
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.436
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.151
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3.507
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Resting_ECG2
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.022
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.447
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2.287
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.022
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2.780
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Peak_Exercise_ST_Segment3
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.003
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.984
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.020
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.308
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2.727
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Peak_Exercise_ST_Segment2
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.833
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.551
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.512
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.130
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2.300
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Exercise_Induced_Angina1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.704
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.526
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.339
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.181
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2.023
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Resting_ECG1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.675
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3.314
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.204
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.839
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.965
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+ST_Depression_Exercise
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.340
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.268
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.267
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.205
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.405
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Thalassemia6.0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.127
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.882
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.144
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.885
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.136
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Resting_Blood_Pressure
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.036
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.014
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2.535
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.011
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.037
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Serum_Cholesterol
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.003
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.005
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.644
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.520
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.003
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Max_Heart_Rate_Achieved
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.032
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.014
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-2.271
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.023
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.969
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Age
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.035
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.029
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-1.198
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.231
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.966
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Chest_Pain_Type3
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.282
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.770
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.366
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.714
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.755
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fasting_Blood_Sugar1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.684
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.718
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.953
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.341
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.504
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+(Intercept)
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-6.350
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3.439
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-1.846
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.065
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.002
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;In the above code I’ve converted the estimate of the coefficient into the odds ratio. The odds ratio represents the odds that an outcome will occur given the presence of a specific predictor, compared to the odds of the outcome occurring in the absence of that predictor, assuming all other predictors remain constant. The odds ratio is calculated from the exponential function of the coefficient estimate based on a unit increase in the predictor. An example with a continuous variable: for 1 mm Hg increased in resting blood pressure rest_bp, the odds of having heart disease increases by a factor of 1.04.&lt;a href=&#34;#fn6&#34; class=&#34;footnoteRef&#34; id=&#34;fnref6&#34;&gt;&lt;sup&gt;6&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Now let’s feed the model the testing data that we held out from the fitting process. It’s the first time the model will have seen these data so we should get a fair assessment (absent of over-fitting). The new_data argument in the predict() function is used to supply the test data to the model and have it output a vector of predictions, one for each observation in the testing data. The results vector can be added as a column into the original dataframe to append the predictions next to the true values.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Make predictions using testing set
+first_training_prediction &amp;lt;- predict(log_regr_hd_model, 
+                                     new_data = test_tbl, 
+                                     type     = &amp;quot;class&amp;quot;)
+
+#Add predictions as new column in heart data set
+first_training_prediction_full_tbl &amp;lt;- test_processed_data %&amp;gt;% 
+  mutate(Predicted_Heart_Disease = first_training_prediction$.pred_class)
+
+#Glimpse data
+first_training_prediction_full_tbl %&amp;gt;% glimpse()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Observations: 59
+## Variables: 15
+## $ Age                      &amp;lt;dbl&amp;gt; 56, 63, 56, 52, 54, 60, 64, 43, 65, 4...
+## $ Resting_Blood_Pressure   &amp;lt;dbl&amp;gt; 120, 130, 140, 172, 140, 117, 140, 12...
+## $ Serum_Cholesterol        &amp;lt;dbl&amp;gt; 236, 254, 294, 199, 239, 230, 335, 17...
+## $ Max_Heart_Rate_Achieved  &amp;lt;dbl&amp;gt; 178, 147, 153, 162, 160, 160, 158, 12...
+## $ ST_Depression_Exercise   &amp;lt;dbl&amp;gt; 0.8, 1.4, 1.3, 0.5, 1.2, 1.4, 0.0, 2....
+## $ Num_Major_Vessels_Flouro &amp;lt;dbl&amp;gt; 2, 3, 2, 2, 2, 4, 2, 2, 5, 2, 2, 2, 2...
+## $ Sex                      &amp;lt;fct&amp;gt; 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1...
+## $ Chest_Pain_Type          &amp;lt;fct&amp;gt; 2, 4, 2, 3, 4, 4, 3, 4, 4, 1, 4, 3, 3...
+## $ Fasting_Blood_Sugar      &amp;lt;fct&amp;gt; 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1...
+## $ Resting_ECG              &amp;lt;fct&amp;gt; 0, 2, 2, 0, 0, 0, 0, 2, 2, 0, 2, 0, 2...
+## $ Exercise_Induced_Angina  &amp;lt;fct&amp;gt; 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0...
+## $ Peak_Exercise_ST_Segment &amp;lt;fct&amp;gt; 1, 2, 2, 1, 1, 1, 1, 2, 2, 1, 1, 1, 3...
+## $ Thalassemia              &amp;lt;fct&amp;gt; 3.0, 7.0, 3.0, 7.0, 3.0, 7.0, 3.0, 7....
+## $ Diagnosis_Heart_Disease  &amp;lt;fct&amp;gt; 0, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0...
+## $ Predicted_Heart_Disease  &amp;lt;fct&amp;gt; 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0...&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;A confusion matrix is a visual way to display the results of the model’s predictions. It’s not just the ability to predict the presence of heart disease that is of interest - we also want to know the number of times the model successfully predicts the absence of heart disease. Likewise, we want to know the number of false positives and false negatives. The confusion matrix captures all these metrics nicely.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Use predictions col and truth col to make a confusion matrix object
+conf_mat_obj &amp;lt;- first_training_prediction_full_tbl %&amp;gt;% 
+  conf_mat(truth    = Diagnosis_Heart_Disease, 
+           estimate = Predicted_Heart_Disease)
+
+#Call conf_mat and supply columns for truth, prediction
+#Pluck() to extract the conf_matrix data into cols and convert to tibble for plotting
+conf_matrix_plt_obj &amp;lt;- first_training_prediction_full_tbl %&amp;gt;% 
+  conf_mat(truth    = Diagnosis_Heart_Disease, 
+           estimate = Predicted_Heart_Disease) %&amp;gt;%
+  pluck(1) %&amp;gt;%
+  as_tibble() %&amp;gt;%
+  mutate(&amp;quot;outcome&amp;quot; = c(&amp;quot;true_negative&amp;quot;,
+                       &amp;quot;false_positive&amp;quot;,
+                       &amp;quot;false_negative&amp;quot;,
+                       &amp;quot;true_positive&amp;quot;)) %&amp;gt;%
+  mutate(Prediction = recode(Prediction, &amp;quot;0&amp;quot; = &amp;quot;No Heart Disease&amp;quot;,
+                                         &amp;quot;1&amp;quot; = &amp;quot;Heart Disease&amp;quot;)) %&amp;gt;%
+  mutate(Truth = recode(Truth,  &amp;quot;0&amp;quot; = &amp;quot;No Heart Disease&amp;quot;,
+                                &amp;quot;1&amp;quot; = &amp;quot;Heart Disease&amp;quot;))
+
+#Convert to kable format
+conf_matrix_plt_obj %&amp;gt;% kable(align = rep(&amp;quot;c&amp;quot;, 4))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+Prediction
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+Truth
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+n
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+outcome
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+No Heart Disease
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+No Heart Disease
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+29
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+true_negative
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Heart Disease
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+No Heart Disease
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+false_positive
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+No Heart Disease
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Heart Disease
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+6
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+false_negative
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Heart Disease
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Heart Disease
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+21
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+true_positive
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Plot confusion matrix
+p1 &amp;lt;- conf_matrix_plt_obj %&amp;gt;% ggplot(aes(x = Truth, y = Prediction)) +
+  geom_tile(aes(fill = n), alpha = .8) +
+  geom_text(aes(label = n), color = &amp;quot;white&amp;quot;) +
+  scale_fill_viridis_c() +
+  theme(legend.title = element_blank()) +
+  labs(
+    title    = &amp;quot;Confusion Matrix&amp;quot;,
+    subtitle = &amp;quot;Heart Disease Prediction Using Logistic Regression&amp;quot;
+  )
+  
+p1&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-13-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Calling summary() on the confusion_matrix_obj gives all the performance measures
+#Filter to the ones we care about
+log_reg_performance_tbl &amp;lt;- summary(conf_mat_obj) %&amp;gt;% filter(
+                                 .metric == &amp;quot;accuracy&amp;quot; | 
+                                 .metric == &amp;quot;sens&amp;quot; |
+                                 .metric == &amp;quot;spec&amp;quot; |
+                                 .metric == &amp;quot;ppv&amp;quot;  |
+                                 .metric == &amp;quot;npv&amp;quot;  |
+                                 .metric == &amp;quot;f_meas&amp;quot;) %&amp;gt;%
+  select(-.estimator) %&amp;gt;%
+  rename(&amp;quot;metric&amp;quot; = .metric, 
+         &amp;quot;estimate&amp;quot; = .estimate) %&amp;gt;%
+  mutate(&amp;quot;estimate&amp;quot; = estimate %&amp;gt;% signif(digits = 3)) %&amp;gt;%
+  mutate(metric = recode(metric, &amp;quot;sens&amp;quot; = &amp;quot;sensitivity&amp;quot;),
+         metric = recode(metric, &amp;quot;spec&amp;quot; = &amp;quot;specificity&amp;quot;),
+         metric = recode(metric, &amp;quot;ppv&amp;quot;  = &amp;quot;positive predictive value&amp;quot;),
+         metric = recode(metric, &amp;quot;npv&amp;quot;  = &amp;quot;negative predictive value&amp;quot;)) %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 3))
+  
+#Display perfomance summary as kable
+log_reg_performance_tbl &lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+metric
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+estimate
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.847
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+sensitivity
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.906
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+specificity
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.778
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+positive predictive value
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.829
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+negative predictive value
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.875
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+f_meas
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.866
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Other common performance metrics are summarized above. Accuracy represents the percentage of correct predictions. Descriptions for each can be found at this link.&lt;a href=&#34;#fn7&#34; class=&#34;footnoteRef&#34; id=&#34;fnref7&#34;&gt;&lt;sup&gt;7&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;The initial split of the data set into training/testing was done randomly so a replicate of the procedure would yield slightly different results. V-fold cross validation is a resampling technique that allows for repeating the process of splitting the data, training the model, and assessing the results many times from the same data set. Each stop in the CV process is annotated in the comments within the code below.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#create multiple split objects w/ vfold cross-validation resampling
+set.seed(925)
+hd_cv_split_objects &amp;lt;- heart_dataset_clean_tbl %&amp;gt;% vfold_cv(strata = Diagnosis_Heart_Disease)
+hd_cv_split_objects&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## #  10-fold cross-validation using stratification 
+## # A tibble: 10 x 2
+##    splits           id    
+##    &amp;lt;named list&amp;gt;     &amp;lt;chr&amp;gt; 
+##  1 &amp;lt;split [270/31]&amp;gt; Fold01
+##  2 &amp;lt;split [270/31]&amp;gt; Fold02
+##  3 &amp;lt;split [270/31]&amp;gt; Fold03
+##  4 &amp;lt;split [271/30]&amp;gt; Fold04
+##  5 &amp;lt;split [271/30]&amp;gt; Fold05
+##  6 &amp;lt;split [271/30]&amp;gt; Fold06
+##  7 &amp;lt;split [271/30]&amp;gt; Fold07
+##  8 &amp;lt;split [271/30]&amp;gt; Fold08
+##  9 &amp;lt;split [272/29]&amp;gt; Fold09
+## 10 &amp;lt;split [272/29]&amp;gt; Fold10&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#I want a big function that takes a split object and an id
+make_cv_predictions_fcn &amp;lt;- function(split, id){
+  #extract data for analysis set from split obj
+  #prep(train) the recipe and return updated recipe
+  #bake(apply) trained recipe to new data  
+  analysis_tbl &amp;lt;- analysis(split)
+  trained_analysis_recipe &amp;lt;- prep(the_recipe ,training = analysis_tbl)
+  baked_analysis_data_tbl &amp;lt;- bake(trained_analysis_recipe, new_data = analysis_tbl)
+  
+  #define model in parsnip syntax
+  model &amp;lt;- logistic_reg(mode = &amp;quot;classification&amp;quot;) %&amp;gt;%
+    set_engine(&amp;quot;glm&amp;quot;) %&amp;gt;%
+    fit(Diagnosis_Heart_Disease ~ ., data = baked_analysis_data_tbl)
+  
+  #same as above but for assessment set (like the test set but for resamples)
+  assessment_tbl &amp;lt;- assessment(split)
+  trained_assessment_recipe &amp;lt;- prep(the_recipe, training = assessment_tbl)
+  baked_assessment_data_tbl &amp;lt;- bake(trained_assessment_recipe, new_data = assessment_tbl)
+  
+  #make a tibble with the results
+  tibble(&amp;quot;id&amp;quot;         = id,
+         &amp;quot;truth&amp;quot;      = baked_assessment_data_tbl$Diagnosis_Heart_Disease,
+         &amp;quot;prediction&amp;quot; = unlist(predict(model, new_data = baked_assessment_data_tbl))
+  )
+}
+
+#map the big function to every split obj / id in the initial cv split tbl
+cv_predictions_tbl &amp;lt;- map2_df(.x = hd_cv_split_objects$splits,
+                              .y = hd_cv_split_objects$id,
+                              ~make_cv_predictions_fcn(split = .x, id = .y))
+
+#see results 
+cv_predictions_tbl %&amp;gt;% head(10) %&amp;gt;% kable(align = rep(&amp;quot;c&amp;quot;, 3))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+id
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+truth
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+prediction
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#define desired metrics
+desired_metrics &amp;lt;- metric_set(accuracy,
+                              sens,
+                              spec,
+                              ppv,
+                              npv,
+                              f_meas)
+
+#group by fold and use get desired metrics [metric_set fcn is from yardstick]
+cv_metrics_long_tbl &amp;lt;- cv_predictions_tbl %&amp;gt;% 
+                       group_by(id) %&amp;gt;% 
+                       desired_metrics(truth = truth, estimate = prediction) 
+
+#see results
+cv_metrics_long_tbl %&amp;gt;% head(10) %&amp;gt;% kable(align = rep(&amp;quot;c&amp;quot;, 4))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+id
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+.metric
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+.estimator
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+.estimate
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.8709677
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold02
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.9354839
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold03
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.8387097
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold04
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.7666667
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold05
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.9000000
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold06
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.8000000
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold07
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.8000000
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold08
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.7333333
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold09
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.7931034
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold10
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.9310345
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#visualize results
+cv_metrics_long_tbl %&amp;gt;% ggplot(aes(x = .metric, y = .estimate)) +
+  geom_boxplot(aes(fill = .metric), 
+               alpha = .6, 
+               fatten = .7) +
+  geom_jitter(alpha = 0.2, width = .05) +
+  labs(x = &amp;quot;&amp;quot;,
+       y = &amp;quot;&amp;quot;,
+       title = &amp;quot;Boxplots for Logistic Regression&amp;quot;,
+       subtitle = &amp;quot;Model Metrics, 10-Fold Cross Validation&amp;quot;) +
+  scale_fill_viridis_d() +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1) ) +
+  theme(legend.title = element_blank(),
+        axis.text.x  = element_blank(),
+        axis.ticks.x = element_blank()) &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-14-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#calculate the mean from all the folds for each metric
+cv_mean_metrics_tbl &amp;lt;- cv_metrics_long_tbl %&amp;gt;%
+                       group_by(.metric) %&amp;gt;%
+                       summarize(&amp;quot;Avg&amp;quot; = mean(.estimate)) %&amp;gt;%
+                       ungroup()
+  
+cv_mean_metrics_tbl %&amp;gt;% 
+  mutate(Average = Avg %&amp;gt;% signif(digits = 3)) %&amp;gt;% 
+  select(.metric,
+         Average) %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 2))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+.metric
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+Average
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.837
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+f_meas
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.853
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+npv
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.852
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+ppv
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.839
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+sens
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.876
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+spec
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.790
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Got there! Average of .837 accuracy after 10-fold cross-validation. Not bad for a basic logistic regression. It is certainly possible that .837 is not sufficient for our purposes given that we are in the domain of health care where false classifications have dire consequences. Evaluating other algorithms would be a logical next step for improving the accuracy and reducing patient risk. Nevertheless, I’m ending it here for this session since I have work tomorrow.&lt;/p&gt;
+&lt;p&gt;Thanks for reading.&lt;/p&gt;
+&lt;div class=&#34;footnotes&#34;&gt;
+&lt;hr /&gt;
+&lt;ol&gt;
+&lt;li id=&#34;fn1&#34;&gt;&lt;p&gt;Image Credit: Shutterstock/Crevis&lt;a href=&#34;#fnref1&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn2&#34;&gt;&lt;p&gt;UCI Machine Learning Repository, &lt;a href=&#34;https://archive.ics.uci.edu/ml/datasets/Heart+Disease&#34; class=&#34;uri&#34;&gt;https://archive.ics.uci.edu/ml/datasets/Heart+Disease&lt;/a&gt;&lt;a href=&#34;#fnref2&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn3&#34;&gt;&lt;p&gt;Nuclear stress testing requires the injection of a tracer, commonly technicium 99M (Myoview or Cardiolyte), which is then taken up by healthy, viable myocardial cells. A camera (detector) is used afterwards to image the heart and compare segments. A coronary stenosis is detected when a myocardial segment takes up the nuclear tracer at rest, but not during cardiac stress. This is called a “reversible defect.” Scarred myocardium from prior infarct will not take up tracer at all and is referred to as a “fixed defect.”&lt;a href=&#34;#fnref3&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn4&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://stats.stackexchange.com/questions/3730/pearsons-or-spearmans-correlation-with-non-normal-data&#34; class=&#34;uri&#34;&gt;https://stats.stackexchange.com/questions/3730/pearsons-or-spearmans-correlation-with-non-normal-data&lt;/a&gt;&lt;a href=&#34;#fnref4&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn5&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://notast.netlify.com/post/explaining-predictions-interpretable-models-logistic-regression/&#34; class=&#34;uri&#34;&gt;https://notast.netlify.com/post/explaining-predictions-interpretable-models-logistic-regression/&lt;/a&gt;&lt;a href=&#34;#fnref5&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn6&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://notast.netlify.com/post/explaining-predictions-interpretable-models-logistic-regression/&#34; class=&#34;uri&#34;&gt;https://notast.netlify.com/post/explaining-predictions-interpretable-models-logistic-regression/&lt;/a&gt;&lt;a href=&#34;#fnref6&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn7&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://www.analyticsvidhya.com/blog/2019/08/11-important-model-evaluation-error-metrics/&#34; class=&#34;uri&#34;&gt;https://www.analyticsvidhya.com/blog/2019/08/11-important-model-evaluation-error-metrics/&lt;/a&gt;&lt;a href=&#34;#fnref7&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
+</description>
+  </item>
+  
+<item>
+  <title>Modeling Particulate Counts as a Poisson Process in R</title>
+  <link>/post/modeling-particulate-counts-as-a-poisson-process-in-r/</link>
+  <pubDate>Wed, 18 Sep 2019 00:00:00 +0000</pubDate>
+  
+<guid>/post/modeling-particulate-counts-as-a-poisson-process-in-r/</guid>
+  <description>
+&lt;script src=&#34;/rmarkdown-libs/kePrint/kePrint.js&#34;&gt;&lt;/script&gt;
+
+
+&lt;p&gt;I’ve never really worked much with Poisson data and wanted to get my hands dirty. I thought that for this project I might combine a Poisson data set with the simple Bayesian methods that I’ve explored before since it turns out the Poisson rate parameter lambda also has a nice conjugate prior (more on that later). Poisson distributed data are counts per unit time or space - they are events that arrive at random intervals but that have a characteristic rate parameter which also equals the variance. This rate parameter is usually denoted as lambda. No-hitters in baseball are often modeled as Poisson data, as are certain types of processing defects in electronics and medical devices. A particularly relevant application is in particulate testing for implantable devices. Particulate shed is an unassuming but potentially costly and dangerous phenomenon.&lt;/p&gt;
+&lt;p&gt;Particulate can be shed from the surface of medical devices even when the manufacturing environment is diligently controlled. The source of the particulate can vary: light particulate is attracted to the surface of sheaths and luers due to static charge; hydrophilic coatings may delaminate from the surface during delivery; therapeutic coating on the implant’s surface may degrade over time in the presence of blood.&lt;/p&gt;
+&lt;p&gt;The clinical harms that the patient may face due to particulate shed include neurological events if the particulate migrates cranially or embolism it migrates caudally. The occurrence and severity of symptoms are understood to be functions of both size and quantity of particulate. In recent years, FDA and friends have been more stringent in requiring manufacturers to quantify and understand the nature of the particulate burden associated with their devices. In the analysis below, I’m going to simulate an experiment in which particulate data are collected for 20 devices.&lt;/p&gt;
+&lt;p&gt;Before I get there, I want to remind myself of what Poisson data look like for different rate parameters. I set up a function to make a Poisson pdf based on number of events n and rate parameter lambda. The function then converts the information to a tibble for use with ggplot.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Load libraries
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(tolerance)
+library(ggrepel)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Sequence from 0 to 24 by 1 (x-axis of plot)
+number_of_events &amp;lt;- seq(0, 24, by = 1)
+
+#Function to make a Poisson density vector from n and lambda, convert into tibble
+pois_fcn &amp;lt;- function(lambda){
+            pois_vector &amp;lt;- dpois(x = number_of_events, lambda = lambda, log = FALSE)
+            pois_tbl    &amp;lt;- tibble(&amp;quot;num_of_events&amp;quot; = number_of_events,
+                                  &amp;quot;prob&amp;quot;          = pois_vector,
+                                  &amp;quot;lambda&amp;quot;        = lambda)
+            }
+#Objects to hold tibbles for different Poisson rates
+pois_dist_1_tbl &amp;lt;-  pois_fcn(lambda = 1)
+pois_dist_5_tbl &amp;lt;-  pois_fcn(lambda = 5)
+pois_dist_15_tbl &amp;lt;- pois_fcn(lambda = 15)
+
+#Combine in one df
+pois_total_tbl &amp;lt;- bind_rows(pois_dist_1_tbl,
+                            pois_dist_5_tbl,
+                            pois_dist_15_tbl)
+
+#Convert lambda front int to factor so ggplot maps aesthetics as levels, not gradient
+pois_total_int_tbl &amp;lt;- pois_total_tbl %&amp;gt;% 
+  mutate(lambda = as_factor(lambda))
+
+#Make and store ggplot obj
+h1 &amp;lt;- pois_total_int_tbl %&amp;gt;% ggplot(aes(x = num_of_events, y = prob)) +
+  geom_col(aes(y = prob, fill = lambda), position = &amp;quot;dodge&amp;quot;, color = &amp;quot;black&amp;quot;) +
+  scale_fill_manual(values = c(&amp;quot;#2C728EFF&amp;quot;, &amp;quot;#75D054FF&amp;quot;, &amp;quot;#FDE725FF&amp;quot;)) +
+  labs(x        = &amp;quot;Number of Events&amp;quot;, 
+       y        = &amp;quot;Probability&amp;quot;,
+       title    = &amp;quot;Probability Mass Function&amp;quot;,
+       subtitle = &amp;quot;Poisson Distributions with Different Rates (Lambda)&amp;quot;)
+
+h1&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-18-modeling-device-particulate-counts-as-a-poisson-process_files/figure-html/unnamed-chunk-2-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Cool - so when the rate is low it looks sort of like the discrete version of an exponential curve. It’s still not symmetric at lambda = 5 but by lambda = 15 it looks a lot like a binomial distribution.&lt;/p&gt;
+&lt;p&gt;The data I simulate below are intended to represent the fluid collected during bench-top simulated use testing in a clean “flow loop” or vascular deployment model. The fluid would generally be passed through light obscuration censors to quantify the size and counts of particulate relative to a control. Particulate requirements for many endovascular devices are borrowed from USP &amp;lt;788&amp;gt;. According to that standard, no more than 60 particles greater than 25 micron effective diameter are acceptable. I want to know the probability of passing the test but don’t know the rate parameter lambda. The end goal is to understand what the most credible values for lambda are based on the bench-top data from multiple devices. First I’ll try to quantify the uncertainty in the rate parameter lambda. Each lambda can then be used to estimate a reliability. The large number of simulated lamdas will make a large set of simulated reliabilities. From there I should be able to extract any information needed regarding the uncertainty of the device reliability as it relates to particulate shed. That’s the plan! Note: I’m trying out knitr::kable() which generates html tables nicely. I’m not too good at it yet so bare with me please.&lt;/p&gt;
+&lt;p&gt;Take a look at the data:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Peek at some data
+particulate_data %&amp;gt;% head(5) %&amp;gt;%
+  kable() %&amp;gt;% kable_styling(&amp;quot;full_width&amp;quot; = F)&lt;/code&gt;&lt;/pre&gt;
+&lt;table class=&#34;table&#34; style=&#34;width: auto !important; margin-left: auto; margin-right: auto;&#34;&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:right;&#34;&gt;
+x
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:right;&#34;&gt;
+46
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:right;&#34;&gt;
+58
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:right;&#34;&gt;
+38
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:right;&#34;&gt;
+50
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:right;&#34;&gt;
+62
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;I’m using a Bayesian approach again - partially because I need practice and partially because the Poisson parameter lambda has a convenient conjugate prior: the gamma distribution. This means that some simple math can get me from the prior to the posterior. I love simple math. Using the gamma distribution to describe the prior belief in lambda, the posterior distribution for lambda is:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[\mbox{prior:  lambda ~ Gamma}(a, b)\]&lt;/span&gt; As a reminder to myself, this is read as “lambda is distributed as a Gamma distribution with parameters a and b”.&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[\mbox{posterior:  lambda ~ Gamma}(a + \sum_{i=1}^{n} x_i\ , b + n)\]&lt;/span&gt; It is reasonable to use an relatively uninformed prior for lambda since I don’t have much preliminary knowledge about particulate data for my device design. Setting the shape a to 1 and the rate b to 0.1 provides allocates the credibility across a wide range of lambdas to start. To go from prior to posterior we need only sum up all the particulate counts in the data set and add the total to the shape a, then add the total number of devices tested (sample size n) to the rate b.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Set parameters and constants
+a &amp;lt;- 1
+b &amp;lt;- 0.1
+n &amp;lt;- length(particulate_data)
+total_particulate_count &amp;lt;- sum(particulate_data)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;I like to peek at the prior and posterior distributions of lambda since they are easy to visualize via the relationships above. We are back into continuous distribution mode because the rate parameter lambda can be any positive value even though the particulate counts the come from the process are discrete.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Set sequence of x values; generate prior using a,b; generate posterior 
+x_values  &amp;lt;- seq(0, 60, length.out = 1000)
+prior     &amp;lt;- dgamma(x_values, shape = 1, rate = 0.1)
+posterior &amp;lt;- dgamma(x_values, shape = a + total_particulate_count, rate = b + n)
+
+#Prior in tibble format
+prior_tbl &amp;lt;- tibble(
+  &amp;quot;x_values&amp;quot; = x_values,
+  &amp;quot;prob&amp;quot;     = prior,
+  &amp;quot;config&amp;quot;   = &amp;quot;prior&amp;quot;
+)
+
+#Posterior in tibble format
+posterior_tbl &amp;lt;- tibble(
+  &amp;quot;x_values&amp;quot; = x_values,
+  &amp;quot;prob&amp;quot;     = posterior,
+  &amp;quot;config&amp;quot;   = &amp;quot;posterior&amp;quot;
+)
+
+#Combine prior and posterior in 1 tibble
+prior_post_tbl &amp;lt;- bind_rows(prior_tbl, posterior_tbl)
+
+#Visualize 
+prior_post_tbl %&amp;gt;% ggplot(aes(x = x_values, y = prob)) +
+  geom_line(aes(color = config), size = 1.5, alpha = 0.8) +
+  scale_y_continuous(name=&amp;quot;Density&amp;quot;, limits=c(0, 0.3)) +
+  scale_color_manual(values = c(&amp;quot;#75D054FF&amp;quot;, &amp;quot;#2C728EFF&amp;quot;)) +
+  labs(
+    title    = &amp;quot;Rate Parameter Lambda For Particle Counts&amp;quot;,
+    subtitle = &amp;quot;Modeled as Poisson Process&amp;quot;,
+    x        = &amp;quot;Lambda&amp;quot;,
+    color    = &amp;quot;&amp;quot;
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-18-modeling-device-particulate-counts-as-a-poisson-process_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Having access to the posterior distribution of lambda enables simulation of possible values of lambda by drawing random values from the distributions. The probability of drawing any particular value of lambda is based on the density shown on the y-axis (although the probability of any particular point is zero; we must calculate over a span of x via integration). Each of the values randomly drawn from the posterior can be used to simulate a distribution of particulate counts for comparison with the spec. The workflow is essentially a series of questions:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;&lt;p&gt;What might the values of the rate parameter lambda be based on the data? -&amp;gt; Combine data with conjugate prior to generate the posterior distribution of credible lambdas. (Done and shown above)&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;If a random value of lambda is pulled from the posterior distribution , what would we expect regarding the uncertainty of the original experiment? -&amp;gt; Draw random values lambda and then evaluate what percentage of the cdf lies above the spec (could also run simulations for each random lambda and then count the number of simulated runs above the spec but this is time consuming (10,000 lambdas x 10,000 simulations to build out the particle count distribution for each one…)&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;Combine each of these tail areas into a new distribution. This new distribution represents the uncertainty in the reliability estimate based on uncertainty in lambda. How to estimate the reliability of the real device while taking uncertainty into account? -&amp;gt; Calculate the lower bound of the 95% credible interval by finding the .05 quantile from the set of simulated reliability values.&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Let’s do this!&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Sample and store 10000 random lambda values from posterior 
+n_posterior_samples &amp;lt;- 10000
+sampled_posterior_lambda &amp;lt;- rgamma(n_posterior_samples, shape = a + total_particulate_count, rate = b + n)
+
+#Initialize empty vector to hold reliability data
+reliability_vector &amp;lt;- rep(NA, n_posterior_samples)
+
+#For each lambda value, calc cumulative probability of less than or equal to q particles shed from 1 sample?
+for(i in 1:n_posterior_samples){
+  reliability_vector[i] &amp;lt;- ppois(q = 60, lambda = sampled_posterior_lambda[i])
+}
+
+#Visualize
+reliability_vector %&amp;gt;% head() %&amp;gt;% 
+  kable(align=rep(&amp;#39;c&amp;#39;)) %&amp;gt;% kable_styling(&amp;quot;full_width&amp;quot; = F)&lt;/code&gt;&lt;/pre&gt;
+&lt;table class=&#34;table&#34; style=&#34;width: auto !important; margin-left: auto; margin-right: auto;&#34;&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+x
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.9147028
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.9506510
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.9431756
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.9700806
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.9546490
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.9540933
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Checking what the simulated reliabilities are:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Convert reliability vector to tibble
+reliability_tbl &amp;lt;- reliability_vector %&amp;gt;% 
+  as_tibble() %&amp;gt;%
+  mutate(&amp;quot;reliability&amp;quot; = value) %&amp;gt;%
+  select(reliability)
+
+#Visualize with histogram
+reliability_tbl %&amp;gt;% ggplot(aes(reliability)) +
+  geom_histogram(fill = &amp;quot;#2c3e50&amp;quot;, color = &amp;quot;white&amp;quot;, binwidth = .01, alpha = 0.8) +
+    labs(
+        x        = &amp;quot;Reliability&amp;quot;,
+        title    = &amp;quot;Estimated Reliability Range for Particulate Shed Performance&amp;quot;,
+        subtitle = &amp;quot;Requirement: 60 or less of 25 um or larger&amp;quot;
+    )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-18-modeling-device-particulate-counts-as-a-poisson-process_files/figure-html/unnamed-chunk-8-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;The 95% credible interval for the reliability (conformance rate) is the .05 quantile of this distribution since the spec is 1-sided:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Calculate .05 quantile
+reliability_tbl$reliability %&amp;gt;% 
+  quantile(probs = .05)     %&amp;gt;% 
+  signif(digits = 3)    &lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;##    5% 
+## 0.893&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Finally, the answer! The lowest reliability expected is 89.3 % based on a 95% credible interval. This would likely not meet the product requirements (assigned based on risk of the harms that come from this particular failure mode) and we would likely need to improve our design or processes to reduce particulate shed from the product.&lt;/p&gt;
+&lt;p&gt;This concludes the Bayesian inference of reliability in Poisson distributed particle counts. But hey, since we’re here… one of the things I love about R is the ability to easily check sensitivities, assumptions, and alternatives easily. What would this analysis look like using the conventional frequentist approach? I admit I’m not sure exactly but I assume we would extend the standard tolerance interval approach that is common in Class III medical device submissions. Tolerance intervals are easy to pull from tables or software but actually pretty tricky (for me at least) to derive. They involve uncertainty in both the mean and the variance. For simplicity (and because I’m not confident enough to derive the formula), I’ll use the tolerance package in R to calculate tolerance intervals for Poisson data. It turns out that there are 8 methods and I’ll use them all because I’m feeling a little wild and I want to see if they result in different results.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;## 95%/95% 1-sided Poisson tolerance limits for future
+## occurrences in a period of length 1 part. All eight methods
+## are presented for comparison.
+tl_tab &amp;lt;- poistol.int(x = sum_part_data, n = n, m = 1, alpha = 0.05, P = 0.95,
+side = 1, method = &amp;quot;TAB&amp;quot;) %&amp;gt;% mutate(method = &amp;quot;TAB&amp;quot;) %&amp;gt;% as_tibble() 
+
+tl_ls &amp;lt;- poistol.int(x = sum_part_data, n = n, m = 1, alpha = 0.05, P = 0.95,
+side = 1, method = &amp;quot;LS&amp;quot;) %&amp;gt;% mutate(method = &amp;quot;LS&amp;quot;) %&amp;gt;% as_tibble() 
+
+tl_sc &amp;lt;- poistol.int(x = sum_part_data, n = n, m = 1, alpha = 0.05, P = 0.95,
+side = 1, method = &amp;quot;SC&amp;quot;) %&amp;gt;% mutate(method = &amp;quot;SC&amp;quot;) %&amp;gt;% as_tibble() 
+
+tl_cc &amp;lt;- poistol.int(x = sum_part_data, n = n, m = 1, alpha = 0.05, P = 0.95,
+side = 1, method = &amp;quot;CC&amp;quot;) %&amp;gt;% mutate(method = &amp;quot;CC&amp;quot;) %&amp;gt;% as_tibble()
+
+tl_vs &amp;lt;- poistol.int(x = sum_part_data, n = n, m = 1, alpha = 0.05, P = 0.95,
+side = 1, method = &amp;quot;VS&amp;quot;) %&amp;gt;% mutate(method = &amp;quot;VS&amp;quot;) %&amp;gt;% as_tibble() 
+
+tl_rvs &amp;lt;- poistol.int(x = sum_part_data, n = n, m = 1, alpha = 0.05, P = 0.95,
+side = 1, method = &amp;quot;RVS&amp;quot;) %&amp;gt;% mutate(method = &amp;quot;RVS&amp;quot;) %&amp;gt;% as_tibble() 
+
+tl_ft &amp;lt;- poistol.int(x = sum_part_data, n = n, m = 1, alpha = 0.05, P = 0.95,
+side = 1, method = &amp;quot;FT&amp;quot;) %&amp;gt;%mutate(method = &amp;quot;FT&amp;quot;) %&amp;gt;% as_tibble() 
+
+tl_csc &amp;lt;- poistol.int(x = sum_part_data, n = n, m = 1, alpha = 0.05, P = 0.95,
+side = 1, method = &amp;quot;CSC&amp;quot;) %&amp;gt;% mutate(method = &amp;quot;CSC&amp;quot;) %&amp;gt;% as_tibble() 
+
+tl_all_tbl &amp;lt;-  bind_rows(tl_tab,
+                         tl_ls,
+                         tl_sc,
+                         tl_cc,
+                         tl_vs,
+                         tl_rvs,
+                         tl_ft,
+                         tl_csc)
+
+tl_all_tbl %&amp;gt;% kable(align=rep(&amp;#39;c&amp;#39;, 5)) &lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+alpha
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+P
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+lambda.hat
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+1-sided.lower
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+1-sided.upper
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+method
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.05
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.95
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+49.15
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+36
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+64
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+TAB
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.05
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.95
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+49.15
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+36
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+64
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+LS
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.05
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.95
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+49.15
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+36
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+64
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+SC
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.05
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.95
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+49.15
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+36
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+64
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+CC
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.05
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.95
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+49.15
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+36
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+64
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+VS
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.05
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.95
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+49.15
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+36
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+64
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+RVS
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.05
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.95
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+49.15
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+36
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+64
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+FT
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.05
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.95
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+49.15
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+36
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+64
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+CSC
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;For this data set it can be seen that all 8 methods produce the same 1-sided 95/95 upper tolerance interval 64 counts per device. N=60 was the requirement - since the edge of our tolerance interval lies above the 1-sided spec we would fail this test. This conclusion is consistent with the Bayesian method that estimates the reliability below the 95% requirement.&lt;/p&gt;
+&lt;p&gt;But what sort of reliability claim could our data support? For the Bayesian approach we concluded that the answer was 89.3% (lower bound of 1-sided 95% credible interval). For the frequentist method, we don’t have a posterior distribution to examine. We could try using the tolerance interval function above with various values of P to impute the value of P which coincides with the spec limit of 60.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Sequence of reliability values for which to use as P 
+reliability_freq_tbl &amp;lt;- tibble(
+  &amp;quot;proportion_covered_P&amp;quot; = seq(.40, .99, .01)
+)
+
+#Function that is just like poistol.int but extracts and reports only the upper limit
+#of the tolerance interval
+tol_interval_fcn &amp;lt;- function(data_vec = sum_part_data, n=20, m=1, alpha=.05, P=.95, side=1, method=&amp;quot;TAB&amp;quot;){
+  holder &amp;lt;- poistol.int(data_vec, n, m, alpha, P, side, method)
+  holder_2 &amp;lt;- holder[1,5]
+}
+
+#Test the function
+test_1 &amp;lt;- tol_interval_fcn(data_vec = sum_part_data, n=n, m=1, alpha = .05, P = .95, side = 1, method = &amp;quot;TAB&amp;quot;)
+
+#Test the function
+test_2 &amp;lt;- tol_interval_fcn(P = .95)
+
+#Map the function across a vector of proportions
+#Note to future self: map() arguments are: the list of values map the fn over, the fn
+#itself, then all the additional arguments of the fn that you aren&amp;#39;t mapping over (odd syntax)
+upper_tol_tbl &amp;lt;- reliability_freq_tbl %&amp;gt;% mutate(
+  particles_per_part = map(proportion_covered_P, tol_interval_fcn, data_vec = sum_part_data, n=n, m=1, alpha = .05, side = 1, method = &amp;quot;TAB&amp;quot;) %&amp;gt;% as.integer() 
+)
+
+#View haead and tail of data
+upper_tol_tbl %&amp;gt;% head(20) %&amp;gt;% kable(align=rep(&amp;#39;c&amp;#39;, 2))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+proportion_covered_P
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+particles_per_part
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.40
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+50
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.41
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+50
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.42
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+50
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.43
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+50
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.44
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+51
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.45
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+51
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.46
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+51
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.47
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+51
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.48
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+51
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.49
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+51
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.50
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+52
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.51
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+52
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.52
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+52
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.53
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+52
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.54
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+52
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.55
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+53
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.56
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+53
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.57
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+53
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.58
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+53
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.59
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+53
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;upper_tol_tbl %&amp;gt;% tail(20) %&amp;gt;% kable(align=rep(&amp;#39;c&amp;#39;, 2))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+proportion_covered_P
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+particles_per_part
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.80
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+58
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.81
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+58
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.82
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+58
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.83
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+59
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.84
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+59
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.85
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+59
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.86
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+60
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.87
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+60
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.88
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+60
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.89
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+61
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.90
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+61
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.91
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+62
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.92
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+62
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.93
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+63
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.94
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+63
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.95
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+64
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.96
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+65
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.97
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+66
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.98
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+67
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.99
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+69
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#need this data to feed to gg_label_repel to tell it where to attach label
+point_tbl &amp;lt;- tibble(x = .65, y = 60)
+
+#visualize 
+upper_tol_tbl %&amp;gt;% ggplot(aes(x = proportion_covered_P, y = particles_per_part)) +
+  geom_line(color = &amp;quot;#2c3e50&amp;quot;,
+            size = 2.5) +
+    labs(x = &amp;quot;Estimated Reliability at .95 Confidence Level&amp;quot;,
+         y = &amp;quot;Edge of 1-Sided Tolerance Interval (Particles per Device)&amp;quot;,
+         title = &amp;quot;Edge of Tolerance Interval vs. Specified Reliability&amp;quot;,
+         subtitle = &amp;quot;95% Confidence Level Using TAB Tolerance Technique&amp;quot;) +
+  scale_y_continuous(breaks = seq(40, 70, 5)) +
+  geom_vline(xintercept = .88) +
+  geom_hline(yintercept = 60) +
+  geom_point(x = .65, y = 60, size = 0, alpha = 0) +
+  geom_label_repel(data = point_tbl, aes(x, y), 
+                   label = &amp;quot;Spec Limit: 60 Particles Max&amp;quot;,
+                   fill = &amp;quot;#2c3e50&amp;quot;, 
+                   color = &amp;quot;white&amp;quot;,
+                   segment.color = &amp;quot;#2c3e50&amp;quot;,
+                   segment.size = 1,
+                   min.segment.length = unit(1, &amp;quot;lines&amp;quot;),
+                   nudge_y = 2,
+                   nudge_x = .05)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-18-modeling-device-particulate-counts-as-a-poisson-process_files/figure-html/unnamed-chunk-12-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Here’s a plot that I’ve never made or seen before. For given set of data (in this case: particulate_data from earlier with n=20 from a Poisson distribution, lambda = 50), the x-axis shows the estimated reliability and the y-axis represents the number of particles at the edge the calculated tolerance interval using the TAB method. That is to say: the standard approaches to calculate the edge of the relevant tolerance interval for a specified proportion at a specified confidence level. For example, we could state we want to know the estimate for the 95th percentile at 95% confidence level - the answer would be 64 particles per device. Since the requirement for clinical safety is set at 60 particles max, we would not pass the test because we could not state with high confidence that 95 or more (out of 100) would pass. Usually it’s just a binary pass/fail decision.&lt;/p&gt;
+&lt;p&gt;It’s obvious that the 95/95 edge of the tolerance interval is out of spec… but what would be the greatest reliability we could claim at 95% confidence? It ends up being .88 or 88% - very close to the predicted lower bound of the 95% credible interval calculated from the Bayesian method (which was 89.3%, from above)! In this case, the frequentist and Bayesian methods happen to be similar (even though they aren’t measuring the same thing). Interesting stuff!&lt;/p&gt;
+</description>
+  </item>
+  
+<item>
+  <title>Stopping Rules for Significance Testing in R</title>
+  <link>/post/stopping-rules-for-significance-testing-in-r/</link>
+  <pubDate>Fri, 06 Sep 2019 00:00:00 +0000</pubDate>
+  
+<guid>/post/stopping-rules-for-significance-testing-in-r/</guid>
+  <description>
+&lt;script src=&#34;/rmarkdown-libs/kePrint/kePrint.js&#34;&gt;&lt;/script&gt;
+
+
+&lt;p&gt;When doing comparative testing it can be tempting to stop when we see the result that we hoped for. In the case of null hypothesis significance testing (NHST), the desired outcome is often a p-value of &amp;lt; .05. In the medical device industry, bench top testing can cost a lot of money. Why not just recalculate the p-value after every test and stop when the p-value reaches .05? The reason is that the confidence statement attached to your testing is only valid for a specific stopping rule. In other words, to achieve the desired false positive rate we must continue testing speciments until the pre-determined sample size is reached. Evaluating the p-value as you proceed through the testing is known as “peeking” and it’s a statistical no-no.&lt;/p&gt;
+&lt;p&gt;Suppose we are attempting to demonstrate that a raw material provided by a new vendor results in better corrosion resistance in finished stents relative to the standard supplier. A bench top test is set up to measure the breakdown potential of each sample in a cyclic potentiodynamic polarization (CPP) test. Our goal is to compare the means of the CPP data from the old supplier and the new supplier. The null hypothesis is that the means are equivalent and if the t-test results in a p-value of .05 or lower then we will reject the null and claim improved performance. What happens to the p-value over the course of the testing? We can run a simulation to monitor the p-value and calculate the effect of peeking on the long-term false positive rate. For the test to perform as intended, the long-term false positive rate should be controlled at a level equal to (1 - confidence level).&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(tidyverse)
+library(knitr)
+library(kableExtra)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;First, initialize the objects to hold the data and establish any constants we might need later.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Initial offset constant to keep minimum group size at n=6
+INITIAL_OFFSET &amp;lt;- 5
+
+#Initial values for number of inner and outer loop iterations
+n_inner_loop &amp;lt;- 50
+n_inner_data &amp;lt;- n_inner_loop + INITIAL_OFFSET
+n_outer &amp;lt;- 100
+
+#Initialize empty vector to store p values
+store_p_values_vec &amp;lt;- rep(NA, n_inner_loop)
+
+#Initialize a tibble with placeholder column
+many_runs_tbl &amp;lt;-  tibble(
+  V1 = rep(NA,  n_inner_loop)
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The simulation requires 2 for loops. The inner loop performs a series of t-test adding 1 more experimental observation to each group after each iteration. The p-value for that iteration is extracted and stored. In the outer loop, the initial data for the 2 groups are generated randomly from normal distributions. Since we can’t really run a t-test on groups with very low sample sizes, we use an initial offset value so that the t-test loops don’t start until both groups have a few observations from which to calculate the means.&lt;/p&gt;
+&lt;p&gt;The p-value for a traditional t-test should be an indication of the long-term false positive rate. In other words: if we ran a t-test on samples drawn from 2 identical populations many times we would see a few large differences in means simply due to chance draws. Among all such simulations, the value at the 95% quantile represents the p-value of .05.&lt;/p&gt;
+&lt;p&gt;We can gut-check our simulation in this way by setting the two populations identical to each other and drawing random values in the outer loop as mentioned above.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Set seed for repeatability
+set.seed(1234)
+
+#Outer loop: replicates a t-test between 2 groups
+for(l in 1:n_outer) {
+    
+    #Generate simulated data for each group.  The parameters are set the same to represent 1 population
+    example_group_1 &amp;lt;- rnorm(n = n_inner_data, mean = 10, sd = 4)
+    example_group_2 &amp;lt;- rnorm(n = n_inner_data, mean = 10, sd = 4)
+    
+    #Inner loop: subset the first (i + initial offset) values from grp 1 and grp 2 (y)
+    #Perform t-test, extract p-value, store in a vector
+    #Increment each group&amp;#39;s size by 1 after each iteration
+    for (i in 1:n_inner_loop) {
+    t_test_obj &amp;lt;- t.test(x = example_group_1[1:(INITIAL_OFFSET + i)], y = example_group_2[1:(INITIAL_OFFSET + i)])
+    store_p_values_vec[i] = t_test_obj$p.value
+  }
+  
+    #Store each vector of n_inner_loop p-values to a column in the many_runs_tbl
+    many_runs_tbl[,l] &amp;lt;- store_p_values_vec
+}
+
+#visualize tibble 
+many_runs_tbl[,1:12] %&amp;gt;% 
+  signif(digits = 3) %&amp;gt;%
+  head(10) %&amp;gt;% 
+  kable(align=rep(&amp;#39;c&amp;#39;, 100))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+V2
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+V3
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+V4
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+V5
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+V6
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+V7
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+V8
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+V9
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+V10
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+V11
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+V12
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.3960
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0990
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.204
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.412
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0686
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1450
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.894
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.360
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.721
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.897
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0535
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.668
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1700
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0628
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.106
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.951
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.2240
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0834
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.802
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.614
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.750
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.886
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.3170
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.517
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1410
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0929
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.057
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.618
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1360
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0296
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.499
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.561
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.846
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.809
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1740
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.410
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1560
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.4050
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.146
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.800
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1690
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0625
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.724
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.700
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.857
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.687
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.3620
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.338
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1140
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.2610
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.104
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.992
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.2550
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1860
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.548
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.846
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.727
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.911
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.4270
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.334
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0540
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.3400
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.143
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.889
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.3180
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1740
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.775
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.768
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.795
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.666
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.5630
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.229
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0693
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.4030
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.125
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.871
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.7340
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0757
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.826
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.792
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.704
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.755
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.4810
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.694
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0324
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.4050
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.181
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.930
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.8630
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0617
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.738
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.564
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.501
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.611
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.3930
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.472
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0206
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.4550
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.112
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.912
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.7560
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0958
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.644
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.708
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.265
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.687
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.2520
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.638
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0294
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.6690
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.103
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.777
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.8680
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1700
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.664
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.703
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.284
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.912
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.2450
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.441
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Each column above represents n=50 p-values, with each successive value calculated after observing the newest data point in the simulated test sequence. These are the p-values we see if we peek at the calculation every time.&lt;/p&gt;
+&lt;p&gt;We need to convert data into tidy format for better visualization. In the tidy format, every column should be a unique variable. The gather() function converts data from wide to long by adding a new variable called “rep_sim_number” and combining all the various runs from 1 to 100 in a single column. In total, we’ll have only 3 columns in the tidy version.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#add new column with row id numbers
+final_runs_tbl &amp;lt;- many_runs_tbl %&amp;gt;% 
+    mutate(row_id = row_number()) %&amp;gt;%
+    select(row_id, everything())
+
+#convert from wide format (untidy) to long (tidy) using gather()
+final_runs_tidy_tbl &amp;lt;- final_runs_tbl %&amp;gt;% gather(key = &amp;quot;rep_sim_number&amp;quot;, value = &amp;quot;p_value&amp;quot;, -row_id)
+
+#visualize tidy data structure
+final_runs_tidy_tbl %&amp;gt;% 
+  head(10) %&amp;gt;% 
+  kable(align=rep(&amp;#39;c&amp;#39;, 3))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+row_id
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+rep_sim_number
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+p_value
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.3963352
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1704697
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1414021
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+4
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1557261
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+5
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1141854
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+6
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0539595
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+7
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0693410
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+8
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0324232
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+9
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0205511
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+10
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0293952
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;final_runs_tidy_tbl %&amp;gt;% 
+  tail(10) %&amp;gt;% 
+  kable(align=rep(&amp;#39;c&amp;#39;, 3))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+row_id
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+rep_sim_number
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+p_value
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+41
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V100
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0515933
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+42
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V100
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0509430
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+43
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V100
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0386845
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+44
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V100
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0567804
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+45
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V100
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0762953
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+46
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V100
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0933081
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+47
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V100
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0755494
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+48
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V100
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0558263
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+49
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V100
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0731072
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+50
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V100
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0496300
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;From here it is straightforward to visualize the trajectory of the p-values through the course of the testing for all 100 simulations.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#visualize history of n_outer p-values across n_inner_loop consecutive data points as lineplot
+lp_1 &amp;lt;- final_runs_tidy_tbl %&amp;gt;% ggplot(aes(x = row_id, y = p_value, group = rep_sim_number)) +
+  geom_line(show.legend = &amp;quot;none&amp;quot;,
+            color       = &amp;quot;grey&amp;quot;,
+            alpha       = 0.7) +
+  labs(x        = &amp;quot;Sequential Benchtop Test Observations&amp;quot;,
+       title    = &amp;quot;P-Value History for Difference in Means, Standard T-Test&amp;quot;,
+       subtitle = &amp;quot;Both Groups Sampled From Same Population&amp;quot;
+       )
+
+lp_1&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-06-stopping-rules-for-significance-testing_files/figure-html/unnamed-chunk-4-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;The p-values are all over the place! It makes sense that at the pre-determined stopping point (n=50) we would have a spread of p-values since the population parameters for the two groups were identical and p should only rarely land below .05. However, this visualization makes it clear that prior to the stopping point, the path of any particular p-value fluctuates wildly. This is the reason why we can’t stop early or peek!&lt;/p&gt;
+&lt;p&gt;Let’s take a look at the false positives, defined here as the runs where the p-value ended up less than or equal to .05 at the pre-determined stopping point of n=50.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#filter for runs that ended in false positives (p &amp;lt; .05) at the last data point
+filtered_endpoint_tbl &amp;lt;- final_runs_tidy_tbl %&amp;gt;% 
+    filter(row_id == 50,
+           p_value &amp;lt;= 0.05) %&amp;gt;%
+    select(rep_sim_number) %&amp;gt;%
+    rename(&amp;quot;false_positives&amp;quot; = rep_sim_number)
+
+filtered_endpoint_tbl %&amp;gt;% 
+  head(10) %&amp;gt;% 
+  kable(align=&amp;#39;c&amp;#39;) %&amp;gt;%
+  kable_styling(full_width = FALSE)&lt;/code&gt;&lt;/pre&gt;
+&lt;table class=&#34;table&#34; style=&#34;width: auto !important; margin-left: auto; margin-right: auto;&#34;&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+false_positives
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V23
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V48
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V54
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V77
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V86
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V89
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V100
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;So 8 out of 100 simulations have p-values &amp;lt; .05. This is about as expected since the long term false positive rate should be 5%. Having now identified the false positives, we can visualize the trajectory of their p-values after obtaining each successive data point. This is what happens when we peek early or stop the test when we first see a desired outcome. The following code pulls the full history of the false positive test sequences so we can see their paths before the stopping point.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#extract full false positive test histories.  %in% filters rows that match anything in the false_positives vector
+full_low_runs_tbl &amp;lt;- final_runs_tidy_tbl %&amp;gt;%
+    filter(rep_sim_number %in% filtered_endpoint_tbl$false_positives)
+
+#visualize trajectory of false positives by highlighting their traces
+lp_2 &amp;lt;- final_runs_tidy_tbl %&amp;gt;% 
+    ggplot(aes(x = row_id, y = p_value, group = rep_sim_number)) +
+    geom_line(alpha = 0.7, show.legend = FALSE, color = &amp;quot;grey&amp;quot;) +
+    geom_line(aes(color = rep_sim_number), data = full_low_runs_tbl, show.legend = FALSE, size = .8, alpha = 0.7) +
+    labs(x       = &amp;quot;Sequential Benchtop Test Observations&amp;quot;,
+        title    = &amp;quot;P-Value History for Difference in Means, Standard T-Test&amp;quot;,
+        subtitle = &amp;quot;Highlighted Traces Represent Sequences with p &amp;lt; .05 at n=50&amp;quot;
+        )
+
+lp_2&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-06-stopping-rules-for-significance-testing_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt; Indeed, the p-values that end up less than .05 do not take a straight line path to get there. Likewise, there may be tests that dip below p=.05 at some point but culminate well above .05 at the pre-determined stopping point. These represent additional false-positives we invite when we peek or stop early. Let’s identify and count these:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#filter for all run who&amp;#39;s p-value ever dipped to .05 or lower at any point 
+low_p_tbl &amp;lt;- final_runs_tidy_tbl %&amp;gt;% 
+    filter(p_value &amp;lt;= .05) %&amp;gt;% 
+    distinct(rep_sim_number)
+
+#visualize
+low_p_tbl %&amp;gt;% 
+  head(10) %&amp;gt;% 
+  kable(align=&amp;#39;c&amp;#39;) %&amp;gt;% 
+  kable_styling(full_width = FALSE)&lt;/code&gt;&lt;/pre&gt;
+&lt;table class=&#34;table&#34; style=&#34;width: auto !important; margin-left: auto; margin-right: auto;&#34;&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+rep_sim_number
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V6
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V7
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V16
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V17
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V20
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V21
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V23
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V30
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V33
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#count total number of false positives with peeking
+low_p_tbl %&amp;gt;% nrow() %&amp;gt;%
+  kable(align = &amp;quot;c&amp;quot;) %&amp;gt;% 
+  kable_styling(full_width = FALSE)&lt;/code&gt;&lt;/pre&gt;
+&lt;table class=&#34;table&#34; style=&#34;width: auto !important; margin-left: auto; margin-right: auto;&#34;&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+x
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+37
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;The false positives go from 8 to 37!&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#filter for only the rows where rep_sim_number here matches at least 1 value from low_p_tbl$rep_sim_number
+#this extracts the full history of runs who&amp;#39;s p-value dipped to .05 or lower at any point 
+any_low_runs_tbl &amp;lt;- final_runs_tidy_tbl %&amp;gt;%
+    filter(rep_sim_number %in% low_p_tbl$rep_sim_number)
+
+#visualize
+any_low_runs_tbl %&amp;gt;% 
+  head(10) %&amp;gt;% 
+  kable(align = rep(&amp;quot;c&amp;quot;, 3))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+row_id
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+rep_sim_number
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+p_value
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.3963352
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1704697
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1414021
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+4
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1557261
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+5
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.1141854
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+6
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0539595
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+7
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0693410
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+8
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0324232
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+9
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0205511
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+10
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+V1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.0293952
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#visualize the trajectory or runs that dipped to .05 or below
+lp_3 &amp;lt;- final_runs_tidy_tbl %&amp;gt;% 
+    ggplot(aes(x = row_id, y = p_value, group = rep_sim_number)) +
+    geom_line(alpha = 0.7, show.legend = FALSE, color = &amp;quot;grey&amp;quot;) +
+    geom_line(aes(color = rep_sim_number), data = any_low_runs_tbl, show.legend = FALSE, size = .8, alpha = 0.7) +
+    labs(x       = &amp;quot;Sequential Benchtop Test Observations&amp;quot;,
+        title    = &amp;quot;P-Value History for Difference in Means, Standard T-Test&amp;quot;,
+        subtitle = &amp;quot;Highlighted Runs Represent p &amp;lt; .05 at Any Point&amp;quot;
+        )
+
+lp_3&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-06-stopping-rules-for-significance-testing_files/figure-html/unnamed-chunk-9-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;All these differences in means would be considered significant if we don’t observe our pre-determined stopping rule. This could be a big deal. We might claim a performance benefit when there is none, or waste precious time and money trying to figure out why we can’t replicate an earlier experiment!&lt;/p&gt;
+&lt;p&gt;Thanks for reading.&lt;/p&gt;
+</description>
+  </item>
+  
+<item>
+  <title>Assessing Design Verification Risk with Bayesian Estimation in R</title>
+  <link>/post/assessing-dv-risk-w-bayesian-estimation-in-r/</link>
+  <pubDate>Fri, 23 Aug 2019 00:00:00 +0000</pubDate>
+  
+<guid>/post/assessing-dv-risk-w-bayesian-estimation-in-r/</guid>
+  <description>
+
+
+&lt;p&gt;Suppose our team is preparing to freeze a new implant design. In order to move into the next phase of the PDP, it is common to perform a suite of formal “Design Freeze” testing. If the results of the Design Freeze testing are acceptable, the project can advance from Design Freeze (DF) into Design Verification (DV). DV is an expensive and resource intensive phase culminating in formal reports that are included in the regulatory submission. One key goal of DF is therefore to burn down enough risk to feel confident going into DV. Despite the high stakes, I haven’t ever seen a quantitative assessment of residual risk at the phase review. In this post we’ll attempt to use some simple Bayesian methods to quantify the DV risk as a function of DF sample size for a single, high-risk test.&lt;/p&gt;
+&lt;p&gt;Consider the requirement for accelerated durability (sometimes called fatigue resistance). In this test, the device is subjected to cyclic loading for a number of cycles equal to the desired service life. For 10 years of loading due to systolic - diastolic pressure cycles, vascular implants must survive approximately 400 million cycles. Accelerated durability is usually treated as attribute type data because the results can be only pass (if no fractures observed) or fail (if fractures are observed). Each test specimen can therefore be considered a Bernoulli trial and the number of passing units in n samples can be modeled with the binomial.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/./img/fatigue.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;How many samples should we include in DF? We’ll set up some simulations to find out. In order to incorporate the outcome of the DF data into a statement about the probability of success for DV, we’ll need to apply Bayesian methods.&lt;/p&gt;
+&lt;p&gt;First, load the libraries:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(tidyverse)
+library(cowplot)
+library(gghighlight)
+library(knitr)
+library(kableExtra)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The simulation should start off before we even execute Design Freeze testing. If we’re going to use Bayesian techniques we need to express our uncertainty about the parameters in terms of probability. In this case, the parameter we care about is the reliability. Before seeing any DF data we might know very little about what the true reliability is for this design. If we were asked to indicate what we thought the reliability might be, we should probably state a wide range of possibilities. The design might be good but it might be quite poor. Our belief about the reliability before we do any testing at all is called the prior and we expess it as a probability density function, not a point estimate. We need a mathematical function to describe how we want to spread out our belief in the true reliability.&lt;/p&gt;
+&lt;p&gt;The beta is a flexible distribution that can be adjusted to take a variety of different forms. By tweaking the two shape factors of the beta we can customize the probability density curve in many different ways. If we were super confident that every part we ever made would pass the durability testing, we could put a “spike” prior right on 1.0. This is like saying “there’s no way any part could ever fail”. But the whole point is to communicate uncertainty and in reality there is always a chance the reliability might only be 97%, or 94%, etc. Since we haven’t really seen any DF data, we should probably drop some of our credibility into many different possible values of the reliability. Let’s be very conservative here and just use the flat prior. By evenly binning all of our credibility across the full range of reliability from 0 to 1, we’re saying we don’t want our pre-conceived notions to influence the final estimated reliability much. We’ll instead use the DF data themselves to re-allocate the credibility across the range of reliabilities appropriately according to Bayes’ rule after looking at the Design Freeze results. The more DF data we observe, the more precise the posterior estimate.&lt;/p&gt;
+&lt;p&gt;The mathematical way to turn the beta distribution into a straight line (flat prior) is to set the shape parameters alpha and beta to (1,1). Note the area under the curve must always sum to 1. The image on the left shows a flat prior generated from a beta density with parameters (1,1).&lt;/p&gt;
+&lt;p&gt;Another way to display the prior is to build out the visualization manually by drawing random values from the beta(1,1) distribution and constructing a histogram. This method isn’t terribly useful since we already know the exact distribution we want to use but I like to include it to emphasize the idea of “binning” the credibility across different values of reliability. It’s also nice to see the uncertainty we might see when we start to randomly draw from the distribution (full disclosure: I also just to practice my coding).&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Plot flat prior using stat_function and ggplot
+p_1 &amp;lt;- tibble(x_canvas=c(0,1)) %&amp;gt;% ggplot(aes(x=x_canvas)) +
+    stat_function(fun   = dbeta,
+                  args  = list(1, 1),
+                  color = &amp;quot;#2c3e50&amp;quot;, 
+                  size  = 1,
+                  alpha = .8) +
+    ylim(c(0,1.5)) +
+    labs(
+        y = &amp;quot;Density of Beta&amp;quot;,
+        x = &amp;quot;Reliability&amp;quot;,
+        title = &amp;quot;Credibility Allocation, Start of DF&amp;quot;,
+        subtitle = &amp;quot;Uninformed Prior with Beta (1,1)&amp;quot;
+    )
+
+#Set the number of random draws from beta(1,1) to construct histogram flat prior
+set.seed(123)
+n_draws &amp;lt;- 100000
+
+#Draw random values from beta(1,1), store in object
+prior_dist_sim &amp;lt;- rbeta(n = n_draws, shape1 = 1, shape2 = 1)
+
+#Convert from vector to tibble
+prior_dist_sim_tbl &amp;lt;- prior_dist_sim %&amp;gt;% as_tibble()
+
+#Visualize with ggplot
+p_2 &amp;lt;- prior_dist_sim_tbl %&amp;gt;% ggplot(aes(x = value)) +
+    geom_histogram(
+        boundary = 1, 
+        binwidth = .05, 
+        color    = &amp;quot;white&amp;quot;,
+        fill     = &amp;quot;#2c3e50&amp;quot;,
+        alpha    = 0.8
+        ) +
+    xlim(c(-0.05, 1.05)) +
+    ylim(c(0, 7500)) +
+    labs(
+        y = &amp;quot;Count&amp;quot;,
+        title = &amp;quot;Credibility Simulation , Start of DF&amp;quot;,
+        subtitle = &amp;quot;Uninformed Prior with Beta (1,1)&amp;quot;,
+        x = &amp;quot;Reliability&amp;quot;
+    
+    ) 
+
+plot_grid(p_1,p_2)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-08-23-assessing-dv-risk-w-bayesian-estimation-in-r_files/figure-html/unnamed-chunk-2-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;OK now the fun stuff. There is a cool, mathematical shortcut we can take to combine our simulated Design Freeze data with our flat prior to create the posterior distribution. It’s very simple: we just add the number of passing DF units to our alpha parameter and the number of failing DF units to our beta parameter. The reason why this works so well is beyond the scope of this post, but the main idea is that when the functional form of the prior (beta function in our case) is similar to the functional form of the likelihood function (Bernoulli in our case), then you can multiply them together easily and the product also takes a similar form. When this happens, the prior is said to be the “conjugate prior” of the likelihood function &lt;a href=&#34;#fn1&#34; class=&#34;footnoteRef&#34; id=&#34;fnref1&#34;&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt; The beta and binomial are a special case that go together like peanut butter and jelly.&lt;/p&gt;
+&lt;p&gt;Again, to understand how our belief in the reliability should be allocated after observing the DF data, all we need to do is update the beta function by adding the number of passing units from DF testing to alpha (Shape1 parameter) and the number of failing units to beta (Shape2 parameter).&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[\mbox{Beta}(\alpha_0+\mbox{passes}, \beta_0+\mbox{fails})\]&lt;/span&gt; We’re going to assume all units pass DF, so we only need to adjust the alpha parameter. The resulting beta distribution that we get after updating the alpha parameter represents our belief in where the true reliability may lie after observing the DF data. Remember, even though every unit passed, we can’t just say the reliability is 100% because we’re smart enough to know that if the sample size was, for example, n=15 - there is a reasonable chance that a product with true reliability of 97% could run off n=15 in a row without failing. Even 90% reliability might hit 15 straight every once in a while but it would be pretty unlikely.&lt;/p&gt;
+&lt;p&gt;The code below looks at four different possible sample size options for DF: n=15, n=30, n=45, and a full n=59 (just like we plan for DV).&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Draw radomly from 4 different beta distributions. Alpha parameter is adjusted based on DF sample size
+posterior_dist_sim_15 &amp;lt;- rbeta(n_draws, 16, 1)
+posterior_dist_sim_30 &amp;lt;- rbeta(n_draws, 31, 1)
+posterior_dist_sim_45 &amp;lt;- rbeta(n_draws, 46, 1)
+posterior_dist_sim_59 &amp;lt;- rbeta(n_draws, 60, 1)
+
+#Function to convert vectors above into tibbles and add column for Sample Size 
+pds_clean_fcn &amp;lt;- function(pds, s_size){
+    pds %&amp;gt;% as_tibble() %&amp;gt;% mutate(Sample_Size = s_size) %&amp;gt;%
+    mutate(Sample_Size = factor(Sample_Size, levels = unique(Sample_Size)))}
+
+#Apply function to 4 vectors above
+posterior_dist_sim_15_tbl &amp;lt;- pds_clean_fcn(posterior_dist_sim_15, 15)
+posterior_dist_sim_30_tbl &amp;lt;- pds_clean_fcn(posterior_dist_sim_30, 30)
+posterior_dist_sim_45_tbl &amp;lt;- pds_clean_fcn(posterior_dist_sim_45, 45)
+posterior_dist_sim_59_tbl &amp;lt;- pds_clean_fcn(posterior_dist_sim_59, 59)
+
+#Combine the tibbles in a tidy format for visualization
+full_post_df_tbl &amp;lt;- bind_rows(
+            posterior_dist_sim_15_tbl,
+            posterior_dist_sim_30_tbl, 
+            posterior_dist_sim_45_tbl, 
+            posterior_dist_sim_59_tbl
+            )
+
+#Visualize with density plot
+df_density_plt &amp;lt;- full_post_df_tbl %&amp;gt;% ggplot(aes(x = value, fill = Sample_Size)) +
+    geom_density(alpha = .6) +
+    xlim(c(0.85,1)) +
+    labs(x = &amp;quot;&amp;quot;,
+         y = &amp;quot;Density of Beta&amp;quot;,
+         title = &amp;quot;Credibility Simulation, After Design Freeze&amp;quot;,
+         subtitle = &amp;quot;Updated Belief Modeled with Beta(1 + n,1)&amp;quot;) +
+    scale_fill_manual(values = c(&amp;quot;#2C728EFF&amp;quot;, &amp;quot;#20A486FF&amp;quot;, &amp;quot;#75D054FF&amp;quot;, &amp;quot;#FDE725FF&amp;quot;)) 
+
+#Visualize with histogram 
+df_hist_plt &amp;lt;- full_post_df_tbl %&amp;gt;% ggplot(aes(x = value, fill = Sample_Size)) +
+    geom_histogram(alpha = .9,
+                   position = &amp;quot;dodge&amp;quot;,
+                   boundary = 1,
+                   color = &amp;quot;black&amp;quot;) +
+    xlim(c(0.85,1)) +
+    labs(x = &amp;quot;Reliability&amp;quot;,
+         y = &amp;quot;Count&amp;quot;) +
+    scale_fill_manual(values = c(&amp;quot;#2C728EFF&amp;quot;, &amp;quot;#20A486FF&amp;quot;, &amp;quot;#75D054FF&amp;quot;, &amp;quot;#FDE725FF&amp;quot;))
+
+plot_grid(df_density_plt, df_hist_plt, ncol = 1)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-08-23-assessing-dv-risk-w-bayesian-estimation-in-r_files/figure-html/unnamed-chunk-3-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;If we unpack these charts a bit, we can see that if we only do n=15 in Design Freeze, we still need to allocate some credibility to reliability parameters below .90. For a full n=59, anything below .95 reliability is very unlikely, yet the 59 straight passing units could have very well come from a product with reliability = .98 or .97.&lt;/p&gt;
+&lt;p&gt;We now have a good feel for our uncertainty about the reliability after DF, but what we really want to know is our likelihood of passing Design Verification. To answer this question, we’ll extend our simulation to perform many replicates of n=59 Bernoulli trials, each representing a round of Design Verification testing. The probability of failure will be randomly drawn from the distributions via Monte Carlo. Let’s see how many of these virtual DV tests end with 59/59 passing:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Perform many sets of random binom runs, each with n=59 trials. p is taken from the probs previously generated 
+DV_acceptable_units_15 &amp;lt;- rbinom(size = 59, n = n_draws, 
+                                 prob = (posterior_dist_sim_15_tbl$value))
+DV_acceptable_units_30 &amp;lt;- rbinom(size = 59, n = n_draws, 
+                                 prob = (posterior_dist_sim_30_tbl$value))
+DV_acceptable_units_45 &amp;lt;- rbinom(size = 59, n = n_draws, 
+                                 prob = (posterior_dist_sim_45_tbl$value))
+DV_acceptable_units_59 &amp;lt;- rbinom(size = 59, n = n_draws, 
+                                 prob = (posterior_dist_sim_59_tbl$value))
+
+#Function to convert vectors to tibbles and add col for sample size
+setup_fcn &amp;lt;- function(vec, ss){
+    vec %&amp;gt;% as_tibble() %&amp;gt;% mutate(DF_Sample_Size = ss) %&amp;gt;%
+    mutate(DF_Sample_Size = factor(DF_Sample_Size, levels = unique(DF_Sample_Size)))}
+
+#Apply function
+DV_acceptable_units_15_tbl &amp;lt;- setup_fcn(DV_acceptable_units_15, 15)
+DV_acceptable_units_30_tbl &amp;lt;- setup_fcn(DV_acceptable_units_30, 30)
+DV_acceptable_units_45_tbl &amp;lt;- setup_fcn(DV_acceptable_units_45, 45)
+DV_acceptable_units_59_tbl &amp;lt;- setup_fcn(DV_acceptable_units_59, 59)
+
+#Combine the tibbles in a tidy format for visualization
+DV_acceptable_full_tbl &amp;lt;- bind_rows(DV_acceptable_units_15_tbl,
+                                    DV_acceptable_units_30_tbl,
+                                    DV_acceptable_units_45_tbl,
+                                    DV_acceptable_units_59_tbl)
+
+#Visualize with ggplot.  Apply gghighlight where appropriate
+g1 &amp;lt;- DV_acceptable_full_tbl %&amp;gt;%
+   ggplot(aes(x = value)) +
+   geom_histogram(aes(fill = DF_Sample_Size),binwidth = 1, color = &amp;quot;black&amp;quot;, position = &amp;quot;dodge&amp;quot;, alpha = .9) +
+    xlim(c(45, 60)) +
+    scale_x_continuous(limits = c(45, 60), breaks=seq(45, 60, 1)) +
+    scale_fill_manual(values = c(&amp;quot;#2C728EFF&amp;quot;, &amp;quot;#20A486FF&amp;quot;, &amp;quot;#75D054FF&amp;quot;, &amp;quot;#FDE725FF&amp;quot;)) +
+    labs(
+        x = &amp;quot;Passing Parts out of 59 total&amp;quot;,
+        title = &amp;quot;Simulated Design Verification Testing&amp;quot;,
+        subtitle = &amp;quot;100,000 Simulated DV Runs of n=59&amp;quot;
+    )
+
+g2 &amp;lt;- g1 +
+    gghighlight(value == 59, use_direct_label = FALSE) +
+    labs(
+        title = &amp;quot;Simulations that PASSED Design Verification&amp;quot;
+     )
+    
+g3 &amp;lt;- g1 +
+    gghighlight(value &amp;lt; 59, use_direct_label = FALSE) +
+    labs(
+        title = &amp;quot;Simulations that FAILED Design Verification&amp;quot;
+    )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-08-23-assessing-dv-risk-w-bayesian-estimation-in-r_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;img src=&#34;/post/2019-08-23-assessing-dv-risk-w-bayesian-estimation-in-r_files/figure-html/unnamed-chunk-5-2.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;img src=&#34;/post/2019-08-23-assessing-dv-risk-w-bayesian-estimation-in-r_files/figure-html/unnamed-chunk-5-3.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Taking into consideration the uncertainty of the true reliability after the DF testing, the percentage of times we expect to pass Design Verification is shown below. These percentages are calculated as the number of simulated DV runs that achieved 59/59 passing units divided by the total number of simulated DV runs. Any simulation with 58 or less passing units would have failed DV.&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[\mbox{expected probability of passing DV  = (number of sims with n=59 pass) / (total sims) }\]&lt;/span&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Function to calculate how many DV simulations resulted in 59/59 passing units
+pct_pass_fct &amp;lt;- function(tbl, n){
+    pct_dv_pass &amp;lt;- tbl %&amp;gt;% filter(value == 59) %&amp;gt;% nrow() / n_draws
+    paste(&amp;quot;DF with n = &amp;quot;,n, &amp;quot;(all pass): &amp;quot;, pct_dv_pass %&amp;gt;% scales::percent(), &amp;quot;expected probability of next 59/59 passing DV&amp;quot;)}&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+DF with n = 15 (all pass): 21.3% expected probability of next 59/59 passing DV
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+DF with n = 30 (all pass): 34.5% expected probability of next 59/59 passing DV
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+DF with n = 45 (all pass): 43.5% expected probability of next 59/59 passing DV
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+DF with n = 59 (all pass): 50.3% expected probability of next 59/59 passing DV
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;The percentage of time we expect to pass Design Verification is shockingly low! Even when we did a full n=59 in Design Freeze, we still only be able to predict 50% success in DV! This is because even with 59/59 passes, we still must account for the possibility that the reliability isn’t 100%. We don’t have enough DF data to shift the credibility all the way near 100%, and when the credibility is spread to include possible reliabilities in the mid .90’s we should always be prepared for the possibility of failing Design Verification.&lt;/p&gt;
+&lt;p&gt;We could just leave it at that but I have found that when discussing risk, stakeholders want more than just an estimation of the rate of bad outcomes. They want a recommendation and a mitigation plan. Here are a few ideas; can you think of any more?&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Maintain multiple design configurations as long as possible (often not feasible, but provides an out if 1 design fails)&lt;/li&gt;
+&lt;li&gt;Perform durability testing as “fatigue-to-failure”. In this methodology, the devices are run to failure and the cycles to failure are treated as variable data. By varying the amplitude of the loading cycles, we can force the devices to fail and understand the uncertainty within the failure envelope. &lt;a href=&#34;#fn2&#34; class=&#34;footnoteRef&#34; id=&#34;fnref2&#34;&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Fold in information from pre-DF testing, predicate testing, etc to inform the prior better. I will look at the sensitivity of the reliability estimations to the prior in a future post.&lt;/li&gt;
+&lt;li&gt;Build redundant design cycles into the project schedule to accomodate additional design turns without falling behind the contracted timeline&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Thanks for reading!&lt;/p&gt;
+&lt;style&gt;
+body {
+text-align: justify}
+&lt;/style&gt;
+&lt;div class=&#34;footnotes&#34;&gt;
+&lt;hr /&gt;
+&lt;ol&gt;
+&lt;li id=&#34;fn1&#34;&gt;&lt;p&gt;Kruschke, Doing Bayesian Data Analysis, &lt;a href=&#34;https://sites.google.com/site/doingbayesiandataanalysis/&#34; class=&#34;uri&#34;&gt;https://sites.google.com/site/doingbayesiandataanalysis/&lt;/a&gt;&lt;a href=&#34;#fnref1&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn2&#34;&gt;&lt;p&gt;Fatigue-to Fracture ASTM Standard: &lt;a href=&#34;https://www.astm.org/Standards/F3211.htm&#34; class=&#34;uri&#34;&gt;https://www.astm.org/Standards/F3211.htm&lt;/a&gt;&lt;a href=&#34;#fnref2&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
+</description>
+  </item>
+  
+<item>
+  <title>Permutation Test for NHST of 2 Samples in R</title>
+  <link>/post/permutation-test-for-nhst-of-2-samples-in-r/</link>
+  <pubDate>Sat, 10 Aug 2019 00:00:00 +0000</pubDate>
+  
+<guid>/post/permutation-test-for-nhst-of-2-samples-in-r/</guid>
+  <description>
+
+
+&lt;p&gt;As engineers, it is not uncommon to be asked to determine whether or not two different configurations of a product perform the same. Perhaps we are asked to compare the durability of a next-generation prototype to the current generation. Sometimes we are testing the flexibility of our device versus a competitor for marketing purposes. Maybe we identify a new vendor for a raw material but must first understand whether the resultant finished product will perform any differently than when built using material from the standard supplier. All of these situations call for a comparison between two groups culminating in a statistically supported recommendation.&lt;/p&gt;
+&lt;p&gt;There are a lot of interesting ways to do this: regions of practical equivalence, Bayes Factors, etc. The most common method is still null hypothesis significance testing (NHST) and that’s what I want to explore in this first post. Frequentist methods yield the least useful inferences but have the advantage of a long usage history. Most medical device professionals will be looking for a p-value, so a p-value we must provide.&lt;/p&gt;
+&lt;p&gt;In NHST, the plan is usually to calculate a test statistic from our data and use a table of reference values or a statistical program to tell us how surprising our derived statistic would be in a world where the null hypothesis was true. We generally do this by comparing our statistic to a reference distribution or table of tabulated values. Unfortunately, whenever our benchtop data violates an assumption of the reference model, we are no longer comparing apples-to-apples. We must make tweaks and adjustments to try to compensate. It is easy to get overwhelmed in a decision tree of test names and use cases.&lt;/p&gt;
+&lt;p&gt;A more robust and intuitive approach to NHST is to replace the off-the-shelf distributions and tables with a simulation built right from our dataset. The workflow any such test is shown below. &lt;a href=&#34;#fn1&#34; class=&#34;footnoteRef&#34; id=&#34;fnref1&#34;&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/./img/workflow.png&#34; width=&#34;75%&#34; height=&#34;75%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;The main difference here is that we create the distribution of the data under the null hypothesis using simulation instead of relying on a reference distribution. It’s intuitive, powerful, and fun.&lt;/p&gt;
+&lt;p&gt;Imagine we have just designed a benchtop experiment in which we intend to measure the pressure (in mm Hg) at which a pair of overlapped stent grafts started to migrate or disconnect when deployed in a large thoracic aneurysm. &lt;a href=&#34;#fn2&#34; class=&#34;footnoteRef&#34; id=&#34;fnref2&#34;&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/./img/migration_model.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;A common null hypothesis for comparing groups is that there is no difference between them. Under this model, &lt;strong&gt;we can treat all the experimental data as one big group instead of 2 different groups&lt;/strong&gt;. We therefore pool the data from our completed experiment into one big group, shuffle it, and randomly assign data points into two groups of the original size. This is our generative model. After each round of permutation and assignment, we calculate and store the test statistic for the observed effect (difference in means between the two groups). Once many simulations have been completed, we’ll see where our true data falls relative to the virtual data.&lt;/p&gt;
+&lt;p&gt;One way to setup and execute a simulation-based NHST for comparing two groups in R is as follows (note: there are quicker shortcuts to executing this type of testing but the long version below allows for customization, visualization, and adjust-ability):&lt;/p&gt;
+&lt;p&gt;First, we read in the libraries and transcribe the benchtop data into R and evaluate sample size&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(tidyverse)
+library(cowplot)
+library(knitr)
+library(kableExtra)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Migration pressure for predicate device
+predicate &amp;lt;-  c(186, 188, 189, 189, 192, 193, 194, 194, 194, 195, 195, 196, 196, 197, 197, 198, 198, 199, 199, 201, 206, 207, 210, 213, 216, 218)
+
+#Migration pressure for next_gen device
+next_gen &amp;lt;-  c(189, 190, 192, 193, 193, 196, 199, 199, 199, 202, 203, 204, 205, 206, 206, 207, 208, 208, 210, 210, 212, 214, 216, 216, 217, 218)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Sample Size of Predicate Device Data: 26
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;table&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Sample Size of Next-Gen Device Data: 26
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;So we have slightly uneven groups and relatively small sample sizes. No problem - assign each group to a variable and convert to tibble format:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Assign variables for each group and convert to tibble
+predicate_tbl &amp;lt;- tibble(Device = &amp;quot;Predicate&amp;quot;,
+                        Pressure = predicate)
+
+next_gen_tbl &amp;lt;- tibble(Device = &amp;quot;Next_Gen&amp;quot;,
+                        Pressure = next_gen)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Combine predicate and next_gen data into a single, pooled group called results_tbl. Taking a look at the first few and last few rows in the pooled tibble confirm it was combined appropriately.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Combine in tibble
+results_tbl &amp;lt;- bind_rows(predicate_tbl, next_gen_tbl)
+results_tbl %&amp;gt;% 
+  head() %&amp;gt;% 
+  kable(align = rep(&amp;quot;c&amp;quot;,2))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+Device
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+Pressure
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Predicate
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+186
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Predicate
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+188
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Predicate
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+189
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Predicate
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+189
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Predicate
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+192
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Predicate
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+193
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;results_tbl %&amp;gt;% tail() %&amp;gt;% 
+  head() %&amp;gt;% 
+  kable(align = rep(&amp;quot;c&amp;quot;,2))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+Device
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+Pressure
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Next_Gen
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+212
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Next_Gen
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+214
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Next_Gen
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+216
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Next_Gen
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+216
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Next_Gen
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+217
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Next_Gen
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+218
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Now we do some exploratory data analysis to identify general shape and distribution.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# Visualize w/ basic boxplot
+boxplot_eda &amp;lt;- results_tbl %&amp;gt;% 
+    ggplot(aes(x=Device, y=Pressure)) +
+    geom_boxplot(
+        alpha  = .6,
+        width  = .4,
+        size   = .8,
+        fatten = .5,
+        fill   = c(&amp;quot;#FDE725FF&amp;quot;,&amp;quot;#20A486FF&amp;quot;)) +
+    labs(
+        y        = &amp;quot;Pressure (mm Hg)&amp;quot;,
+        title    = &amp;quot;Predicate and Next-Gen Data&amp;quot;,
+        subtitle = &amp;quot;Modular Disconnect Pressure&amp;quot;
+    )
+
+boxplot_eda&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-08-10-simple-permutation-test-for-nhst-of-2-samples_files/figure-html/unnamed-chunk-7-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Visualize with density plot
+density_eda &amp;lt;- results_tbl %&amp;gt;% 
+    ggplot(aes(x = Pressure)) +
+    geom_density(aes(fill = Device),
+        color = &amp;quot;black&amp;quot;,
+        alpha = 0.6
+        ) +
+    scale_fill_manual(values = c(&amp;quot;#FDE725FF&amp;quot;,&amp;quot;#20A486FF&amp;quot;)) +
+    labs(
+        x        = &amp;quot;Pressure (mm Hg)&amp;quot;,
+        title    = &amp;quot;Predicate and Next-Gen Data&amp;quot;,
+        subtitle = &amp;quot;Modular Disconnect Pressure&amp;quot;
+    )
+
+density_eda&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-08-10-simple-permutation-test-for-nhst-of-2-samples_files/figure-html/unnamed-chunk-7-2.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Yikes! These data do not look normal. Fortunately, the permutation test does not need the data to take on any particular distribution. The main assumption is exchangability, meaning it must be reasonable that the labels could be arbitrarily permuted under the null hypothesis. Provided the sample size is approximately equal, the permutation test is robust against unequal variances.&lt;a href=&#34;#fn3&#34; class=&#34;footnoteRef&#34; id=&#34;fnref3&#34;&gt;&lt;sup&gt;3&lt;/sup&gt;&lt;/a&gt; This gives us an attractive option for data shaped as shown above.&lt;/p&gt;
+&lt;p&gt;To get started with our permutation test we create a function that accepts 3 arguments: the pooled data from all trials in our benchtop experiment (x), the number of observations taken from Group 1 (n1), and the number of observations taken from Group 2 (n2). The function creates an object containing indices 1:n, then randomly assigns indices into two Groups A and B with sizes to match the original group sizes. It then uses the randomly assigned indices to splice the dataset x producing 2 “shuffled” groups from the original data. Finally, it computes and returns the mean between the 2 randomly assigned groups.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Function to permute vector indices and then compute difference in group means
+perm_fun &amp;lt;- function(x, n1, n2){
+  n &amp;lt;- n1 + n2
+  group_B &amp;lt;- sample(1:n, n1)
+  group_A &amp;lt;- setdiff(1:n, group_B)
+  mean_diff &amp;lt;- mean(x[group_B] - mean(x[group_A]))
+  return(mean_diff)
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Here we initialize an dummy vector called perm_diffs to hold the results of the loop we are about to use. It’ll have all 0’s to start and then we’ll assign values from each iteration of the for loop.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Set number of simulations to run
+n_sims &amp;lt;- 10000
+
+#Initialize empty vector
+perm_diffs &amp;lt;- rep(0,n_sims)
+perm_diffs %&amp;gt;% head()  %&amp;gt;% 
+  kable(align = &amp;quot;c&amp;quot;, col.names = NULL)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Set up a simple for loop to execute the same evaluation using perm_fun() 10,000 times. On each iteration, we’ll store the results into the corresponding index within perm_diffs that we initialized above.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Set seed for reproducibility
+set.seed(2015)
+
+#Iterate over desired number of simulations using permutation function
+for (i in 1:n_sims)
+  perm_diffs[i] = perm_fun(results_tbl$Pressure, 26, 26)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now we have 10,000 replicates of our permutation test stored in perm_diffs. We want to visualize the data with ggplot so we convert it into a tibble frame using tibble().&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Convert results to a tibble and look at it
+perm_diffs_df &amp;lt;- tibble(perm_diffs)
+perm_diffs_df %&amp;gt;% head()  %&amp;gt;% 
+  kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+perm_diffs
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.6153846
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-3.3076923
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.6923077
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-2.3846154
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.3076923
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3.1538462
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Visualize the difference in means as a histogram and density plot:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Visualize difference in means as a histogram
+diffs_histogram_plot &amp;lt;- perm_diffs_df %&amp;gt;% ggplot(aes(perm_diffs)) +
+  geom_histogram(fill = &amp;quot;#2c3e50&amp;quot;, color = &amp;quot;white&amp;quot;, binwidth = .3, alpha = 0.8) +
+    labs(
+        x = &amp;quot;Pressure (mm Hg)&amp;quot;,
+        title = &amp;quot;Histogram of Difference in Means&amp;quot;,
+        subtitle = &amp;quot;Generated Under Null Hypothesis&amp;quot;
+    )
+
+#Visualize difference in means as a density plot
+diffs_density_plot &amp;lt;-  perm_diffs_df %&amp;gt;% ggplot(aes(perm_diffs)) +
+  geom_density(fill = &amp;quot;#2c3e50&amp;quot;, color = &amp;quot;white&amp;quot;, alpha = 0.8) +
+     labs(
+        x = &amp;quot;Pressure (mm Hg)&amp;quot;,
+        title = &amp;quot;Density Plot of Difference in Means&amp;quot;,
+        subtitle = &amp;quot;Generated Under Null Hypothesis&amp;quot;
+    )
+
+plot_grid(diffs_histogram_plot, diffs_density_plot)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-08-10-simple-permutation-test-for-nhst-of-2-samples_files/figure-html/unnamed-chunk-12-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We just simulated many tests from the null hypothesis. These virtual data give us a good understanding of what sort of difference in means we might observe if there truly was no difference between the groups. As expected, most of the time the difference is around 0. But occasionally there is a noticeable difference in means just due to chance.&lt;/p&gt;
+&lt;p&gt;But how big was the difference in means from our real world dataset? We’ll call this “baseline difference”.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Evaluate difference in means from true data set
+predicate_pressure_mean &amp;lt;- mean(predicate_tbl$Pressure)
+next_gen_pressure_mean &amp;lt;- mean(next_gen_tbl$Pressure)
+
+baseline_difference &amp;lt;- predicate_pressure_mean - next_gen_pressure_mean
+baseline_difference  %&amp;gt;% 
+  signif(digits = 3) %&amp;gt;%
+  kable(align = &amp;quot;c&amp;quot;, col.names = NULL)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-5.85
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;So our real, observed data show a difference in means of -5.85. Is this large or small? With the context of the shuffle testing we already performed, we know exactly how extreme our observed data is and can visualize it with a vertical line.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Visualize real data in context of simulations
+g1 &amp;lt;- diffs_histogram_plot + 
+  geom_vline(xintercept = baseline_difference, 
+             linetype   = &amp;quot;dotted&amp;quot;, 
+             color      = &amp;quot;#2c3e50&amp;quot;, 
+             size       = 1
+             ) 
+
+g2 &amp;lt;- diffs_density_plot + 
+  geom_vline(xintercept = baseline_difference, 
+             linetype   =&amp;quot;dotted&amp;quot;, 
+             color      = &amp;quot;#2c3e50&amp;quot;, 
+             size       = 1
+             ) 
+
+plot_grid(g1,g2)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-08-10-simple-permutation-test-for-nhst-of-2-samples_files/figure-html/unnamed-chunk-14-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;It looks like the our benchtop data was pretty extreme relative to the null. We should start to consider the possibility that this effect was not due solely to chance alone. 0.05 is a commonly used threshold for declaring statistical significance. Let’s see if our data is more or less extreme than 0.05 (solid line).&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Calculate the 5% quantile of the simulated distribution for difference in means
+the_five_percent_quantile &amp;lt;- quantile(perm_diffs_df$perm_diffs, probs = 0.05)
+the_five_percent_quantile&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;##        5% 
+## -4.153846&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Visualize the 5% quantile on the histogram and density plots
+g3 &amp;lt;- g1 +
+         geom_vline(xintercept = the_five_percent_quantile, 
+             color      = &amp;quot;#2c3e50&amp;quot;, 
+             size       = 1
+             )
+
+g4 &amp;lt;- g2 +
+        geom_vline(xintercept = the_five_percent_quantile, 
+             color      = &amp;quot;#2c3e50&amp;quot;, 
+             size       = 1
+             )
+
+plot_grid(g3,g4)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-08-10-simple-permutation-test-for-nhst-of-2-samples_files/figure-html/unnamed-chunk-15-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can see here that our data is more extreme than the 5% quantile which means our p-value is less than 0.05. This satisfies the traditional, frequentist definition of statistically significant. If we want to actual p-value, we have to determine the percentage of simulated data that are as extreme or more extreme than our observed data.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Calculate percentage of simulations as extreme or more extreme than the observed data (p-value)
+p_value &amp;lt;- perm_diffs_df %&amp;gt;% 
+    filter(perm_diffs &amp;lt;= baseline_difference) %&amp;gt;%
+    nrow() / n_sims
+
+paste(&amp;quot;The empirical p-value is: &amp;quot;, p_value)  %&amp;gt;% 
+  kable(align = &amp;quot;c&amp;quot;, col.names = NULL)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+The empirical p-value is: 0.0096
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Our p-value is well below 0.05. This is likely enough evidence for us to claim that there was a statistically significant difference observed between the Next Gen device and the predicate device.&lt;/p&gt;
+&lt;p&gt;Our marketing team will be thrilled, but we should always be wary that statistically significant does not mean practically important. Domain knowledge should provide the context to interpret the relevance of the observed difference. A difference in mean Pressure of a few mm Hg seems to be enough to claim a statistically significant improvement in our new device vs. the predicate, but is it enough for our marketing team to make a meaningful campaign? In reality, a few mm Hg is noticeable on the bench but is likely lost in the noise of anatomical variation within real patient anatomies.&lt;/p&gt;
+&lt;style&gt;
+body {
+text-align: justify}
+&lt;/style&gt;
+&lt;div class=&#34;footnotes&#34;&gt;
+&lt;hr /&gt;
+&lt;ol&gt;
+&lt;li id=&#34;fn1&#34;&gt;&lt;p&gt;Probably Overthinking It, &lt;a href=&#34;http://allendowney.blogspot.com/2016/06/there-is-still-only-one-test.html&#34; class=&#34;uri&#34;&gt;http://allendowney.blogspot.com/2016/06/there-is-still-only-one-test.html&lt;/a&gt;&lt;a href=&#34;#fnref1&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn2&#34;&gt;&lt;p&gt;J ENDOVASC THER 2011;18:559-568, open access &lt;a href=&#34;https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3163409/&#34; class=&#34;uri&#34;&gt;https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3163409/&lt;/a&gt;&lt;a href=&#34;#fnref2&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn3&#34;&gt;&lt;p&gt;Simulations and Explanation of Unequal Variance and Sample Sizes, &lt;a href=&#34;https://stats.stackexchange.com/questions/87215/does-a-big-difference-in-sample-sizes-together-with-a-difference-in-variances-ma&#34; class=&#34;uri&#34;&gt;https://stats.stackexchange.com/questions/87215/does-a-big-difference-in-sample-sizes-together-with-a-difference-in-variances-ma&lt;/a&gt;&lt;a href=&#34;#fnref3&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
+</description>
+  </item>
+  
+</channel>
+  </rss>

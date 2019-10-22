@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.56.1" />
+
+  <title>Stopping Rules for Significance Testing in R &middot; [R]eliability</title>
+
+    
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.9.0/css/all.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+ 
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/img/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+  <a class="pure-menu-heading brand" href="/">Riley King</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/about/"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
+      
+        </li>
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/riley-king-9594247" rel="me" target="_blank"><i class="fab fa-linkedin"></i></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/tw0handt0uch" rel="me" target="_blank"><i class="fab fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2019. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+
+<div class="header">
+  <h1>Stopping Rules for Significance Testing in R</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+    <i class="fa fa-calendar fa-fw"></i>
+    <time>06 Sep 2019</time>
+  </div>
+
+  
+
+  
+  
+  
+  
+
+  
+  
+  
+  <div>
+    <i class="fa fa-tags fa-fw"></i>
+    
+      <a class="post-taxonomy-tag" href="/tags/r">R</a>&nbsp;&#47;
+    
+      <a class="post-taxonomy-tag" href="/tags/simulation">Simulation</a>&nbsp;&#47;
+    
+      <a class="post-taxonomy-tag" href="/tags/stats">Stats</a>
+    
+  </div>
+  
+  
+
+</div>
+
+  
+<script src="/rmarkdown-libs/kePrint/kePrint.js"></script>
+
+
+<p>When doing comparative testing it can be tempting to stop when we see the result that we hoped for. In the case of null hypothesis significance testing (NHST), the desired outcome is often a p-value of &lt; .05. In the medical device industry, bench top testing can cost a lot of money. Why not just recalculate the p-value after every test and stop when the p-value reaches .05? The reason is that the confidence statement attached to your testing is only valid for a specific stopping rule. In other words, to achieve the desired false positive rate we must continue testing speciments until the pre-determined sample size is reached. Evaluating the p-value as you proceed through the testing is known as “peeking” and it’s a statistical no-no.</p>
+<p>Suppose we are attempting to demonstrate that a raw material provided by a new vendor results in better corrosion resistance in finished stents relative to the standard supplier. A bench top test is set up to measure the breakdown potential of each sample in a cyclic potentiodynamic polarization (CPP) test. Our goal is to compare the means of the CPP data from the old supplier and the new supplier. The null hypothesis is that the means are equivalent and if the t-test results in a p-value of .05 or lower then we will reject the null and claim improved performance. What happens to the p-value over the course of the testing? We can run a simulation to monitor the p-value and calculate the effect of peeking on the long-term false positive rate. For the test to perform as intended, the long-term false positive rate should be controlled at a level equal to (1 - confidence level).</p>
+<pre class="r"><code>library(tidyverse)
+library(knitr)
+library(kableExtra)</code></pre>
+<p>First, initialize the objects to hold the data and establish any constants we might need later.</p>
+<pre class="r"><code>#Initial offset constant to keep minimum group size at n=6
+INITIAL_OFFSET &lt;- 5
+
+#Initial values for number of inner and outer loop iterations
+n_inner_loop &lt;- 50
+n_inner_data &lt;- n_inner_loop + INITIAL_OFFSET
+n_outer &lt;- 100
+
+#Initialize empty vector to store p values
+store_p_values_vec &lt;- rep(NA, n_inner_loop)
+
+#Initialize a tibble with placeholder column
+many_runs_tbl &lt;-  tibble(
+  V1 = rep(NA,  n_inner_loop)
+  )</code></pre>
+<p>The simulation requires 2 for loops. The inner loop performs a series of t-test adding 1 more experimental observation to each group after each iteration. The p-value for that iteration is extracted and stored. In the outer loop, the initial data for the 2 groups are generated randomly from normal distributions. Since we can’t really run a t-test on groups with very low sample sizes, we use an initial offset value so that the t-test loops don’t start until both groups have a few observations from which to calculate the means.</p>
+<p>The p-value for a traditional t-test should be an indication of the long-term false positive rate. In other words: if we ran a t-test on samples drawn from 2 identical populations many times we would see a few large differences in means simply due to chance draws. Among all such simulations, the value at the 95% quantile represents the p-value of .05.</p>
+<p>We can gut-check our simulation in this way by setting the two populations identical to each other and drawing random values in the outer loop as mentioned above.</p>
+<pre class="r"><code>#Set seed for repeatability
+set.seed(1234)
+
+#Outer loop: replicates a t-test between 2 groups
+for(l in 1:n_outer) {
+    
+    #Generate simulated data for each group.  The parameters are set the same to represent 1 population
+    example_group_1 &lt;- rnorm(n = n_inner_data, mean = 10, sd = 4)
+    example_group_2 &lt;- rnorm(n = n_inner_data, mean = 10, sd = 4)
+    
+    #Inner loop: subset the first (i + initial offset) values from grp 1 and grp 2 (y)
+    #Perform t-test, extract p-value, store in a vector
+    #Increment each group&#39;s size by 1 after each iteration
+    for (i in 1:n_inner_loop) {
+    t_test_obj &lt;- t.test(x = example_group_1[1:(INITIAL_OFFSET + i)], y = example_group_2[1:(INITIAL_OFFSET + i)])
+    store_p_values_vec[i] = t_test_obj$p.value
+  }
+  
+    #Store each vector of n_inner_loop p-values to a column in the many_runs_tbl
+    many_runs_tbl[,l] &lt;- store_p_values_vec
+}
+
+#visualize tibble 
+many_runs_tbl[,1:12] %&gt;% 
+  signif(digits = 3) %&gt;%
+  head(10) %&gt;% 
+  kable(align=rep(&#39;c&#39;, 100))</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+V1
+</th>
+<th style="text-align:center;">
+V2
+</th>
+<th style="text-align:center;">
+V3
+</th>
+<th style="text-align:center;">
+V4
+</th>
+<th style="text-align:center;">
+V5
+</th>
+<th style="text-align:center;">
+V6
+</th>
+<th style="text-align:center;">
+V7
+</th>
+<th style="text-align:center;">
+V8
+</th>
+<th style="text-align:center;">
+V9
+</th>
+<th style="text-align:center;">
+V10
+</th>
+<th style="text-align:center;">
+V11
+</th>
+<th style="text-align:center;">
+V12
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+0.3960
+</td>
+<td style="text-align:center;">
+0.0990
+</td>
+<td style="text-align:center;">
+0.204
+</td>
+<td style="text-align:center;">
+0.412
+</td>
+<td style="text-align:center;">
+0.0686
+</td>
+<td style="text-align:center;">
+0.1450
+</td>
+<td style="text-align:center;">
+0.894
+</td>
+<td style="text-align:center;">
+0.360
+</td>
+<td style="text-align:center;">
+0.721
+</td>
+<td style="text-align:center;">
+0.897
+</td>
+<td style="text-align:center;">
+0.0535
+</td>
+<td style="text-align:center;">
+0.668
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.1700
+</td>
+<td style="text-align:center;">
+0.0628
+</td>
+<td style="text-align:center;">
+0.106
+</td>
+<td style="text-align:center;">
+0.951
+</td>
+<td style="text-align:center;">
+0.2240
+</td>
+<td style="text-align:center;">
+0.0834
+</td>
+<td style="text-align:center;">
+0.802
+</td>
+<td style="text-align:center;">
+0.614
+</td>
+<td style="text-align:center;">
+0.750
+</td>
+<td style="text-align:center;">
+0.886
+</td>
+<td style="text-align:center;">
+0.3170
+</td>
+<td style="text-align:center;">
+0.517
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.1410
+</td>
+<td style="text-align:center;">
+0.0929
+</td>
+<td style="text-align:center;">
+0.057
+</td>
+<td style="text-align:center;">
+0.618
+</td>
+<td style="text-align:center;">
+0.1360
+</td>
+<td style="text-align:center;">
+0.0296
+</td>
+<td style="text-align:center;">
+0.499
+</td>
+<td style="text-align:center;">
+0.561
+</td>
+<td style="text-align:center;">
+0.846
+</td>
+<td style="text-align:center;">
+0.809
+</td>
+<td style="text-align:center;">
+0.1740
+</td>
+<td style="text-align:center;">
+0.410
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.1560
+</td>
+<td style="text-align:center;">
+0.4050
+</td>
+<td style="text-align:center;">
+0.146
+</td>
+<td style="text-align:center;">
+0.800
+</td>
+<td style="text-align:center;">
+0.1690
+</td>
+<td style="text-align:center;">
+0.0625
+</td>
+<td style="text-align:center;">
+0.724
+</td>
+<td style="text-align:center;">
+0.700
+</td>
+<td style="text-align:center;">
+0.857
+</td>
+<td style="text-align:center;">
+0.687
+</td>
+<td style="text-align:center;">
+0.3620
+</td>
+<td style="text-align:center;">
+0.338
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.1140
+</td>
+<td style="text-align:center;">
+0.2610
+</td>
+<td style="text-align:center;">
+0.104
+</td>
+<td style="text-align:center;">
+0.992
+</td>
+<td style="text-align:center;">
+0.2550
+</td>
+<td style="text-align:center;">
+0.1860
+</td>
+<td style="text-align:center;">
+0.548
+</td>
+<td style="text-align:center;">
+0.846
+</td>
+<td style="text-align:center;">
+0.727
+</td>
+<td style="text-align:center;">
+0.911
+</td>
+<td style="text-align:center;">
+0.4270
+</td>
+<td style="text-align:center;">
+0.334
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.0540
+</td>
+<td style="text-align:center;">
+0.3400
+</td>
+<td style="text-align:center;">
+0.143
+</td>
+<td style="text-align:center;">
+0.889
+</td>
+<td style="text-align:center;">
+0.3180
+</td>
+<td style="text-align:center;">
+0.1740
+</td>
+<td style="text-align:center;">
+0.775
+</td>
+<td style="text-align:center;">
+0.768
+</td>
+<td style="text-align:center;">
+0.795
+</td>
+<td style="text-align:center;">
+0.666
+</td>
+<td style="text-align:center;">
+0.5630
+</td>
+<td style="text-align:center;">
+0.229
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.0693
+</td>
+<td style="text-align:center;">
+0.4030
+</td>
+<td style="text-align:center;">
+0.125
+</td>
+<td style="text-align:center;">
+0.871
+</td>
+<td style="text-align:center;">
+0.7340
+</td>
+<td style="text-align:center;">
+0.0757
+</td>
+<td style="text-align:center;">
+0.826
+</td>
+<td style="text-align:center;">
+0.792
+</td>
+<td style="text-align:center;">
+0.704
+</td>
+<td style="text-align:center;">
+0.755
+</td>
+<td style="text-align:center;">
+0.4810
+</td>
+<td style="text-align:center;">
+0.694
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.0324
+</td>
+<td style="text-align:center;">
+0.4050
+</td>
+<td style="text-align:center;">
+0.181
+</td>
+<td style="text-align:center;">
+0.930
+</td>
+<td style="text-align:center;">
+0.8630
+</td>
+<td style="text-align:center;">
+0.0617
+</td>
+<td style="text-align:center;">
+0.738
+</td>
+<td style="text-align:center;">
+0.564
+</td>
+<td style="text-align:center;">
+0.501
+</td>
+<td style="text-align:center;">
+0.611
+</td>
+<td style="text-align:center;">
+0.3930
+</td>
+<td style="text-align:center;">
+0.472
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.0206
+</td>
+<td style="text-align:center;">
+0.4550
+</td>
+<td style="text-align:center;">
+0.112
+</td>
+<td style="text-align:center;">
+0.912
+</td>
+<td style="text-align:center;">
+0.7560
+</td>
+<td style="text-align:center;">
+0.0958
+</td>
+<td style="text-align:center;">
+0.644
+</td>
+<td style="text-align:center;">
+0.708
+</td>
+<td style="text-align:center;">
+0.265
+</td>
+<td style="text-align:center;">
+0.687
+</td>
+<td style="text-align:center;">
+0.2520
+</td>
+<td style="text-align:center;">
+0.638
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.0294
+</td>
+<td style="text-align:center;">
+0.6690
+</td>
+<td style="text-align:center;">
+0.103
+</td>
+<td style="text-align:center;">
+0.777
+</td>
+<td style="text-align:center;">
+0.8680
+</td>
+<td style="text-align:center;">
+0.1700
+</td>
+<td style="text-align:center;">
+0.664
+</td>
+<td style="text-align:center;">
+0.703
+</td>
+<td style="text-align:center;">
+0.284
+</td>
+<td style="text-align:center;">
+0.912
+</td>
+<td style="text-align:center;">
+0.2450
+</td>
+<td style="text-align:center;">
+0.441
+</td>
+</tr>
+</tbody>
+</table>
+<p>Each column above represents n=50 p-values, with each successive value calculated after observing the newest data point in the simulated test sequence. These are the p-values we see if we peek at the calculation every time.</p>
+<p>We need to convert data into tidy format for better visualization. In the tidy format, every column should be a unique variable. The gather() function converts data from wide to long by adding a new variable called “rep_sim_number” and combining all the various runs from 1 to 100 in a single column. In total, we’ll have only 3 columns in the tidy version.</p>
+<pre class="r"><code>#add new column with row id numbers
+final_runs_tbl &lt;- many_runs_tbl %&gt;% 
+    mutate(row_id = row_number()) %&gt;%
+    select(row_id, everything())
+
+#convert from wide format (untidy) to long (tidy) using gather()
+final_runs_tidy_tbl &lt;- final_runs_tbl %&gt;% gather(key = &quot;rep_sim_number&quot;, value = &quot;p_value&quot;, -row_id)
+
+#visualize tidy data structure
+final_runs_tidy_tbl %&gt;% 
+  head(10) %&gt;% 
+  kable(align=rep(&#39;c&#39;, 3))</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+row_id
+</th>
+<th style="text-align:center;">
+rep_sim_number
+</th>
+<th style="text-align:center;">
+p_value
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+1
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.3963352
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+2
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.1704697
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+3
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.1414021
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+4
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.1557261
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+5
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.1141854
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+6
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.0539595
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+7
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.0693410
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+8
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.0324232
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+9
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.0205511
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+10
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.0293952
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>final_runs_tidy_tbl %&gt;% 
+  tail(10) %&gt;% 
+  kable(align=rep(&#39;c&#39;, 3))</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+row_id
+</th>
+<th style="text-align:center;">
+rep_sim_number
+</th>
+<th style="text-align:center;">
+p_value
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+41
+</td>
+<td style="text-align:center;">
+V100
+</td>
+<td style="text-align:center;">
+0.0515933
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+42
+</td>
+<td style="text-align:center;">
+V100
+</td>
+<td style="text-align:center;">
+0.0509430
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+43
+</td>
+<td style="text-align:center;">
+V100
+</td>
+<td style="text-align:center;">
+0.0386845
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+44
+</td>
+<td style="text-align:center;">
+V100
+</td>
+<td style="text-align:center;">
+0.0567804
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+45
+</td>
+<td style="text-align:center;">
+V100
+</td>
+<td style="text-align:center;">
+0.0762953
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+46
+</td>
+<td style="text-align:center;">
+V100
+</td>
+<td style="text-align:center;">
+0.0933081
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+47
+</td>
+<td style="text-align:center;">
+V100
+</td>
+<td style="text-align:center;">
+0.0755494
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+48
+</td>
+<td style="text-align:center;">
+V100
+</td>
+<td style="text-align:center;">
+0.0558263
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+49
+</td>
+<td style="text-align:center;">
+V100
+</td>
+<td style="text-align:center;">
+0.0731072
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+50
+</td>
+<td style="text-align:center;">
+V100
+</td>
+<td style="text-align:center;">
+0.0496300
+</td>
+</tr>
+</tbody>
+</table>
+<p>From here it is straightforward to visualize the trajectory of the p-values through the course of the testing for all 100 simulations.</p>
+<pre class="r"><code>#visualize history of n_outer p-values across n_inner_loop consecutive data points as lineplot
+lp_1 &lt;- final_runs_tidy_tbl %&gt;% ggplot(aes(x = row_id, y = p_value, group = rep_sim_number)) +
+  geom_line(show.legend = &quot;none&quot;,
+            color       = &quot;grey&quot;,
+            alpha       = 0.7) +
+  labs(x        = &quot;Sequential Benchtop Test Observations&quot;,
+       title    = &quot;P-Value History for Difference in Means, Standard T-Test&quot;,
+       subtitle = &quot;Both Groups Sampled From Same Population&quot;
+       )
+
+lp_1</code></pre>
+<p><img src="/post/2019-09-06-stopping-rules-for-significance-testing_files/figure-html/unnamed-chunk-4-1.png" width="100%" height="500px" /></p>
+<p>The p-values are all over the place! It makes sense that at the pre-determined stopping point (n=50) we would have a spread of p-values since the population parameters for the two groups were identical and p should only rarely land below .05. However, this visualization makes it clear that prior to the stopping point, the path of any particular p-value fluctuates wildly. This is the reason why we can’t stop early or peek!</p>
+<p>Let’s take a look at the false positives, defined here as the runs where the p-value ended up less than or equal to .05 at the pre-determined stopping point of n=50.</p>
+<pre class="r"><code>#filter for runs that ended in false positives (p &lt; .05) at the last data point
+filtered_endpoint_tbl &lt;- final_runs_tidy_tbl %&gt;% 
+    filter(row_id == 50,
+           p_value &lt;= 0.05) %&gt;%
+    select(rep_sim_number) %&gt;%
+    rename(&quot;false_positives&quot; = rep_sim_number)
+
+filtered_endpoint_tbl %&gt;% 
+  head(10) %&gt;% 
+  kable(align=&#39;c&#39;) %&gt;%
+  kable_styling(full_width = FALSE)</code></pre>
+<table class="table" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:center;">
+false_positives
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+V1
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+V23
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+V48
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+V54
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+V77
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+V86
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+V89
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+V100
+</td>
+</tr>
+</tbody>
+</table>
+<p>So 8 out of 100 simulations have p-values &lt; .05. This is about as expected since the long term false positive rate should be 5%. Having now identified the false positives, we can visualize the trajectory of their p-values after obtaining each successive data point. This is what happens when we peek early or stop the test when we first see a desired outcome. The following code pulls the full history of the false positive test sequences so we can see their paths before the stopping point.</p>
+<pre class="r"><code>#extract full false positive test histories.  %in% filters rows that match anything in the false_positives vector
+full_low_runs_tbl &lt;- final_runs_tidy_tbl %&gt;%
+    filter(rep_sim_number %in% filtered_endpoint_tbl$false_positives)
+
+#visualize trajectory of false positives by highlighting their traces
+lp_2 &lt;- final_runs_tidy_tbl %&gt;% 
+    ggplot(aes(x = row_id, y = p_value, group = rep_sim_number)) +
+    geom_line(alpha = 0.7, show.legend = FALSE, color = &quot;grey&quot;) +
+    geom_line(aes(color = rep_sim_number), data = full_low_runs_tbl, show.legend = FALSE, size = .8, alpha = 0.7) +
+    labs(x       = &quot;Sequential Benchtop Test Observations&quot;,
+        title    = &quot;P-Value History for Difference in Means, Standard T-Test&quot;,
+        subtitle = &quot;Highlighted Traces Represent Sequences with p &lt; .05 at n=50&quot;
+        )
+
+lp_2</code></pre>
+<p><img src="/post/2019-09-06-stopping-rules-for-significance-testing_files/figure-html/unnamed-chunk-6-1.png" width="100%" height="500px" /> Indeed, the p-values that end up less than .05 do not take a straight line path to get there. Likewise, there may be tests that dip below p=.05 at some point but culminate well above .05 at the pre-determined stopping point. These represent additional false-positives we invite when we peek or stop early. Let’s identify and count these:</p>
+<pre class="r"><code>#filter for all run who&#39;s p-value ever dipped to .05 or lower at any point 
+low_p_tbl &lt;- final_runs_tidy_tbl %&gt;% 
+    filter(p_value &lt;= .05) %&gt;% 
+    distinct(rep_sim_number)
+
+#visualize
+low_p_tbl %&gt;% 
+  head(10) %&gt;% 
+  kable(align=&#39;c&#39;) %&gt;% 
+  kable_styling(full_width = FALSE)</code></pre>
+<table class="table" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:center;">
+rep_sim_number
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+V1
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+V6
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+V7
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+V16
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+V17
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+V20
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+V21
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+V23
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+V30
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+V33
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>#count total number of false positives with peeking
+low_p_tbl %&gt;% nrow() %&gt;%
+  kable(align = &quot;c&quot;) %&gt;% 
+  kable_styling(full_width = FALSE)</code></pre>
+<table class="table" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:center;">
+x
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+37
+</td>
+</tr>
+</tbody>
+</table>
+<p>The false positives go from 8 to 37!</p>
+<pre class="r"><code>#filter for only the rows where rep_sim_number here matches at least 1 value from low_p_tbl$rep_sim_number
+#this extracts the full history of runs who&#39;s p-value dipped to .05 or lower at any point 
+any_low_runs_tbl &lt;- final_runs_tidy_tbl %&gt;%
+    filter(rep_sim_number %in% low_p_tbl$rep_sim_number)
+
+#visualize
+any_low_runs_tbl %&gt;% 
+  head(10) %&gt;% 
+  kable(align = rep(&quot;c&quot;, 3))</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+row_id
+</th>
+<th style="text-align:center;">
+rep_sim_number
+</th>
+<th style="text-align:center;">
+p_value
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+1
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.3963352
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+2
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.1704697
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+3
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.1414021
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+4
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.1557261
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+5
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.1141854
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+6
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.0539595
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+7
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.0693410
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+8
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.0324232
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+9
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.0205511
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+10
+</td>
+<td style="text-align:center;">
+V1
+</td>
+<td style="text-align:center;">
+0.0293952
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>#visualize the trajectory or runs that dipped to .05 or below
+lp_3 &lt;- final_runs_tidy_tbl %&gt;% 
+    ggplot(aes(x = row_id, y = p_value, group = rep_sim_number)) +
+    geom_line(alpha = 0.7, show.legend = FALSE, color = &quot;grey&quot;) +
+    geom_line(aes(color = rep_sim_number), data = any_low_runs_tbl, show.legend = FALSE, size = .8, alpha = 0.7) +
+    labs(x       = &quot;Sequential Benchtop Test Observations&quot;,
+        title    = &quot;P-Value History for Difference in Means, Standard T-Test&quot;,
+        subtitle = &quot;Highlighted Runs Represent p &lt; .05 at Any Point&quot;
+        )
+
+lp_3</code></pre>
+<p><img src="/post/2019-09-06-stopping-rules-for-significance-testing_files/figure-html/unnamed-chunk-9-1.png" width="100%" height="500px" /></p>
+<p>All these differences in means would be considered significant if we don’t observe our pre-determined stopping rule. This could be a big deal. We might claim a performance benefit when there is none, or waste precious time and money trying to figure out why we can’t replicate an earlier experiment!</p>
+<p>Thanks for reading.</p>
+
+  
+  <h4><i class="fa-share-alt" aria-hidden="true"></i>&nbsp;Share!</h4>
+<ul class="share-buttons">
+	<li><a href="https://www.facebook.com/sharer/sharer.php?u=%2fpost%2fstopping-rules-for-significance-testing-in-r%2f" target="_blank" title="Share on Facebook"><i class="fa-facebook" aria-hidden="true"></i><span class="sr-only">Share on Facebook</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="https://twitter.com/intent/tweet?source=%2fpost%2fstopping-rules-for-significance-testing-in-r%2f&via=HorribleGeek" target="_blank" title="Tweet"><i class="fa-twitter" aria-hidden="true"></i><span class="sr-only">Tweet</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="https://plus.google.com/share?url=%2fpost%2fstopping-rules-for-significance-testing-in-r%2f" target="_blank" title="Share on Google+"><i class="fa-google-plus" aria-hidden="true"></i><span class="sr-only">Share on Google+</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="http://www.tumblr.com/share?v=3&u=%2fpost%2fstopping-rules-for-significance-testing-in-r%2f" target="_blank" title="Post to Tumblr"><i class="fa-tumblr" aria-hidden="true"></i><span class="sr-only">Post to Tumblr</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="http://pinterest.com/pin/create/button/?url=%2fpost%2fstopping-rules-for-significance-testing-in-r%2f" target="_blank" title="Pin it"><i class="fa-pinterest-p" aria-hidden="true"></i><span class="sr-only">Pin it</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="http://www.reddit.com/submit?url=%2fpost%2fstopping-rules-for-significance-testing-in-r%2f" target="_blank" title="Submit to Reddit"><i class="fa-reddit-alien" aria-hidden="true"></i><span class="sr-only">Submit to Reddit</span></a>
+	</li>
+</ul>
+
+
+<style>
+	ul.share-buttons{
+	  list-style: none;
+	  padding: 0;
+	}
+
+	ul.share-buttons li{
+	  display: inline;
+	}
+
+	ul.share-buttons .sr-only{
+	  position: absolute;
+	  clip: rect(1px 1px 1px 1px);
+	  clip: rect(1px, 1px, 1px, 1px);
+	  padding: 0;
+	  border: 0;
+	  height: 1px;
+	  width: 1px;
+	  overflow: hidden;
+	}
+</style>
+
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/post/assessing-dv-risk-w-bayesian-estimation-in-r/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/post/assessing-dv-risk-w-bayesian-estimation-in-r/">Assessing Design Verification Risk with Bayesian Estimation in R</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/post/modeling-particulate-counts-as-a-poisson-process-in-r/">Modeling Particulate Counts as a Poisson Process in R</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/post/modeling-particulate-counts-as-a-poisson-process-in-r/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+
+</div>
+
+</div>
+</div>
+<script src="/js/ui.js"></script>
+<script src="/js/menus.js"></script>
+
+
+<script>
+  
+  if (window.location.hostname != "localhost") {
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+    ga('create', 'Your Google Analytics tracking ID', 'auto');
+    ga('send', 'pageview');
+  }
+</script>
+
+
+
+
+
+<script src="/js/math-code.js"></script>
+  <script async src="//cdn.bootcss.com/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+  
+
+
+</body>
+</html>
+

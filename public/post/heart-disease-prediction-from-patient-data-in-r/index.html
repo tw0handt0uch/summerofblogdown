@@ -1,0 +1,1862 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.56.1" />
+
+  <title>Heart Disease Prediction From Patient Data in R &middot; [R]eliability</title>
+
+    
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.9.0/css/all.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+ 
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/img/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+  <a class="pure-menu-heading brand" href="/">Riley King</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/about/"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
+      
+        </li>
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/riley-king-9594247" rel="me" target="_blank"><i class="fab fa-linkedin"></i></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/tw0handt0uch" rel="me" target="_blank"><i class="fab fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2019. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+
+<div class="header">
+  <h1>Heart Disease Prediction From Patient Data in R</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+    <i class="fa fa-calendar fa-fw"></i>
+    <time>29 Sep 2019</time>
+  </div>
+
+  
+
+  
+  
+  
+  
+
+  
+  
+  
+  <div>
+    <i class="fa fa-tags fa-fw"></i>
+    
+      <a class="post-taxonomy-tag" href="/tags/r">R</a>&nbsp;&#47;
+    
+      <a class="post-taxonomy-tag" href="/tags/machine-learning">Machine-Learning</a>
+    
+  </div>
+  
+  
+
+</div>
+
+  
+<script src="/rmarkdown-libs/kePrint/kePrint.js"></script>
+
+
+<p>Test 1. In this post I’ll be attempting to leverage the parsnip package in R to run through some straightforward predictive analytics/machine learning. Parsnip provides a flexible and consistent interface to apply common regression and classification algorithms in R. I’ll be working with the Cleveland Clinic Heart Disease dataset which contains 13 variables related to patient diagnostics and one outcome variable indicating the presence or absence of heart disease.<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> The data was accessed from the UCI Machine Learning Repository in September 2019.<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a>. The goal is to be able to accurately classify as having or not having heart disease based on diagnostic test data.</p>
+<p><img src="/./img/cda.jpg" width="100%" height="100%" style="display: block; margin: auto;" /></p>
+<p>Load the libraries to be used.</p>
+<pre class="r"><code>#Load libraries
+library(tidyverse)
+library(kableExtra)
+library(rsample)
+library(recipes)
+library(parsnip)
+library(yardstick)
+library(viridisLite)
+library(GGally)</code></pre>
+<p>The first part of the analysis is to read in the data set and clean the column names up a bit.</p>
+<pre class="r"><code>#Read in data
+heart_disease_dataset &lt;- read.csv(file = &quot;processed.cleveland.data&quot;, header = F)
+
+#Prepare column names
+names &lt;- c(&quot;Age&quot;,
+           &quot;Sex&quot;,
+           &quot;Chest_Pain_Type&quot;,
+           &quot;Resting_Blood_Pressure&quot;,
+           &quot;Serum_Cholesterol&quot;,
+           &quot;Fasting_Blood_Sugar&quot;,
+           &quot;Resting_ECG&quot;,
+           &quot;Max_Heart_Rate_Achieved&quot;,
+           &quot;Exercise_Induced_Angina&quot;,
+           &quot;ST_Depression_Exercise&quot;,
+           &quot;Peak_Exercise_ST_Segment&quot;,
+           &quot;Num_Major_Vessels_Flouro&quot;,
+           &quot;Thalassemia&quot;,
+           &quot;Diagnosis_Heart_Disease&quot;)
+
+#Apply column names to the dataframe
+colnames(heart_disease_dataset) &lt;- names
+
+#Glimpse data to verify new column names are in place
+heart_disease_dataset %&gt;% glimpse()</code></pre>
+<pre><code>## Observations: 303
+## Variables: 14
+## $ Age                      &lt;dbl&gt; 63, 67, 67, 37, 41, 56, 62, 57, 63, 5...
+## $ Sex                      &lt;dbl&gt; 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1...
+## $ Chest_Pain_Type          &lt;dbl&gt; 1, 4, 4, 3, 2, 2, 4, 4, 4, 4, 4, 2, 3...
+## $ Resting_Blood_Pressure   &lt;dbl&gt; 145, 160, 120, 130, 130, 120, 140, 12...
+## $ Serum_Cholesterol        &lt;dbl&gt; 233, 286, 229, 250, 204, 236, 268, 35...
+## $ Fasting_Blood_Sugar      &lt;dbl&gt; 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1...
+## $ Resting_ECG              &lt;dbl&gt; 2, 2, 2, 0, 2, 0, 2, 0, 2, 2, 0, 2, 2...
+## $ Max_Heart_Rate_Achieved  &lt;dbl&gt; 150, 108, 129, 187, 172, 178, 160, 16...
+## $ Exercise_Induced_Angina  &lt;dbl&gt; 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1...
+## $ ST_Depression_Exercise   &lt;dbl&gt; 2.3, 1.5, 2.6, 3.5, 1.4, 0.8, 3.6, 0....
+## $ Peak_Exercise_ST_Segment &lt;dbl&gt; 3, 2, 2, 3, 1, 1, 3, 1, 2, 3, 2, 2, 2...
+## $ Num_Major_Vessels_Flouro &lt;fct&gt; 0.0, 3.0, 2.0, 0.0, 0.0, 0.0, 2.0, 0....
+## $ Thalassemia              &lt;fct&gt; 6.0, 3.0, 7.0, 3.0, 3.0, 3.0, 3.0, 3....
+## $ Diagnosis_Heart_Disease  &lt;int&gt; 0, 2, 1, 0, 0, 0, 3, 0, 2, 1, 0, 0, 2...</code></pre>
+<p>There are 14 variables provided in the data set and the last one is the dependent variable that we want to be able to predict. Here is a summary of what the other variables mean:</p>
+<ol style="list-style-type: decimal">
+<li><p><strong>Age</strong>: Age of subject</p></li>
+<li><p><strong>Sex</strong>: Gender of subject:<br />
+0 = female 1 = male</p></li>
+<li><p><strong>Chest-pain type</strong>: Type of chest-pain experienced by the individual:<br />
+1 = typical angina<br />
+2 = atypical angina<br />
+3 = non-angina pain<br />
+4 = asymptomatic angina</p></li>
+<li><p><strong>Resting Blood Pressure</strong>: Resting blood pressure in mm Hg</p></li>
+<li><p><strong>Serum Cholesterol</strong>: Serum cholesterol in mg/dl</p></li>
+<li><p><strong>Fasting Blood Sugar</strong>: Fasting blood sugar level relative to 120 mg/dl: 0 = fasting blood sugar &lt;= 120 mg/dl<br />
+1 = fasting blood sugar &gt; 120 mg/dl</p></li>
+<li><p><strong>Resting ECG</strong>: Resting electrocardiographic results<br />
+0 = normal<br />
+1 = ST-T wave abnormality<br />
+2 = left ventricle hyperthrophy</p></li>
+<li><p><strong>Max Heart Rate Achieved</strong>: Max heart rate of subject</p></li>
+<li><p><strong>Exercise Induced Angina</strong>:<br />
+0 = no 1 = yes</p></li>
+<li><p><strong>ST Depression Induced by Exercise Relative to Rest</strong>: ST Depression of subject</p></li>
+<li><p><strong>Peak Exercise ST Segment</strong>:<br />
+1 = Up-sloaping<br />
+2 = Flat<br />
+3 = Down-sloaping</p></li>
+<li><p><strong>Number of Major Vessels (0-3) Visible on Flouroscopy</strong>: Number of visible vessels under flouro</p></li>
+<li><p><strong>Thal</strong>: Form of thalassemia: <a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a><br />
+3 = normal<br />
+6 = fixed defect<br />
+7 = reversible defect</p></li>
+<li><p><strong>Diagnosis of Heart Disease</strong>: Indicates whether subject is suffering from heart disease or not:<br />
+0 = absence<br />
+1, 2, 3, 4 = heart disease present</p></li>
+</ol>
+<p>A closer look at the data identifies some NA and “?” values that will need to be addressed in the cleaning step. We also want to know the number of observations in the dependent variable column to understand if the dataset is relatively balanced.</p>
+<pre class="r"><code>#Determine the number of values in each level of dependent variable
+heart_disease_dataset %&gt;% 
+  drop_na() %&gt;%
+  group_by(Diagnosis_Heart_Disease) %&gt;%
+  count() %&gt;% 
+  ungroup() %&gt;%
+  kable(align = rep(&quot;c&quot;, 2)) %&gt;% kable_styling(&quot;full_width&quot; = F)</code></pre>
+<table class="table" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:center;">
+Diagnosis_Heart_Disease
+</th>
+<th style="text-align:center;">
+n
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+164
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+1
+</td>
+<td style="text-align:center;">
+55
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+2
+</td>
+<td style="text-align:center;">
+36
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+3
+</td>
+<td style="text-align:center;">
+35
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+4
+</td>
+<td style="text-align:center;">
+13
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>#Identify the different levels of Thalassemia
+heart_disease_dataset %&gt;% 
+  drop_na() %&gt;%
+  group_by(Thalassemia) %&gt;%
+  count() %&gt;% 
+  ungroup() %&gt;%
+  kable(align = rep(&quot;c&quot;, 2)) %&gt;% kable_styling(&quot;full_width&quot; = F)</code></pre>
+<table class="table" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:center;">
+Thalassemia
+</th>
+<th style="text-align:center;">
+n
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+?
+</td>
+<td style="text-align:center;">
+2
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+3.0
+</td>
+<td style="text-align:center;">
+166
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+6.0
+</td>
+<td style="text-align:center;">
+18
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+7.0
+</td>
+<td style="text-align:center;">
+117
+</td>
+</tr>
+</tbody>
+</table>
+<p>Since any value above 0 in ‘Diagnosis_Heart_Disease’ (column 14) indicates the presence of heart disease, we can lump all levels &gt; 0 together so the classification predictions are binary - Yes or No (1 or 0). The total count of positive heart disease results is less than the number of negative results so the fct_lump() call with default arguments will convert that variable from 4 levels to 2.</p>
+<p>The data cleaning pipeline below deals with NA values, converts some variables to factors, lumps the dependent variable into two buckets, removes the rows that had “?” for observations, and reorders the variables within the dataframe:</p>
+<pre class="r"><code>#Drop NA&#39;s, convert to factors, lump target variable to 2 levels, remove &quot;?&quot;, reorder variables
+heart_dataset_clean_tbl &lt;- heart_disease_dataset %&gt;% 
+    drop_na() %&gt;%
+    mutate_at(c(&quot;Resting_ECG&quot;, 
+                &quot;Fasting_Blood_Sugar&quot;, 
+                &quot;Sex&quot;, 
+                &quot;Diagnosis_Heart_Disease&quot;, 
+                &quot;Exercise_Induced_Angina&quot;,
+                &quot;Peak_Exercise_ST_Segment&quot;, 
+                &quot;Chest_Pain_Type&quot;), as_factor) %&gt;%
+    mutate(Num_Major_Vessels_Flouro = as.numeric(Num_Major_Vessels_Flouro)) %&gt;%
+    mutate(Diagnosis_Heart_Disease = fct_lump(Diagnosis_Heart_Disease, other_level = &quot;1&quot;)) %&gt;% 
+    filter(Thalassemia != &quot;?&quot;) %&gt;%
+    select(Age, 
+           Resting_Blood_Pressure, 
+           Serum_Cholesterol, 
+           Max_Heart_Rate_Achieved, 
+           ST_Depression_Exercise,
+           Num_Major_Vessels_Flouro,
+           everything())
+
+#Glimpse data
+heart_dataset_clean_tbl %&gt;%
+  glimpse()</code></pre>
+<pre><code>## Observations: 301
+## Variables: 14
+## $ Age                      &lt;dbl&gt; 63, 67, 67, 37, 41, 56, 62, 57, 63, 5...
+## $ Resting_Blood_Pressure   &lt;dbl&gt; 145, 160, 120, 130, 130, 120, 140, 12...
+## $ Serum_Cholesterol        &lt;dbl&gt; 233, 286, 229, 250, 204, 236, 268, 35...
+## $ Max_Heart_Rate_Achieved  &lt;dbl&gt; 150, 108, 129, 187, 172, 178, 160, 16...
+## $ ST_Depression_Exercise   &lt;dbl&gt; 2.3, 1.5, 2.6, 3.5, 1.4, 0.8, 3.6, 0....
+## $ Num_Major_Vessels_Flouro &lt;dbl&gt; 2, 5, 4, 2, 2, 2, 4, 2, 3, 2, 2, 2, 3...
+## $ Sex                      &lt;fct&gt; 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1...
+## $ Chest_Pain_Type          &lt;fct&gt; 1, 4, 4, 3, 2, 2, 4, 4, 4, 4, 4, 2, 3...
+## $ Fasting_Blood_Sugar      &lt;fct&gt; 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1...
+## $ Resting_ECG              &lt;fct&gt; 2, 2, 2, 0, 2, 0, 2, 0, 2, 2, 0, 2, 2...
+## $ Exercise_Induced_Angina  &lt;fct&gt; 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1...
+## $ Peak_Exercise_ST_Segment &lt;fct&gt; 3, 2, 2, 3, 1, 1, 3, 1, 2, 3, 2, 2, 2...
+## $ Thalassemia              &lt;fct&gt; 6.0, 3.0, 7.0, 3.0, 3.0, 3.0, 3.0, 3....
+## $ Diagnosis_Heart_Disease  &lt;fct&gt; 0, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 1...</code></pre>
+<p>Time for some basic exploratory data analysis. The workflow below breaks out the categorical variables and visualizes them on a faceted bar plot. I’m recoding the factors levels from numeric back to text-based so the labels are easy to interpret on the plots and stripping the y-axis labels since the relative differences are what matters.</p>
+<pre class="r"><code>#Select categorical vars, recode them to their character values, convert to long format
+hd_long_fact_tbl &lt;- heart_dataset_clean_tbl  %&gt;%
+  select(Sex,
+         Chest_Pain_Type,
+         Fasting_Blood_Sugar,
+         Resting_ECG,
+         Exercise_Induced_Angina,
+         Peak_Exercise_ST_Segment,
+         Thalassemia,
+         Diagnosis_Heart_Disease) %&gt;%
+  mutate(Sex = recode_factor(Sex, `0` = &quot;female&quot;, 
+                                  `1` = &quot;male&quot; ),
+         Chest_Pain_Type = recode_factor(Chest_Pain_Type, `1` = &quot;typical&quot;,   
+                                                          `2` = &quot;atypical&quot;,
+                                                          `3` = &quot;non-angina&quot;, 
+                                                          `4` = &quot;asymptomatic&quot;),
+         Fasting_Blood_Sugar = recode_factor(Fasting_Blood_Sugar, `0` = &quot;&lt;= 120 mg/dl&quot;, 
+                                                                  `1` = &quot;&gt; 120 mg/dl&quot;),
+         Resting_ECG = recode_factor(Resting_ECG, `0` = &quot;normal&quot;,
+                                                  `1` = &quot;ST-T abnormality&quot;,
+                                                  `2` = &quot;LV hypertrophy&quot;),
+         Exercise_Induced_Angina = recode_factor(Exercise_Induced_Angina, `0` = &quot;no&quot;,
+                                                                          `1` = &quot;yes&quot;),
+         Peak_Exercise_ST_Segment = recode_factor(Peak_Exercise_ST_Segment, `1` = &quot;up-sloaping&quot;,
+                                                                            `2` = &quot;flat&quot;,
+                                                                            `3` = &quot;down-sloaping&quot;),
+         Thalassemia = recode_factor(Thalassemia, `3` = &quot;normal&quot;,
+                                                  `6` = &quot;fixed defect&quot;,
+                                                  `7` = &quot;reversible defect&quot;)) %&gt;%
+  gather(key = &quot;key&quot;, value = &quot;value&quot;, -Diagnosis_Heart_Disease)
+
+#Visualize with bar plot
+hd_long_fact_tbl %&gt;% 
+  ggplot(aes(value)) +
+    geom_bar(aes(x        = value, 
+                 fill     = Diagnosis_Heart_Disease), 
+                 alpha    = .6, 
+                 position = &quot;dodge&quot;, 
+                 color    = &quot;black&quot;,
+                 width    = .8
+             ) +
+    labs(x = &quot;&quot;,
+         y = &quot;&quot;,
+         title = &quot;Scaled Effect of Categorical Variables&quot;) +
+    theme(
+         axis.text.y  = element_blank(),
+         axis.ticks.y = element_blank()) +
+    facet_wrap(~ key, scales = &quot;free&quot;, nrow = 4) +
+    scale_fill_manual(
+         values = c(&quot;#fde725ff&quot;, &quot;#20a486ff&quot;),
+         name   = &quot;Heart\nDisease&quot;,
+         labels = c(&quot;No HD&quot;, &quot;Yes HD&quot;))</code></pre>
+<p><img src="/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-6-1.png" width="100%" height="500px" /></p>
+<p>I prefer boxplots for evaluating the continuous variables.</p>
+<pre class="r"><code>#Must gather() data first in order to facet wrap by key 
+#(default gather call puts all var names into new key col)
+hd_long_cont_tbl &lt;- heart_dataset_clean_tbl  %&gt;%
+  select(Age,
+         Resting_Blood_Pressure,
+         Serum_Cholesterol,
+         Max_Heart_Rate_Achieved,
+         ST_Depression_Exercise,
+         Num_Major_Vessels_Flouro,
+         Diagnosis_Heart_Disease) %&gt;% 
+  gather(key   = &quot;key&quot;, 
+         value = &quot;value&quot;,
+         -Diagnosis_Heart_Disease)
+
+#Visualize continuous variables as boxplots
+hd_long_cont_tbl %&gt;% 
+  ggplot(aes(y = value)) +
+       geom_boxplot(aes(fill = Diagnosis_Heart_Disease),
+                      alpha  = .6,
+                      fatten = .7) +
+        labs(x = &quot;&quot;,
+             y = &quot;&quot;,
+             title = &quot;Boxplots for Continuous Variables&quot;) +
+      scale_fill_manual(
+            values = c(&quot;#fde725ff&quot;, &quot;#20a486ff&quot;),
+            name   = &quot;Heart\nDisease&quot;,
+            labels = c(&quot;No HD&quot;, &quot;Yes HD&quot;)) +
+      theme(
+         axis.text.x  = element_blank(),
+         axis.ticks.x = element_blank()) +
+      facet_wrap(~ key, 
+                 scales = &quot;free&quot;, 
+                 ncol   = 2) </code></pre>
+<p><img src="/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-7-1.png" width="100%" height="500px" /> The faceted plots for categorical and continuous variables suggest the following conditions are associated with increased prevalence of heart disease (note: this does not mean the relationship is causal).</p>
+<ul>
+<li>Asymptomatic angina chest pain (relative to typical angina chest pain, atypical angina pain, or non-angina pain)</li>
+<li>Presence of exercise induced angina</li>
+<li>Lower fasting blood sugar</li>
+<li>Flat or down-sloaping peak exercise ST segment</li>
+<li>Presence of left ventricle hypertrophy</li>
+<li>Male</li>
+<li>Higher thelassemia score</li>
+<li>Higher age</li>
+<li>Lower max heart rate achieved</li>
+<li>Higher resting blood pressure</li>
+<li>Higher cholesterol</li>
+<li>Higher ST depression induced by exercise relative to rest</li>
+</ul>
+<p>We can’t all be cardiologists but these do seem to pass the eye check. Particularly: age, blood pressure, cholesterol, and sex all point in the right direction based on what we generally know about the world around us. This provides a nice phase gate to let us proceed with the analysis.</p>
+<p>Highly correlated variables can lead to overly complicated models or wonky predictions. The ggcorr() function from GGally package provides a nice, clean correlation matrix of the numeric variables. The default method is Pearson which I use here first. Pearson isn’t ideal if the data is skewed or has a lot of outliers so I’ll check using the rank-based Kendall method as well.<a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a></p>
+<pre class="r"><code>#Correlation matrix using Pearson method, default method is Pearson
+heart_dataset_clean_tbl %&gt;% ggcorr(high       = &quot;#20a486ff&quot;,
+                                   low        = &quot;#fde725ff&quot;,
+                                   label      = TRUE, 
+                                   hjust      = .75, 
+                                   size       = 3, 
+                                   label_size = 3,
+                                   nbreaks    = 5
+                                              ) +
+  labs(title = &quot;Correlation Matrix&quot;,
+  subtitle = &quot;Pearson Method Using Pairwise Obervations&quot;)</code></pre>
+<p><img src="/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-8-1.png" width="100%" height="500px" /></p>
+<pre class="r"><code>#Correlation matrix using Kendall method
+heart_dataset_clean_tbl %&gt;% ggcorr(method     = c(&quot;pairwise&quot;, &quot;kendall&quot;),
+                                   high       = &quot;#20a486ff&quot;,
+                                   low        = &quot;#fde725ff&quot;,
+                                   label      = TRUE, 
+                                   hjust      = .75, 
+                                   size       = 3, 
+                                   label_size = 3,
+                                   nbreaks    = 5
+                                   ) +
+  labs(title = &quot;Correlation Matrix&quot;,
+  subtitle = &quot;Kendall Method Using Pairwise Observations&quot;)</code></pre>
+<p><img src="/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-8-2.png" width="100%" height="500px" /></p>
+<p>There are very minor differences between the Pearson and Kendall results. No variables appear to be highly correlated. As such, it seems reasonable to stay with the original 14 variables as we proceed into the modeling section.</p>
+<p>The plan is to split up the original data set to form a training group and testing group. The training group will be used to fit the model while the testing group will be used to evaluate predictions. The initial_split() function creates a split object which is just an efficient way to store both the training and testing sets. The training() and testing() functions are used to extract the appropriate dataframes out of the split object when needed.</p>
+<pre class="r"><code>#set seed for repeatability
+set.seed(1333)
+
+#create split object 
+train_test_split &lt;- heart_dataset_clean_tbl %&gt;% initial_split(prop = .8, strata = &quot;Diagnosis_Heart_Disease&quot;)
+
+#pipe split obj to training() fcn to create training set
+train_tbl &lt;- train_test_split %&gt;% training()
+
+#pipe split obj to testing() fcn to create test set
+test_tbl &lt;- train_test_split %&gt;% testing()</code></pre>
+<p>We chose to do our data preparation early on during the cleaning phase. For more complicated modeling operations it may be desirable to set up a recipe to do the pre-processing in a repeatable and reversible fashion and I chose here to leave some placeholder lines commented out and available for future work. The recipe is the spot to transform, scale, or binarize the data. We have to tell the recipe() function what we want to model: Diagnosis_Heart_Disease as a function of all the other variables (not needed here since we took care of the necessary conversions). The training data should be used exclusively to train the recipe to avoid data leakage. After giving the model syntax to the recipe, the data is piped into the prep() function which will extract all the processing parameters (if we had implemented processing steps here). The trained recipe is stored as an object and bake function is used to apply the trained recipe to a new (test) data set.</p>
+<p>Juice() is a shortcut to extract the finalized training set which is already embedded in the recipe by default. Calling the bake() function and proving the recipe and a new data set will apply the processing steps to that dataframe.</p>
+<pre class="r"><code>#Set up recipe (use training data here to avoid leakage)
+the_recipe &lt;- recipe(Diagnosis_Heart_Disease ~ . , data = train_tbl) %&gt;%
+              #[Processing Step 1]
+              #[Processing Step 2]
+              prep(train_tbl, retain = TRUE)
+
+#Apply recipe to training data to create processed training_data_obj (already populated in the recipe object)
+train_processed_data &lt;- juice(the_recipe)
+
+#Apply recipe to test data to create processed test_data_obj
+test_processed_data &lt;- bake(the_recipe, new_data = test_tbl)</code></pre>
+<p>Once the training and testing data have been processed and stored, the logistic regression model can be set up using the parsnip workflow. Parsnip uses a 3-step process:</p>
+<ul>
+<li>specify the model and its arguments</li>
+<li>set the engine (how the model is created)</li>
+<li>fit the model to the processed training data</li>
+</ul>
+<p>Logistic regression is a convenient first model to work with since it is relatively easy to implement and yields results that have intuitive meaning. It can be easily interpreted when the odds ratio is calculated from the model structure. <a href="#fn5" class="footnoteRef" id="fnref5"><sup>5</sup></a></p>
+<pre class="r"><code>#Set up and train the model using processed training_data_obj
+set.seed(100)
+log_regr_hd_model &lt;- logistic_reg(mode = &quot;classification&quot;) %&gt;%
+                     set_engine(&quot;glm&quot;) %&gt;% 
+                     fit(Diagnosis_Heart_Disease ~ ., data = train_processed_data)
+
+#Take a look at model coefficients and add odds ratio for interpretability
+broom::tidy(log_regr_hd_model$fit) %&gt;%
+  arrange(desc(estimate)) %&gt;% 
+  mutate(odds_ratio = exp(estimate)) %&gt;%
+  kable(align = rep(&quot;c&quot;, 5), digits = 3)</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+term
+</th>
+<th style="text-align:center;">
+estimate
+</th>
+<th style="text-align:center;">
+std.error
+</th>
+<th style="text-align:center;">
+statistic
+</th>
+<th style="text-align:center;">
+p.value
+</th>
+<th style="text-align:center;">
+odds_ratio
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+Thalassemia7.0
+</td>
+<td style="text-align:center;">
+1.932
+</td>
+<td style="text-align:center;">
+0.519
+</td>
+<td style="text-align:center;">
+3.726
+</td>
+<td style="text-align:center;">
+0.000
+</td>
+<td style="text-align:center;">
+6.906
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Chest_Pain_Type4
+</td>
+<td style="text-align:center;">
+1.694
+</td>
+<td style="text-align:center;">
+0.770
+</td>
+<td style="text-align:center;">
+2.201
+</td>
+<td style="text-align:center;">
+0.028
+</td>
+<td style="text-align:center;">
+5.443
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Sex1
+</td>
+<td style="text-align:center;">
+1.473
+</td>
+<td style="text-align:center;">
+0.648
+</td>
+<td style="text-align:center;">
+2.274
+</td>
+<td style="text-align:center;">
+0.023
+</td>
+<td style="text-align:center;">
+4.364
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Num_Major_Vessels_Flouro
+</td>
+<td style="text-align:center;">
+1.264
+</td>
+<td style="text-align:center;">
+0.307
+</td>
+<td style="text-align:center;">
+4.119
+</td>
+<td style="text-align:center;">
+0.000
+</td>
+<td style="text-align:center;">
+3.538
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Chest_Pain_Type2
+</td>
+<td style="text-align:center;">
+1.255
+</td>
+<td style="text-align:center;">
+0.874
+</td>
+<td style="text-align:center;">
+1.436
+</td>
+<td style="text-align:center;">
+0.151
+</td>
+<td style="text-align:center;">
+3.507
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Resting_ECG2
+</td>
+<td style="text-align:center;">
+1.022
+</td>
+<td style="text-align:center;">
+0.447
+</td>
+<td style="text-align:center;">
+2.287
+</td>
+<td style="text-align:center;">
+0.022
+</td>
+<td style="text-align:center;">
+2.780
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Peak_Exercise_ST_Segment3
+</td>
+<td style="text-align:center;">
+1.003
+</td>
+<td style="text-align:center;">
+0.984
+</td>
+<td style="text-align:center;">
+1.020
+</td>
+<td style="text-align:center;">
+0.308
+</td>
+<td style="text-align:center;">
+2.727
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Peak_Exercise_ST_Segment2
+</td>
+<td style="text-align:center;">
+0.833
+</td>
+<td style="text-align:center;">
+0.551
+</td>
+<td style="text-align:center;">
+1.512
+</td>
+<td style="text-align:center;">
+0.130
+</td>
+<td style="text-align:center;">
+2.300
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Exercise_Induced_Angina1
+</td>
+<td style="text-align:center;">
+0.704
+</td>
+<td style="text-align:center;">
+0.526
+</td>
+<td style="text-align:center;">
+1.339
+</td>
+<td style="text-align:center;">
+0.181
+</td>
+<td style="text-align:center;">
+2.023
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Resting_ECG1
+</td>
+<td style="text-align:center;">
+0.675
+</td>
+<td style="text-align:center;">
+3.314
+</td>
+<td style="text-align:center;">
+0.204
+</td>
+<td style="text-align:center;">
+0.839
+</td>
+<td style="text-align:center;">
+1.965
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+ST_Depression_Exercise
+</td>
+<td style="text-align:center;">
+0.340
+</td>
+<td style="text-align:center;">
+0.268
+</td>
+<td style="text-align:center;">
+1.267
+</td>
+<td style="text-align:center;">
+0.205
+</td>
+<td style="text-align:center;">
+1.405
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Thalassemia6.0
+</td>
+<td style="text-align:center;">
+0.127
+</td>
+<td style="text-align:center;">
+0.882
+</td>
+<td style="text-align:center;">
+0.144
+</td>
+<td style="text-align:center;">
+0.885
+</td>
+<td style="text-align:center;">
+1.136
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Resting_Blood_Pressure
+</td>
+<td style="text-align:center;">
+0.036
+</td>
+<td style="text-align:center;">
+0.014
+</td>
+<td style="text-align:center;">
+2.535
+</td>
+<td style="text-align:center;">
+0.011
+</td>
+<td style="text-align:center;">
+1.037
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Serum_Cholesterol
+</td>
+<td style="text-align:center;">
+0.003
+</td>
+<td style="text-align:center;">
+0.005
+</td>
+<td style="text-align:center;">
+0.644
+</td>
+<td style="text-align:center;">
+0.520
+</td>
+<td style="text-align:center;">
+1.003
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Max_Heart_Rate_Achieved
+</td>
+<td style="text-align:center;">
+-0.032
+</td>
+<td style="text-align:center;">
+0.014
+</td>
+<td style="text-align:center;">
+-2.271
+</td>
+<td style="text-align:center;">
+0.023
+</td>
+<td style="text-align:center;">
+0.969
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Age
+</td>
+<td style="text-align:center;">
+-0.035
+</td>
+<td style="text-align:center;">
+0.029
+</td>
+<td style="text-align:center;">
+-1.198
+</td>
+<td style="text-align:center;">
+0.231
+</td>
+<td style="text-align:center;">
+0.966
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Chest_Pain_Type3
+</td>
+<td style="text-align:center;">
+-0.282
+</td>
+<td style="text-align:center;">
+0.770
+</td>
+<td style="text-align:center;">
+-0.366
+</td>
+<td style="text-align:center;">
+0.714
+</td>
+<td style="text-align:center;">
+0.755
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fasting_Blood_Sugar1
+</td>
+<td style="text-align:center;">
+-0.684
+</td>
+<td style="text-align:center;">
+0.718
+</td>
+<td style="text-align:center;">
+-0.953
+</td>
+<td style="text-align:center;">
+0.341
+</td>
+<td style="text-align:center;">
+0.504
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+(Intercept)
+</td>
+<td style="text-align:center;">
+-6.350
+</td>
+<td style="text-align:center;">
+3.439
+</td>
+<td style="text-align:center;">
+-1.846
+</td>
+<td style="text-align:center;">
+0.065
+</td>
+<td style="text-align:center;">
+0.002
+</td>
+</tr>
+</tbody>
+</table>
+<p>In the above code I’ve converted the estimate of the coefficient into the odds ratio. The odds ratio represents the odds that an outcome will occur given the presence of a specific predictor, compared to the odds of the outcome occurring in the absence of that predictor, assuming all other predictors remain constant. The odds ratio is calculated from the exponential function of the coefficient estimate based on a unit increase in the predictor. An example with a continuous variable: for 1 mm Hg increased in resting blood pressure rest_bp, the odds of having heart disease increases by a factor of 1.04.<a href="#fn6" class="footnoteRef" id="fnref6"><sup>6</sup></a></p>
+<p>Now let’s feed the model the testing data that we held out from the fitting process. It’s the first time the model will have seen these data so we should get a fair assessment (absent of over-fitting). The new_data argument in the predict() function is used to supply the test data to the model and have it output a vector of predictions, one for each observation in the testing data. The results vector can be added as a column into the original dataframe to append the predictions next to the true values.</p>
+<pre class="r"><code>#Make predictions using testing set
+first_training_prediction &lt;- predict(log_regr_hd_model, 
+                                     new_data = test_tbl, 
+                                     type     = &quot;class&quot;)
+
+#Add predictions as new column in heart data set
+first_training_prediction_full_tbl &lt;- test_processed_data %&gt;% 
+  mutate(Predicted_Heart_Disease = first_training_prediction$.pred_class)
+
+#Glimpse data
+first_training_prediction_full_tbl %&gt;% glimpse()</code></pre>
+<pre><code>## Observations: 59
+## Variables: 15
+## $ Age                      &lt;dbl&gt; 56, 63, 56, 52, 54, 60, 64, 43, 65, 4...
+## $ Resting_Blood_Pressure   &lt;dbl&gt; 120, 130, 140, 172, 140, 117, 140, 12...
+## $ Serum_Cholesterol        &lt;dbl&gt; 236, 254, 294, 199, 239, 230, 335, 17...
+## $ Max_Heart_Rate_Achieved  &lt;dbl&gt; 178, 147, 153, 162, 160, 160, 158, 12...
+## $ ST_Depression_Exercise   &lt;dbl&gt; 0.8, 1.4, 1.3, 0.5, 1.2, 1.4, 0.0, 2....
+## $ Num_Major_Vessels_Flouro &lt;dbl&gt; 2, 3, 2, 2, 2, 4, 2, 2, 5, 2, 2, 2, 2...
+## $ Sex                      &lt;fct&gt; 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1...
+## $ Chest_Pain_Type          &lt;fct&gt; 2, 4, 2, 3, 4, 4, 3, 4, 4, 1, 4, 3, 3...
+## $ Fasting_Blood_Sugar      &lt;fct&gt; 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1...
+## $ Resting_ECG              &lt;fct&gt; 0, 2, 2, 0, 0, 0, 0, 2, 2, 0, 2, 0, 2...
+## $ Exercise_Induced_Angina  &lt;fct&gt; 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0...
+## $ Peak_Exercise_ST_Segment &lt;fct&gt; 1, 2, 2, 1, 1, 1, 1, 2, 2, 1, 1, 1, 3...
+## $ Thalassemia              &lt;fct&gt; 3.0, 7.0, 3.0, 7.0, 3.0, 7.0, 3.0, 7....
+## $ Diagnosis_Heart_Disease  &lt;fct&gt; 0, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0...
+## $ Predicted_Heart_Disease  &lt;fct&gt; 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0...</code></pre>
+<p>A confusion matrix is a visual way to display the results of the model’s predictions. It’s not just the ability to predict the presence of heart disease that is of interest - we also want to know the number of times the model successfully predicts the absence of heart disease. Likewise, we want to know the number of false positives and false negatives. The confusion matrix captures all these metrics nicely.</p>
+<pre class="r"><code>#Use predictions col and truth col to make a confusion matrix object
+conf_mat_obj &lt;- first_training_prediction_full_tbl %&gt;% 
+  conf_mat(truth    = Diagnosis_Heart_Disease, 
+           estimate = Predicted_Heart_Disease)
+
+#Call conf_mat and supply columns for truth, prediction
+#Pluck() to extract the conf_matrix data into cols and convert to tibble for plotting
+conf_matrix_plt_obj &lt;- first_training_prediction_full_tbl %&gt;% 
+  conf_mat(truth    = Diagnosis_Heart_Disease, 
+           estimate = Predicted_Heart_Disease) %&gt;%
+  pluck(1) %&gt;%
+  as_tibble() %&gt;%
+  mutate(&quot;outcome&quot; = c(&quot;true_negative&quot;,
+                       &quot;false_positive&quot;,
+                       &quot;false_negative&quot;,
+                       &quot;true_positive&quot;)) %&gt;%
+  mutate(Prediction = recode(Prediction, &quot;0&quot; = &quot;No Heart Disease&quot;,
+                                         &quot;1&quot; = &quot;Heart Disease&quot;)) %&gt;%
+  mutate(Truth = recode(Truth,  &quot;0&quot; = &quot;No Heart Disease&quot;,
+                                &quot;1&quot; = &quot;Heart Disease&quot;))
+
+#Convert to kable format
+conf_matrix_plt_obj %&gt;% kable(align = rep(&quot;c&quot;, 4))</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+Prediction
+</th>
+<th style="text-align:center;">
+Truth
+</th>
+<th style="text-align:center;">
+n
+</th>
+<th style="text-align:center;">
+outcome
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+No Heart Disease
+</td>
+<td style="text-align:center;">
+No Heart Disease
+</td>
+<td style="text-align:center;">
+29
+</td>
+<td style="text-align:center;">
+true_negative
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Heart Disease
+</td>
+<td style="text-align:center;">
+No Heart Disease
+</td>
+<td style="text-align:center;">
+3
+</td>
+<td style="text-align:center;">
+false_positive
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+No Heart Disease
+</td>
+<td style="text-align:center;">
+Heart Disease
+</td>
+<td style="text-align:center;">
+6
+</td>
+<td style="text-align:center;">
+false_negative
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Heart Disease
+</td>
+<td style="text-align:center;">
+Heart Disease
+</td>
+<td style="text-align:center;">
+21
+</td>
+<td style="text-align:center;">
+true_positive
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>#Plot confusion matrix
+p1 &lt;- conf_matrix_plt_obj %&gt;% ggplot(aes(x = Truth, y = Prediction)) +
+  geom_tile(aes(fill = n), alpha = .8) +
+  geom_text(aes(label = n), color = &quot;white&quot;) +
+  scale_fill_viridis_c() +
+  theme(legend.title = element_blank()) +
+  labs(
+    title    = &quot;Confusion Matrix&quot;,
+    subtitle = &quot;Heart Disease Prediction Using Logistic Regression&quot;
+  )
+  
+p1</code></pre>
+<p><img src="/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-13-1.png" width="100%" height="500px" /></p>
+<pre class="r"><code>#Calling summary() on the confusion_matrix_obj gives all the performance measures
+#Filter to the ones we care about
+log_reg_performance_tbl &lt;- summary(conf_mat_obj) %&gt;% filter(
+                                 .metric == &quot;accuracy&quot; | 
+                                 .metric == &quot;sens&quot; |
+                                 .metric == &quot;spec&quot; |
+                                 .metric == &quot;ppv&quot;  |
+                                 .metric == &quot;npv&quot;  |
+                                 .metric == &quot;f_meas&quot;) %&gt;%
+  select(-.estimator) %&gt;%
+  rename(&quot;metric&quot; = .metric, 
+         &quot;estimate&quot; = .estimate) %&gt;%
+  mutate(&quot;estimate&quot; = estimate %&gt;% signif(digits = 3)) %&gt;%
+  mutate(metric = recode(metric, &quot;sens&quot; = &quot;sensitivity&quot;),
+         metric = recode(metric, &quot;spec&quot; = &quot;specificity&quot;),
+         metric = recode(metric, &quot;ppv&quot;  = &quot;positive predictive value&quot;),
+         metric = recode(metric, &quot;npv&quot;  = &quot;negative predictive value&quot;)) %&gt;%
+  kable(align = rep(&quot;c&quot;, 3))
+  
+#Display perfomance summary as kable
+log_reg_performance_tbl </code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+metric
+</th>
+<th style="text-align:center;">
+estimate
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+accuracy
+</td>
+<td style="text-align:center;">
+0.847
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+sensitivity
+</td>
+<td style="text-align:center;">
+0.906
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+specificity
+</td>
+<td style="text-align:center;">
+0.778
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+positive predictive value
+</td>
+<td style="text-align:center;">
+0.829
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+negative predictive value
+</td>
+<td style="text-align:center;">
+0.875
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+f_meas
+</td>
+<td style="text-align:center;">
+0.866
+</td>
+</tr>
+</tbody>
+</table>
+<p>Other common performance metrics are summarized above. Accuracy represents the percentage of correct predictions. Descriptions for each can be found at this link.<a href="#fn7" class="footnoteRef" id="fnref7"><sup>7</sup></a></p>
+<p>The initial split of the data set into training/testing was done randomly so a replicate of the procedure would yield slightly different results. V-fold cross validation is a resampling technique that allows for repeating the process of splitting the data, training the model, and assessing the results many times from the same data set. Each stop in the CV process is annotated in the comments within the code below.</p>
+<pre class="r"><code>#create multiple split objects w/ vfold cross-validation resampling
+set.seed(925)
+hd_cv_split_objects &lt;- heart_dataset_clean_tbl %&gt;% vfold_cv(strata = Diagnosis_Heart_Disease)
+hd_cv_split_objects</code></pre>
+<pre><code>## #  10-fold cross-validation using stratification 
+## # A tibble: 10 x 2
+##    splits           id    
+##    &lt;named list&gt;     &lt;chr&gt; 
+##  1 &lt;split [270/31]&gt; Fold01
+##  2 &lt;split [270/31]&gt; Fold02
+##  3 &lt;split [270/31]&gt; Fold03
+##  4 &lt;split [271/30]&gt; Fold04
+##  5 &lt;split [271/30]&gt; Fold05
+##  6 &lt;split [271/30]&gt; Fold06
+##  7 &lt;split [271/30]&gt; Fold07
+##  8 &lt;split [271/30]&gt; Fold08
+##  9 &lt;split [272/29]&gt; Fold09
+## 10 &lt;split [272/29]&gt; Fold10</code></pre>
+<pre class="r"><code>#I want a big function that takes a split object and an id
+make_cv_predictions_fcn &lt;- function(split, id){
+  #extract data for analysis set from split obj
+  #prep(train) the recipe and return updated recipe
+  #bake(apply) trained recipe to new data  
+  analysis_tbl &lt;- analysis(split)
+  trained_analysis_recipe &lt;- prep(the_recipe ,training = analysis_tbl)
+  baked_analysis_data_tbl &lt;- bake(trained_analysis_recipe, new_data = analysis_tbl)
+  
+  #define model in parsnip syntax
+  model &lt;- logistic_reg(mode = &quot;classification&quot;) %&gt;%
+    set_engine(&quot;glm&quot;) %&gt;%
+    fit(Diagnosis_Heart_Disease ~ ., data = baked_analysis_data_tbl)
+  
+  #same as above but for assessment set (like the test set but for resamples)
+  assessment_tbl &lt;- assessment(split)
+  trained_assessment_recipe &lt;- prep(the_recipe, training = assessment_tbl)
+  baked_assessment_data_tbl &lt;- bake(trained_assessment_recipe, new_data = assessment_tbl)
+  
+  #make a tibble with the results
+  tibble(&quot;id&quot;         = id,
+         &quot;truth&quot;      = baked_assessment_data_tbl$Diagnosis_Heart_Disease,
+         &quot;prediction&quot; = unlist(predict(model, new_data = baked_assessment_data_tbl))
+  )
+}
+
+#map the big function to every split obj / id in the initial cv split tbl
+cv_predictions_tbl &lt;- map2_df(.x = hd_cv_split_objects$splits,
+                              .y = hd_cv_split_objects$id,
+                              ~make_cv_predictions_fcn(split = .x, id = .y))
+
+#see results 
+cv_predictions_tbl %&gt;% head(10) %&gt;% kable(align = rep(&quot;c&quot;, 3))</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+id
+</th>
+<th style="text-align:center;">
+truth
+</th>
+<th style="text-align:center;">
+prediction
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+Fold01
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+0
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold01
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+0
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold01
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+0
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold01
+</td>
+<td style="text-align:center;">
+1
+</td>
+<td style="text-align:center;">
+1
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold01
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+0
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold01
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+1
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold01
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+0
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold01
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+0
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold01
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+0
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold01
+</td>
+<td style="text-align:center;">
+1
+</td>
+<td style="text-align:center;">
+1
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>#define desired metrics
+desired_metrics &lt;- metric_set(accuracy,
+                              sens,
+                              spec,
+                              ppv,
+                              npv,
+                              f_meas)
+
+#group by fold and use get desired metrics [metric_set fcn is from yardstick]
+cv_metrics_long_tbl &lt;- cv_predictions_tbl %&gt;% 
+                       group_by(id) %&gt;% 
+                       desired_metrics(truth = truth, estimate = prediction) 
+
+#see results
+cv_metrics_long_tbl %&gt;% head(10) %&gt;% kable(align = rep(&quot;c&quot;, 4))</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+id
+</th>
+<th style="text-align:center;">
+.metric
+</th>
+<th style="text-align:center;">
+.estimator
+</th>
+<th style="text-align:center;">
+.estimate
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+Fold01
+</td>
+<td style="text-align:center;">
+accuracy
+</td>
+<td style="text-align:center;">
+binary
+</td>
+<td style="text-align:center;">
+0.8709677
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold02
+</td>
+<td style="text-align:center;">
+accuracy
+</td>
+<td style="text-align:center;">
+binary
+</td>
+<td style="text-align:center;">
+0.9354839
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold03
+</td>
+<td style="text-align:center;">
+accuracy
+</td>
+<td style="text-align:center;">
+binary
+</td>
+<td style="text-align:center;">
+0.8387097
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold04
+</td>
+<td style="text-align:center;">
+accuracy
+</td>
+<td style="text-align:center;">
+binary
+</td>
+<td style="text-align:center;">
+0.7666667
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold05
+</td>
+<td style="text-align:center;">
+accuracy
+</td>
+<td style="text-align:center;">
+binary
+</td>
+<td style="text-align:center;">
+0.9000000
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold06
+</td>
+<td style="text-align:center;">
+accuracy
+</td>
+<td style="text-align:center;">
+binary
+</td>
+<td style="text-align:center;">
+0.8000000
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold07
+</td>
+<td style="text-align:center;">
+accuracy
+</td>
+<td style="text-align:center;">
+binary
+</td>
+<td style="text-align:center;">
+0.8000000
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold08
+</td>
+<td style="text-align:center;">
+accuracy
+</td>
+<td style="text-align:center;">
+binary
+</td>
+<td style="text-align:center;">
+0.7333333
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold09
+</td>
+<td style="text-align:center;">
+accuracy
+</td>
+<td style="text-align:center;">
+binary
+</td>
+<td style="text-align:center;">
+0.7931034
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+Fold10
+</td>
+<td style="text-align:center;">
+accuracy
+</td>
+<td style="text-align:center;">
+binary
+</td>
+<td style="text-align:center;">
+0.9310345
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>#visualize results
+cv_metrics_long_tbl %&gt;% ggplot(aes(x = .metric, y = .estimate)) +
+  geom_boxplot(aes(fill = .metric), 
+               alpha = .6, 
+               fatten = .7) +
+  geom_jitter(alpha = 0.2, width = .05) +
+  labs(x = &quot;&quot;,
+       y = &quot;&quot;,
+       title = &quot;Boxplots for Logistic Regression&quot;,
+       subtitle = &quot;Model Metrics, 10-Fold Cross Validation&quot;) +
+  scale_fill_viridis_d() +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1) ) +
+  theme(legend.title = element_blank(),
+        axis.text.x  = element_blank(),
+        axis.ticks.x = element_blank()) </code></pre>
+<p><img src="/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-14-1.png" width="100%" height="500px" /></p>
+<pre class="r"><code>#calculate the mean from all the folds for each metric
+cv_mean_metrics_tbl &lt;- cv_metrics_long_tbl %&gt;%
+                       group_by(.metric) %&gt;%
+                       summarize(&quot;Avg&quot; = mean(.estimate)) %&gt;%
+                       ungroup()
+  
+cv_mean_metrics_tbl %&gt;% 
+  mutate(Average = Avg %&gt;% signif(digits = 3)) %&gt;% 
+  select(.metric,
+         Average) %&gt;%
+  kable(align = rep(&quot;c&quot;, 2))</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+.metric
+</th>
+<th style="text-align:center;">
+Average
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+accuracy
+</td>
+<td style="text-align:center;">
+0.837
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+f_meas
+</td>
+<td style="text-align:center;">
+0.853
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+npv
+</td>
+<td style="text-align:center;">
+0.852
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+ppv
+</td>
+<td style="text-align:center;">
+0.839
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+sens
+</td>
+<td style="text-align:center;">
+0.876
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+spec
+</td>
+<td style="text-align:center;">
+0.790
+</td>
+</tr>
+</tbody>
+</table>
+<p>Got there! Average of .837 accuracy after 10-fold cross-validation. Not bad for a basic logistic regression. It is certainly possible that .837 is not sufficient for our purposes given that we are in the domain of health care where false classifications have dire consequences. Evaluating other algorithms would be a logical next step for improving the accuracy and reducing patient risk. Nevertheless, I’m ending it here for this session since I have work tomorrow.</p>
+<p>Thanks for reading.</p>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Image Credit: Shutterstock/Crevis<a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>UCI Machine Learning Repository, <a href="https://archive.ics.uci.edu/ml/datasets/Heart+Disease" class="uri">https://archive.ics.uci.edu/ml/datasets/Heart+Disease</a><a href="#fnref2">↩</a></p></li>
+<li id="fn3"><p>Nuclear stress testing requires the injection of a tracer, commonly technicium 99M (Myoview or Cardiolyte), which is then taken up by healthy, viable myocardial cells. A camera (detector) is used afterwards to image the heart and compare segments. A coronary stenosis is detected when a myocardial segment takes up the nuclear tracer at rest, but not during cardiac stress. This is called a “reversible defect.” Scarred myocardium from prior infarct will not take up tracer at all and is referred to as a “fixed defect.”<a href="#fnref3">↩</a></p></li>
+<li id="fn4"><p><a href="https://stats.stackexchange.com/questions/3730/pearsons-or-spearmans-correlation-with-non-normal-data" class="uri">https://stats.stackexchange.com/questions/3730/pearsons-or-spearmans-correlation-with-non-normal-data</a><a href="#fnref4">↩</a></p></li>
+<li id="fn5"><p><a href="https://notast.netlify.com/post/explaining-predictions-interpretable-models-logistic-regression/" class="uri">https://notast.netlify.com/post/explaining-predictions-interpretable-models-logistic-regression/</a><a href="#fnref5">↩</a></p></li>
+<li id="fn6"><p><a href="https://notast.netlify.com/post/explaining-predictions-interpretable-models-logistic-regression/" class="uri">https://notast.netlify.com/post/explaining-predictions-interpretable-models-logistic-regression/</a><a href="#fnref6">↩</a></p></li>
+<li id="fn7"><p><a href="https://www.analyticsvidhya.com/blog/2019/08/11-important-model-evaluation-error-metrics/" class="uri">https://www.analyticsvidhya.com/blog/2019/08/11-important-model-evaluation-error-metrics/</a><a href="#fnref7">↩</a></p></li>
+</ol>
+</div>
+
+  
+  <h4><i class="fa-share-alt" aria-hidden="true"></i>&nbsp;Share!</h4>
+<ul class="share-buttons">
+	<li><a href="https://www.facebook.com/sharer/sharer.php?u=%2fpost%2fheart-disease-prediction-from-patient-data-in-r%2f" target="_blank" title="Share on Facebook"><i class="fa-facebook" aria-hidden="true"></i><span class="sr-only">Share on Facebook</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="https://twitter.com/intent/tweet?source=%2fpost%2fheart-disease-prediction-from-patient-data-in-r%2f&via=HorribleGeek" target="_blank" title="Tweet"><i class="fa-twitter" aria-hidden="true"></i><span class="sr-only">Tweet</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="https://plus.google.com/share?url=%2fpost%2fheart-disease-prediction-from-patient-data-in-r%2f" target="_blank" title="Share on Google+"><i class="fa-google-plus" aria-hidden="true"></i><span class="sr-only">Share on Google+</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="http://www.tumblr.com/share?v=3&u=%2fpost%2fheart-disease-prediction-from-patient-data-in-r%2f" target="_blank" title="Post to Tumblr"><i class="fa-tumblr" aria-hidden="true"></i><span class="sr-only">Post to Tumblr</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="http://pinterest.com/pin/create/button/?url=%2fpost%2fheart-disease-prediction-from-patient-data-in-r%2f" target="_blank" title="Pin it"><i class="fa-pinterest-p" aria-hidden="true"></i><span class="sr-only">Pin it</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="http://www.reddit.com/submit?url=%2fpost%2fheart-disease-prediction-from-patient-data-in-r%2f" target="_blank" title="Submit to Reddit"><i class="fa-reddit-alien" aria-hidden="true"></i><span class="sr-only">Submit to Reddit</span></a>
+	</li>
+</ul>
+
+
+<style>
+	ul.share-buttons{
+	  list-style: none;
+	  padding: 0;
+	}
+
+	ul.share-buttons li{
+	  display: inline;
+	}
+
+	ul.share-buttons .sr-only{
+	  position: absolute;
+	  clip: rect(1px 1px 1px 1px);
+	  clip: rect(1px, 1px, 1px, 1px);
+	  padding: 0;
+	  border: 0;
+	  height: 1px;
+	  width: 1px;
+	  overflow: hidden;
+	}
+</style>
+
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/post/modeling-particulate-counts-as-a-poisson-process-in-r/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/post/modeling-particulate-counts-as-a-poisson-process-in-r/">Modeling Particulate Counts as a Poisson Process in R</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+  </div>
+</div>
+
+
+
+  
+
+</div>
+
+</div>
+</div>
+<script src="/js/ui.js"></script>
+<script src="/js/menus.js"></script>
+
+
+<script>
+  
+  if (window.location.hostname != "localhost") {
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+    ga('create', 'Your Google Analytics tracking ID', 'auto');
+    ga('send', 'pageview');
+  }
+</script>
+
+
+
+
+
+<script src="/js/math-code.js"></script>
+  <script async src="//cdn.bootcss.com/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+  
+
+
+</body>
+</html>
+

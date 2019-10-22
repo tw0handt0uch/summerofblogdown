@@ -1,0 +1,1537 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+  <title>Machine-Learning on [R]eliability</title>
+  <link>/tags/machine-learning/</link>
+  <description>Recent content in Machine-Learning on [R]eliability</description>
+  <generator>Hugo -- gohugo.io</generator>
+<language>en-us</language>
+<copyright>&amp;copy; 2019. All rights reserved.</copyright>
+<lastBuildDate>Sun, 29 Sep 2019 00:00:00 +0000</lastBuildDate>
+
+<atom:link href="/tags/machine-learning/index.xml" rel="self" type="application/rss+xml" />
+
+
+<item>
+  <title>Heart Disease Prediction From Patient Data in R</title>
+  <link>/post/heart-disease-prediction-from-patient-data-in-r/</link>
+  <pubDate>Sun, 29 Sep 2019 00:00:00 +0000</pubDate>
+  
+<guid>/post/heart-disease-prediction-from-patient-data-in-r/</guid>
+  <description>
+&lt;script src=&#34;/rmarkdown-libs/kePrint/kePrint.js&#34;&gt;&lt;/script&gt;
+
+
+&lt;p&gt;Test 1. In this post I’ll be attempting to leverage the parsnip package in R to run through some straightforward predictive analytics/machine learning. Parsnip provides a flexible and consistent interface to apply common regression and classification algorithms in R. I’ll be working with the Cleveland Clinic Heart Disease dataset which contains 13 variables related to patient diagnostics and one outcome variable indicating the presence or absence of heart disease.&lt;a href=&#34;#fn1&#34; class=&#34;footnoteRef&#34; id=&#34;fnref1&#34;&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt; The data was accessed from the UCI Machine Learning Repository in September 2019.&lt;a href=&#34;#fn2&#34; class=&#34;footnoteRef&#34; id=&#34;fnref2&#34;&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt;. The goal is to be able to accurately classify as having or not having heart disease based on diagnostic test data.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/./img/cda.jpg&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Load the libraries to be used.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Load libraries
+library(tidyverse)
+library(kableExtra)
+library(rsample)
+library(recipes)
+library(parsnip)
+library(yardstick)
+library(viridisLite)
+library(GGally)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The first part of the analysis is to read in the data set and clean the column names up a bit.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Read in data
+heart_disease_dataset &amp;lt;- read.csv(file = &amp;quot;processed.cleveland.data&amp;quot;, header = F)
+
+#Prepare column names
+names &amp;lt;- c(&amp;quot;Age&amp;quot;,
+           &amp;quot;Sex&amp;quot;,
+           &amp;quot;Chest_Pain_Type&amp;quot;,
+           &amp;quot;Resting_Blood_Pressure&amp;quot;,
+           &amp;quot;Serum_Cholesterol&amp;quot;,
+           &amp;quot;Fasting_Blood_Sugar&amp;quot;,
+           &amp;quot;Resting_ECG&amp;quot;,
+           &amp;quot;Max_Heart_Rate_Achieved&amp;quot;,
+           &amp;quot;Exercise_Induced_Angina&amp;quot;,
+           &amp;quot;ST_Depression_Exercise&amp;quot;,
+           &amp;quot;Peak_Exercise_ST_Segment&amp;quot;,
+           &amp;quot;Num_Major_Vessels_Flouro&amp;quot;,
+           &amp;quot;Thalassemia&amp;quot;,
+           &amp;quot;Diagnosis_Heart_Disease&amp;quot;)
+
+#Apply column names to the dataframe
+colnames(heart_disease_dataset) &amp;lt;- names
+
+#Glimpse data to verify new column names are in place
+heart_disease_dataset %&amp;gt;% glimpse()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Observations: 303
+## Variables: 14
+## $ Age                      &amp;lt;dbl&amp;gt; 63, 67, 67, 37, 41, 56, 62, 57, 63, 5...
+## $ Sex                      &amp;lt;dbl&amp;gt; 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1...
+## $ Chest_Pain_Type          &amp;lt;dbl&amp;gt; 1, 4, 4, 3, 2, 2, 4, 4, 4, 4, 4, 2, 3...
+## $ Resting_Blood_Pressure   &amp;lt;dbl&amp;gt; 145, 160, 120, 130, 130, 120, 140, 12...
+## $ Serum_Cholesterol        &amp;lt;dbl&amp;gt; 233, 286, 229, 250, 204, 236, 268, 35...
+## $ Fasting_Blood_Sugar      &amp;lt;dbl&amp;gt; 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1...
+## $ Resting_ECG              &amp;lt;dbl&amp;gt; 2, 2, 2, 0, 2, 0, 2, 0, 2, 2, 0, 2, 2...
+## $ Max_Heart_Rate_Achieved  &amp;lt;dbl&amp;gt; 150, 108, 129, 187, 172, 178, 160, 16...
+## $ Exercise_Induced_Angina  &amp;lt;dbl&amp;gt; 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1...
+## $ ST_Depression_Exercise   &amp;lt;dbl&amp;gt; 2.3, 1.5, 2.6, 3.5, 1.4, 0.8, 3.6, 0....
+## $ Peak_Exercise_ST_Segment &amp;lt;dbl&amp;gt; 3, 2, 2, 3, 1, 1, 3, 1, 2, 3, 2, 2, 2...
+## $ Num_Major_Vessels_Flouro &amp;lt;fct&amp;gt; 0.0, 3.0, 2.0, 0.0, 0.0, 0.0, 2.0, 0....
+## $ Thalassemia              &amp;lt;fct&amp;gt; 6.0, 3.0, 7.0, 3.0, 3.0, 3.0, 3.0, 3....
+## $ Diagnosis_Heart_Disease  &amp;lt;int&amp;gt; 0, 2, 1, 0, 0, 0, 3, 0, 2, 1, 0, 0, 2...&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;There are 14 variables provided in the data set and the last one is the dependent variable that we want to be able to predict. Here is a summary of what the other variables mean:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Age&lt;/strong&gt;: Age of subject&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Sex&lt;/strong&gt;: Gender of subject:&lt;br /&gt;
+0 = female 1 = male&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Chest-pain type&lt;/strong&gt;: Type of chest-pain experienced by the individual:&lt;br /&gt;
+1 = typical angina&lt;br /&gt;
+2 = atypical angina&lt;br /&gt;
+3 = non-angina pain&lt;br /&gt;
+4 = asymptomatic angina&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Resting Blood Pressure&lt;/strong&gt;: Resting blood pressure in mm Hg&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Serum Cholesterol&lt;/strong&gt;: Serum cholesterol in mg/dl&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Fasting Blood Sugar&lt;/strong&gt;: Fasting blood sugar level relative to 120 mg/dl: 0 = fasting blood sugar &amp;lt;= 120 mg/dl&lt;br /&gt;
+1 = fasting blood sugar &amp;gt; 120 mg/dl&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Resting ECG&lt;/strong&gt;: Resting electrocardiographic results&lt;br /&gt;
+0 = normal&lt;br /&gt;
+1 = ST-T wave abnormality&lt;br /&gt;
+2 = left ventricle hyperthrophy&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Max Heart Rate Achieved&lt;/strong&gt;: Max heart rate of subject&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Exercise Induced Angina&lt;/strong&gt;:&lt;br /&gt;
+0 = no 1 = yes&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;ST Depression Induced by Exercise Relative to Rest&lt;/strong&gt;: ST Depression of subject&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Peak Exercise ST Segment&lt;/strong&gt;:&lt;br /&gt;
+1 = Up-sloaping&lt;br /&gt;
+2 = Flat&lt;br /&gt;
+3 = Down-sloaping&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Number of Major Vessels (0-3) Visible on Flouroscopy&lt;/strong&gt;: Number of visible vessels under flouro&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Thal&lt;/strong&gt;: Form of thalassemia: &lt;a href=&#34;#fn3&#34; class=&#34;footnoteRef&#34; id=&#34;fnref3&#34;&gt;&lt;sup&gt;3&lt;/sup&gt;&lt;/a&gt;&lt;br /&gt;
+3 = normal&lt;br /&gt;
+6 = fixed defect&lt;br /&gt;
+7 = reversible defect&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Diagnosis of Heart Disease&lt;/strong&gt;: Indicates whether subject is suffering from heart disease or not:&lt;br /&gt;
+0 = absence&lt;br /&gt;
+1, 2, 3, 4 = heart disease present&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;A closer look at the data identifies some NA and “?” values that will need to be addressed in the cleaning step. We also want to know the number of observations in the dependent variable column to understand if the dataset is relatively balanced.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Determine the number of values in each level of dependent variable
+heart_disease_dataset %&amp;gt;% 
+  drop_na() %&amp;gt;%
+  group_by(Diagnosis_Heart_Disease) %&amp;gt;%
+  count() %&amp;gt;% 
+  ungroup() %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 2)) %&amp;gt;% kable_styling(&amp;quot;full_width&amp;quot; = F)&lt;/code&gt;&lt;/pre&gt;
+&lt;table class=&#34;table&#34; style=&#34;width: auto !important; margin-left: auto; margin-right: auto;&#34;&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+Diagnosis_Heart_Disease
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+n
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+164
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+55
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+36
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+35
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+4
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+13
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Identify the different levels of Thalassemia
+heart_disease_dataset %&amp;gt;% 
+  drop_na() %&amp;gt;%
+  group_by(Thalassemia) %&amp;gt;%
+  count() %&amp;gt;% 
+  ungroup() %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 2)) %&amp;gt;% kable_styling(&amp;quot;full_width&amp;quot; = F)&lt;/code&gt;&lt;/pre&gt;
+&lt;table class=&#34;table&#34; style=&#34;width: auto !important; margin-left: auto; margin-right: auto;&#34;&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+Thalassemia
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+n
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+?
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3.0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+166
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+6.0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+18
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+7.0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+117
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Since any value above 0 in ‘Diagnosis_Heart_Disease’ (column 14) indicates the presence of heart disease, we can lump all levels &amp;gt; 0 together so the classification predictions are binary - Yes or No (1 or 0). The total count of positive heart disease results is less than the number of negative results so the fct_lump() call with default arguments will convert that variable from 4 levels to 2.&lt;/p&gt;
+&lt;p&gt;The data cleaning pipeline below deals with NA values, converts some variables to factors, lumps the dependent variable into two buckets, removes the rows that had “?” for observations, and reorders the variables within the dataframe:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Drop NA&amp;#39;s, convert to factors, lump target variable to 2 levels, remove &amp;quot;?&amp;quot;, reorder variables
+heart_dataset_clean_tbl &amp;lt;- heart_disease_dataset %&amp;gt;% 
+    drop_na() %&amp;gt;%
+    mutate_at(c(&amp;quot;Resting_ECG&amp;quot;, 
+                &amp;quot;Fasting_Blood_Sugar&amp;quot;, 
+                &amp;quot;Sex&amp;quot;, 
+                &amp;quot;Diagnosis_Heart_Disease&amp;quot;, 
+                &amp;quot;Exercise_Induced_Angina&amp;quot;,
+                &amp;quot;Peak_Exercise_ST_Segment&amp;quot;, 
+                &amp;quot;Chest_Pain_Type&amp;quot;), as_factor) %&amp;gt;%
+    mutate(Num_Major_Vessels_Flouro = as.numeric(Num_Major_Vessels_Flouro)) %&amp;gt;%
+    mutate(Diagnosis_Heart_Disease = fct_lump(Diagnosis_Heart_Disease, other_level = &amp;quot;1&amp;quot;)) %&amp;gt;% 
+    filter(Thalassemia != &amp;quot;?&amp;quot;) %&amp;gt;%
+    select(Age, 
+           Resting_Blood_Pressure, 
+           Serum_Cholesterol, 
+           Max_Heart_Rate_Achieved, 
+           ST_Depression_Exercise,
+           Num_Major_Vessels_Flouro,
+           everything())
+
+#Glimpse data
+heart_dataset_clean_tbl %&amp;gt;%
+  glimpse()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Observations: 301
+## Variables: 14
+## $ Age                      &amp;lt;dbl&amp;gt; 63, 67, 67, 37, 41, 56, 62, 57, 63, 5...
+## $ Resting_Blood_Pressure   &amp;lt;dbl&amp;gt; 145, 160, 120, 130, 130, 120, 140, 12...
+## $ Serum_Cholesterol        &amp;lt;dbl&amp;gt; 233, 286, 229, 250, 204, 236, 268, 35...
+## $ Max_Heart_Rate_Achieved  &amp;lt;dbl&amp;gt; 150, 108, 129, 187, 172, 178, 160, 16...
+## $ ST_Depression_Exercise   &amp;lt;dbl&amp;gt; 2.3, 1.5, 2.6, 3.5, 1.4, 0.8, 3.6, 0....
+## $ Num_Major_Vessels_Flouro &amp;lt;dbl&amp;gt; 2, 5, 4, 2, 2, 2, 4, 2, 3, 2, 2, 2, 3...
+## $ Sex                      &amp;lt;fct&amp;gt; 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1...
+## $ Chest_Pain_Type          &amp;lt;fct&amp;gt; 1, 4, 4, 3, 2, 2, 4, 4, 4, 4, 4, 2, 3...
+## $ Fasting_Blood_Sugar      &amp;lt;fct&amp;gt; 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1...
+## $ Resting_ECG              &amp;lt;fct&amp;gt; 2, 2, 2, 0, 2, 0, 2, 0, 2, 2, 0, 2, 2...
+## $ Exercise_Induced_Angina  &amp;lt;fct&amp;gt; 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1...
+## $ Peak_Exercise_ST_Segment &amp;lt;fct&amp;gt; 3, 2, 2, 3, 1, 1, 3, 1, 2, 3, 2, 2, 2...
+## $ Thalassemia              &amp;lt;fct&amp;gt; 6.0, 3.0, 7.0, 3.0, 3.0, 3.0, 3.0, 3....
+## $ Diagnosis_Heart_Disease  &amp;lt;fct&amp;gt; 0, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 1...&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Time for some basic exploratory data analysis. The workflow below breaks out the categorical variables and visualizes them on a faceted bar plot. I’m recoding the factors levels from numeric back to text-based so the labels are easy to interpret on the plots and stripping the y-axis labels since the relative differences are what matters.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Select categorical vars, recode them to their character values, convert to long format
+hd_long_fact_tbl &amp;lt;- heart_dataset_clean_tbl  %&amp;gt;%
+  select(Sex,
+         Chest_Pain_Type,
+         Fasting_Blood_Sugar,
+         Resting_ECG,
+         Exercise_Induced_Angina,
+         Peak_Exercise_ST_Segment,
+         Thalassemia,
+         Diagnosis_Heart_Disease) %&amp;gt;%
+  mutate(Sex = recode_factor(Sex, `0` = &amp;quot;female&amp;quot;, 
+                                  `1` = &amp;quot;male&amp;quot; ),
+         Chest_Pain_Type = recode_factor(Chest_Pain_Type, `1` = &amp;quot;typical&amp;quot;,   
+                                                          `2` = &amp;quot;atypical&amp;quot;,
+                                                          `3` = &amp;quot;non-angina&amp;quot;, 
+                                                          `4` = &amp;quot;asymptomatic&amp;quot;),
+         Fasting_Blood_Sugar = recode_factor(Fasting_Blood_Sugar, `0` = &amp;quot;&amp;lt;= 120 mg/dl&amp;quot;, 
+                                                                  `1` = &amp;quot;&amp;gt; 120 mg/dl&amp;quot;),
+         Resting_ECG = recode_factor(Resting_ECG, `0` = &amp;quot;normal&amp;quot;,
+                                                  `1` = &amp;quot;ST-T abnormality&amp;quot;,
+                                                  `2` = &amp;quot;LV hypertrophy&amp;quot;),
+         Exercise_Induced_Angina = recode_factor(Exercise_Induced_Angina, `0` = &amp;quot;no&amp;quot;,
+                                                                          `1` = &amp;quot;yes&amp;quot;),
+         Peak_Exercise_ST_Segment = recode_factor(Peak_Exercise_ST_Segment, `1` = &amp;quot;up-sloaping&amp;quot;,
+                                                                            `2` = &amp;quot;flat&amp;quot;,
+                                                                            `3` = &amp;quot;down-sloaping&amp;quot;),
+         Thalassemia = recode_factor(Thalassemia, `3` = &amp;quot;normal&amp;quot;,
+                                                  `6` = &amp;quot;fixed defect&amp;quot;,
+                                                  `7` = &amp;quot;reversible defect&amp;quot;)) %&amp;gt;%
+  gather(key = &amp;quot;key&amp;quot;, value = &amp;quot;value&amp;quot;, -Diagnosis_Heart_Disease)
+
+#Visualize with bar plot
+hd_long_fact_tbl %&amp;gt;% 
+  ggplot(aes(value)) +
+    geom_bar(aes(x        = value, 
+                 fill     = Diagnosis_Heart_Disease), 
+                 alpha    = .6, 
+                 position = &amp;quot;dodge&amp;quot;, 
+                 color    = &amp;quot;black&amp;quot;,
+                 width    = .8
+             ) +
+    labs(x = &amp;quot;&amp;quot;,
+         y = &amp;quot;&amp;quot;,
+         title = &amp;quot;Scaled Effect of Categorical Variables&amp;quot;) +
+    theme(
+         axis.text.y  = element_blank(),
+         axis.ticks.y = element_blank()) +
+    facet_wrap(~ key, scales = &amp;quot;free&amp;quot;, nrow = 4) +
+    scale_fill_manual(
+         values = c(&amp;quot;#fde725ff&amp;quot;, &amp;quot;#20a486ff&amp;quot;),
+         name   = &amp;quot;Heart\nDisease&amp;quot;,
+         labels = c(&amp;quot;No HD&amp;quot;, &amp;quot;Yes HD&amp;quot;))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;I prefer boxplots for evaluating the continuous variables.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Must gather() data first in order to facet wrap by key 
+#(default gather call puts all var names into new key col)
+hd_long_cont_tbl &amp;lt;- heart_dataset_clean_tbl  %&amp;gt;%
+  select(Age,
+         Resting_Blood_Pressure,
+         Serum_Cholesterol,
+         Max_Heart_Rate_Achieved,
+         ST_Depression_Exercise,
+         Num_Major_Vessels_Flouro,
+         Diagnosis_Heart_Disease) %&amp;gt;% 
+  gather(key   = &amp;quot;key&amp;quot;, 
+         value = &amp;quot;value&amp;quot;,
+         -Diagnosis_Heart_Disease)
+
+#Visualize continuous variables as boxplots
+hd_long_cont_tbl %&amp;gt;% 
+  ggplot(aes(y = value)) +
+       geom_boxplot(aes(fill = Diagnosis_Heart_Disease),
+                      alpha  = .6,
+                      fatten = .7) +
+        labs(x = &amp;quot;&amp;quot;,
+             y = &amp;quot;&amp;quot;,
+             title = &amp;quot;Boxplots for Continuous Variables&amp;quot;) +
+      scale_fill_manual(
+            values = c(&amp;quot;#fde725ff&amp;quot;, &amp;quot;#20a486ff&amp;quot;),
+            name   = &amp;quot;Heart\nDisease&amp;quot;,
+            labels = c(&amp;quot;No HD&amp;quot;, &amp;quot;Yes HD&amp;quot;)) +
+      theme(
+         axis.text.x  = element_blank(),
+         axis.ticks.x = element_blank()) +
+      facet_wrap(~ key, 
+                 scales = &amp;quot;free&amp;quot;, 
+                 ncol   = 2) &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-7-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt; The faceted plots for categorical and continuous variables suggest the following conditions are associated with increased prevalence of heart disease (note: this does not mean the relationship is causal).&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Asymptomatic angina chest pain (relative to typical angina chest pain, atypical angina pain, or non-angina pain)&lt;/li&gt;
+&lt;li&gt;Presence of exercise induced angina&lt;/li&gt;
+&lt;li&gt;Lower fasting blood sugar&lt;/li&gt;
+&lt;li&gt;Flat or down-sloaping peak exercise ST segment&lt;/li&gt;
+&lt;li&gt;Presence of left ventricle hypertrophy&lt;/li&gt;
+&lt;li&gt;Male&lt;/li&gt;
+&lt;li&gt;Higher thelassemia score&lt;/li&gt;
+&lt;li&gt;Higher age&lt;/li&gt;
+&lt;li&gt;Lower max heart rate achieved&lt;/li&gt;
+&lt;li&gt;Higher resting blood pressure&lt;/li&gt;
+&lt;li&gt;Higher cholesterol&lt;/li&gt;
+&lt;li&gt;Higher ST depression induced by exercise relative to rest&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;We can’t all be cardiologists but these do seem to pass the eye check. Particularly: age, blood pressure, cholesterol, and sex all point in the right direction based on what we generally know about the world around us. This provides a nice phase gate to let us proceed with the analysis.&lt;/p&gt;
+&lt;p&gt;Highly correlated variables can lead to overly complicated models or wonky predictions. The ggcorr() function from GGally package provides a nice, clean correlation matrix of the numeric variables. The default method is Pearson which I use here first. Pearson isn’t ideal if the data is skewed or has a lot of outliers so I’ll check using the rank-based Kendall method as well.&lt;a href=&#34;#fn4&#34; class=&#34;footnoteRef&#34; id=&#34;fnref4&#34;&gt;&lt;sup&gt;4&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Correlation matrix using Pearson method, default method is Pearson
+heart_dataset_clean_tbl %&amp;gt;% ggcorr(high       = &amp;quot;#20a486ff&amp;quot;,
+                                   low        = &amp;quot;#fde725ff&amp;quot;,
+                                   label      = TRUE, 
+                                   hjust      = .75, 
+                                   size       = 3, 
+                                   label_size = 3,
+                                   nbreaks    = 5
+                                              ) +
+  labs(title = &amp;quot;Correlation Matrix&amp;quot;,
+  subtitle = &amp;quot;Pearson Method Using Pairwise Obervations&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-8-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Correlation matrix using Kendall method
+heart_dataset_clean_tbl %&amp;gt;% ggcorr(method     = c(&amp;quot;pairwise&amp;quot;, &amp;quot;kendall&amp;quot;),
+                                   high       = &amp;quot;#20a486ff&amp;quot;,
+                                   low        = &amp;quot;#fde725ff&amp;quot;,
+                                   label      = TRUE, 
+                                   hjust      = .75, 
+                                   size       = 3, 
+                                   label_size = 3,
+                                   nbreaks    = 5
+                                   ) +
+  labs(title = &amp;quot;Correlation Matrix&amp;quot;,
+  subtitle = &amp;quot;Kendall Method Using Pairwise Observations&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-8-2.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;There are very minor differences between the Pearson and Kendall results. No variables appear to be highly correlated. As such, it seems reasonable to stay with the original 14 variables as we proceed into the modeling section.&lt;/p&gt;
+&lt;p&gt;The plan is to split up the original data set to form a training group and testing group. The training group will be used to fit the model while the testing group will be used to evaluate predictions. The initial_split() function creates a split object which is just an efficient way to store both the training and testing sets. The training() and testing() functions are used to extract the appropriate dataframes out of the split object when needed.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#set seed for repeatability
+set.seed(1333)
+
+#create split object 
+train_test_split &amp;lt;- heart_dataset_clean_tbl %&amp;gt;% initial_split(prop = .8, strata = &amp;quot;Diagnosis_Heart_Disease&amp;quot;)
+
+#pipe split obj to training() fcn to create training set
+train_tbl &amp;lt;- train_test_split %&amp;gt;% training()
+
+#pipe split obj to testing() fcn to create test set
+test_tbl &amp;lt;- train_test_split %&amp;gt;% testing()&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We chose to do our data preparation early on during the cleaning phase. For more complicated modeling operations it may be desirable to set up a recipe to do the pre-processing in a repeatable and reversible fashion and I chose here to leave some placeholder lines commented out and available for future work. The recipe is the spot to transform, scale, or binarize the data. We have to tell the recipe() function what we want to model: Diagnosis_Heart_Disease as a function of all the other variables (not needed here since we took care of the necessary conversions). The training data should be used exclusively to train the recipe to avoid data leakage. After giving the model syntax to the recipe, the data is piped into the prep() function which will extract all the processing parameters (if we had implemented processing steps here). The trained recipe is stored as an object and bake function is used to apply the trained recipe to a new (test) data set.&lt;/p&gt;
+&lt;p&gt;Juice() is a shortcut to extract the finalized training set which is already embedded in the recipe by default. Calling the bake() function and proving the recipe and a new data set will apply the processing steps to that dataframe.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Set up recipe (use training data here to avoid leakage)
+the_recipe &amp;lt;- recipe(Diagnosis_Heart_Disease ~ . , data = train_tbl) %&amp;gt;%
+              #[Processing Step 1]
+              #[Processing Step 2]
+              prep(train_tbl, retain = TRUE)
+
+#Apply recipe to training data to create processed training_data_obj (already populated in the recipe object)
+train_processed_data &amp;lt;- juice(the_recipe)
+
+#Apply recipe to test data to create processed test_data_obj
+test_processed_data &amp;lt;- bake(the_recipe, new_data = test_tbl)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Once the training and testing data have been processed and stored, the logistic regression model can be set up using the parsnip workflow. Parsnip uses a 3-step process:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;specify the model and its arguments&lt;/li&gt;
+&lt;li&gt;set the engine (how the model is created)&lt;/li&gt;
+&lt;li&gt;fit the model to the processed training data&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Logistic regression is a convenient first model to work with since it is relatively easy to implement and yields results that have intuitive meaning. It can be easily interpreted when the odds ratio is calculated from the model structure. &lt;a href=&#34;#fn5&#34; class=&#34;footnoteRef&#34; id=&#34;fnref5&#34;&gt;&lt;sup&gt;5&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Set up and train the model using processed training_data_obj
+set.seed(100)
+log_regr_hd_model &amp;lt;- logistic_reg(mode = &amp;quot;classification&amp;quot;) %&amp;gt;%
+                     set_engine(&amp;quot;glm&amp;quot;) %&amp;gt;% 
+                     fit(Diagnosis_Heart_Disease ~ ., data = train_processed_data)
+
+#Take a look at model coefficients and add odds ratio for interpretability
+broom::tidy(log_regr_hd_model$fit) %&amp;gt;%
+  arrange(desc(estimate)) %&amp;gt;% 
+  mutate(odds_ratio = exp(estimate)) %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 5), digits = 3)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+term
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+estimate
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+std.error
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+statistic
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+p.value
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+odds_ratio
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Thalassemia7.0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.932
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.519
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3.726
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.000
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+6.906
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Chest_Pain_Type4
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.694
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.770
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2.201
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.028
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+5.443
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Sex1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.473
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.648
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2.274
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.023
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+4.364
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Num_Major_Vessels_Flouro
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.264
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.307
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+4.119
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.000
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3.538
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Chest_Pain_Type2
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.255
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.874
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.436
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.151
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3.507
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Resting_ECG2
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.022
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.447
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2.287
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.022
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2.780
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Peak_Exercise_ST_Segment3
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.003
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.984
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.020
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.308
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2.727
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Peak_Exercise_ST_Segment2
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.833
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.551
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.512
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.130
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2.300
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Exercise_Induced_Angina1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.704
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.526
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.339
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.181
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2.023
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Resting_ECG1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.675
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3.314
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.204
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.839
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.965
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+ST_Depression_Exercise
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.340
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.268
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.267
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.205
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.405
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Thalassemia6.0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.127
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.882
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.144
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.885
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.136
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Resting_Blood_Pressure
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.036
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.014
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+2.535
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.011
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.037
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Serum_Cholesterol
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.003
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.005
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.644
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.520
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.003
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Max_Heart_Rate_Achieved
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.032
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.014
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-2.271
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.023
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.969
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Age
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.035
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.029
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-1.198
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.231
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.966
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Chest_Pain_Type3
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.282
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.770
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.366
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.714
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.755
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fasting_Blood_Sugar1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.684
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.718
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.953
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.341
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.504
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+(Intercept)
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-6.350
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3.439
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-1.846
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.065
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.002
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;In the above code I’ve converted the estimate of the coefficient into the odds ratio. The odds ratio represents the odds that an outcome will occur given the presence of a specific predictor, compared to the odds of the outcome occurring in the absence of that predictor, assuming all other predictors remain constant. The odds ratio is calculated from the exponential function of the coefficient estimate based on a unit increase in the predictor. An example with a continuous variable: for 1 mm Hg increased in resting blood pressure rest_bp, the odds of having heart disease increases by a factor of 1.04.&lt;a href=&#34;#fn6&#34; class=&#34;footnoteRef&#34; id=&#34;fnref6&#34;&gt;&lt;sup&gt;6&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Now let’s feed the model the testing data that we held out from the fitting process. It’s the first time the model will have seen these data so we should get a fair assessment (absent of over-fitting). The new_data argument in the predict() function is used to supply the test data to the model and have it output a vector of predictions, one for each observation in the testing data. The results vector can be added as a column into the original dataframe to append the predictions next to the true values.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Make predictions using testing set
+first_training_prediction &amp;lt;- predict(log_regr_hd_model, 
+                                     new_data = test_tbl, 
+                                     type     = &amp;quot;class&amp;quot;)
+
+#Add predictions as new column in heart data set
+first_training_prediction_full_tbl &amp;lt;- test_processed_data %&amp;gt;% 
+  mutate(Predicted_Heart_Disease = first_training_prediction$.pred_class)
+
+#Glimpse data
+first_training_prediction_full_tbl %&amp;gt;% glimpse()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Observations: 59
+## Variables: 15
+## $ Age                      &amp;lt;dbl&amp;gt; 56, 63, 56, 52, 54, 60, 64, 43, 65, 4...
+## $ Resting_Blood_Pressure   &amp;lt;dbl&amp;gt; 120, 130, 140, 172, 140, 117, 140, 12...
+## $ Serum_Cholesterol        &amp;lt;dbl&amp;gt; 236, 254, 294, 199, 239, 230, 335, 17...
+## $ Max_Heart_Rate_Achieved  &amp;lt;dbl&amp;gt; 178, 147, 153, 162, 160, 160, 158, 12...
+## $ ST_Depression_Exercise   &amp;lt;dbl&amp;gt; 0.8, 1.4, 1.3, 0.5, 1.2, 1.4, 0.0, 2....
+## $ Num_Major_Vessels_Flouro &amp;lt;dbl&amp;gt; 2, 3, 2, 2, 2, 4, 2, 2, 5, 2, 2, 2, 2...
+## $ Sex                      &amp;lt;fct&amp;gt; 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1...
+## $ Chest_Pain_Type          &amp;lt;fct&amp;gt; 2, 4, 2, 3, 4, 4, 3, 4, 4, 1, 4, 3, 3...
+## $ Fasting_Blood_Sugar      &amp;lt;fct&amp;gt; 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1...
+## $ Resting_ECG              &amp;lt;fct&amp;gt; 0, 2, 2, 0, 0, 0, 0, 2, 2, 0, 2, 0, 2...
+## $ Exercise_Induced_Angina  &amp;lt;fct&amp;gt; 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0...
+## $ Peak_Exercise_ST_Segment &amp;lt;fct&amp;gt; 1, 2, 2, 1, 1, 1, 1, 2, 2, 1, 1, 1, 3...
+## $ Thalassemia              &amp;lt;fct&amp;gt; 3.0, 7.0, 3.0, 7.0, 3.0, 7.0, 3.0, 7....
+## $ Diagnosis_Heart_Disease  &amp;lt;fct&amp;gt; 0, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0...
+## $ Predicted_Heart_Disease  &amp;lt;fct&amp;gt; 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0...&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;A confusion matrix is a visual way to display the results of the model’s predictions. It’s not just the ability to predict the presence of heart disease that is of interest - we also want to know the number of times the model successfully predicts the absence of heart disease. Likewise, we want to know the number of false positives and false negatives. The confusion matrix captures all these metrics nicely.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Use predictions col and truth col to make a confusion matrix object
+conf_mat_obj &amp;lt;- first_training_prediction_full_tbl %&amp;gt;% 
+  conf_mat(truth    = Diagnosis_Heart_Disease, 
+           estimate = Predicted_Heart_Disease)
+
+#Call conf_mat and supply columns for truth, prediction
+#Pluck() to extract the conf_matrix data into cols and convert to tibble for plotting
+conf_matrix_plt_obj &amp;lt;- first_training_prediction_full_tbl %&amp;gt;% 
+  conf_mat(truth    = Diagnosis_Heart_Disease, 
+           estimate = Predicted_Heart_Disease) %&amp;gt;%
+  pluck(1) %&amp;gt;%
+  as_tibble() %&amp;gt;%
+  mutate(&amp;quot;outcome&amp;quot; = c(&amp;quot;true_negative&amp;quot;,
+                       &amp;quot;false_positive&amp;quot;,
+                       &amp;quot;false_negative&amp;quot;,
+                       &amp;quot;true_positive&amp;quot;)) %&amp;gt;%
+  mutate(Prediction = recode(Prediction, &amp;quot;0&amp;quot; = &amp;quot;No Heart Disease&amp;quot;,
+                                         &amp;quot;1&amp;quot; = &amp;quot;Heart Disease&amp;quot;)) %&amp;gt;%
+  mutate(Truth = recode(Truth,  &amp;quot;0&amp;quot; = &amp;quot;No Heart Disease&amp;quot;,
+                                &amp;quot;1&amp;quot; = &amp;quot;Heart Disease&amp;quot;))
+
+#Convert to kable format
+conf_matrix_plt_obj %&amp;gt;% kable(align = rep(&amp;quot;c&amp;quot;, 4))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+Prediction
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+Truth
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+n
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+outcome
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+No Heart Disease
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+No Heart Disease
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+29
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+true_negative
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Heart Disease
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+No Heart Disease
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+3
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+false_positive
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+No Heart Disease
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Heart Disease
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+6
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+false_negative
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Heart Disease
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Heart Disease
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+21
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+true_positive
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Plot confusion matrix
+p1 &amp;lt;- conf_matrix_plt_obj %&amp;gt;% ggplot(aes(x = Truth, y = Prediction)) +
+  geom_tile(aes(fill = n), alpha = .8) +
+  geom_text(aes(label = n), color = &amp;quot;white&amp;quot;) +
+  scale_fill_viridis_c() +
+  theme(legend.title = element_blank()) +
+  labs(
+    title    = &amp;quot;Confusion Matrix&amp;quot;,
+    subtitle = &amp;quot;Heart Disease Prediction Using Logistic Regression&amp;quot;
+  )
+  
+p1&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-13-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Calling summary() on the confusion_matrix_obj gives all the performance measures
+#Filter to the ones we care about
+log_reg_performance_tbl &amp;lt;- summary(conf_mat_obj) %&amp;gt;% filter(
+                                 .metric == &amp;quot;accuracy&amp;quot; | 
+                                 .metric == &amp;quot;sens&amp;quot; |
+                                 .metric == &amp;quot;spec&amp;quot; |
+                                 .metric == &amp;quot;ppv&amp;quot;  |
+                                 .metric == &amp;quot;npv&amp;quot;  |
+                                 .metric == &amp;quot;f_meas&amp;quot;) %&amp;gt;%
+  select(-.estimator) %&amp;gt;%
+  rename(&amp;quot;metric&amp;quot; = .metric, 
+         &amp;quot;estimate&amp;quot; = .estimate) %&amp;gt;%
+  mutate(&amp;quot;estimate&amp;quot; = estimate %&amp;gt;% signif(digits = 3)) %&amp;gt;%
+  mutate(metric = recode(metric, &amp;quot;sens&amp;quot; = &amp;quot;sensitivity&amp;quot;),
+         metric = recode(metric, &amp;quot;spec&amp;quot; = &amp;quot;specificity&amp;quot;),
+         metric = recode(metric, &amp;quot;ppv&amp;quot;  = &amp;quot;positive predictive value&amp;quot;),
+         metric = recode(metric, &amp;quot;npv&amp;quot;  = &amp;quot;negative predictive value&amp;quot;)) %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 3))
+  
+#Display perfomance summary as kable
+log_reg_performance_tbl &lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+metric
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+estimate
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.847
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+sensitivity
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.906
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+specificity
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.778
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+positive predictive value
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.829
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+negative predictive value
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.875
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+f_meas
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.866
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Other common performance metrics are summarized above. Accuracy represents the percentage of correct predictions. Descriptions for each can be found at this link.&lt;a href=&#34;#fn7&#34; class=&#34;footnoteRef&#34; id=&#34;fnref7&#34;&gt;&lt;sup&gt;7&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;The initial split of the data set into training/testing was done randomly so a replicate of the procedure would yield slightly different results. V-fold cross validation is a resampling technique that allows for repeating the process of splitting the data, training the model, and assessing the results many times from the same data set. Each stop in the CV process is annotated in the comments within the code below.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#create multiple split objects w/ vfold cross-validation resampling
+set.seed(925)
+hd_cv_split_objects &amp;lt;- heart_dataset_clean_tbl %&amp;gt;% vfold_cv(strata = Diagnosis_Heart_Disease)
+hd_cv_split_objects&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## #  10-fold cross-validation using stratification 
+## # A tibble: 10 x 2
+##    splits           id    
+##    &amp;lt;named list&amp;gt;     &amp;lt;chr&amp;gt; 
+##  1 &amp;lt;split [270/31]&amp;gt; Fold01
+##  2 &amp;lt;split [270/31]&amp;gt; Fold02
+##  3 &amp;lt;split [270/31]&amp;gt; Fold03
+##  4 &amp;lt;split [271/30]&amp;gt; Fold04
+##  5 &amp;lt;split [271/30]&amp;gt; Fold05
+##  6 &amp;lt;split [271/30]&amp;gt; Fold06
+##  7 &amp;lt;split [271/30]&amp;gt; Fold07
+##  8 &amp;lt;split [271/30]&amp;gt; Fold08
+##  9 &amp;lt;split [272/29]&amp;gt; Fold09
+## 10 &amp;lt;split [272/29]&amp;gt; Fold10&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#I want a big function that takes a split object and an id
+make_cv_predictions_fcn &amp;lt;- function(split, id){
+  #extract data for analysis set from split obj
+  #prep(train) the recipe and return updated recipe
+  #bake(apply) trained recipe to new data  
+  analysis_tbl &amp;lt;- analysis(split)
+  trained_analysis_recipe &amp;lt;- prep(the_recipe ,training = analysis_tbl)
+  baked_analysis_data_tbl &amp;lt;- bake(trained_analysis_recipe, new_data = analysis_tbl)
+  
+  #define model in parsnip syntax
+  model &amp;lt;- logistic_reg(mode = &amp;quot;classification&amp;quot;) %&amp;gt;%
+    set_engine(&amp;quot;glm&amp;quot;) %&amp;gt;%
+    fit(Diagnosis_Heart_Disease ~ ., data = baked_analysis_data_tbl)
+  
+  #same as above but for assessment set (like the test set but for resamples)
+  assessment_tbl &amp;lt;- assessment(split)
+  trained_assessment_recipe &amp;lt;- prep(the_recipe, training = assessment_tbl)
+  baked_assessment_data_tbl &amp;lt;- bake(trained_assessment_recipe, new_data = assessment_tbl)
+  
+  #make a tibble with the results
+  tibble(&amp;quot;id&amp;quot;         = id,
+         &amp;quot;truth&amp;quot;      = baked_assessment_data_tbl$Diagnosis_Heart_Disease,
+         &amp;quot;prediction&amp;quot; = unlist(predict(model, new_data = baked_assessment_data_tbl))
+  )
+}
+
+#map the big function to every split obj / id in the initial cv split tbl
+cv_predictions_tbl &amp;lt;- map2_df(.x = hd_cv_split_objects$splits,
+                              .y = hd_cv_split_objects$id,
+                              ~make_cv_predictions_fcn(split = .x, id = .y))
+
+#see results 
+cv_predictions_tbl %&amp;gt;% head(10) %&amp;gt;% kable(align = rep(&amp;quot;c&amp;quot;, 3))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+id
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+truth
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+prediction
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#define desired metrics
+desired_metrics &amp;lt;- metric_set(accuracy,
+                              sens,
+                              spec,
+                              ppv,
+                              npv,
+                              f_meas)
+
+#group by fold and use get desired metrics [metric_set fcn is from yardstick]
+cv_metrics_long_tbl &amp;lt;- cv_predictions_tbl %&amp;gt;% 
+                       group_by(id) %&amp;gt;% 
+                       desired_metrics(truth = truth, estimate = prediction) 
+
+#see results
+cv_metrics_long_tbl %&amp;gt;% head(10) %&amp;gt;% kable(align = rep(&amp;quot;c&amp;quot;, 4))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+id
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+.metric
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+.estimator
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+.estimate
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold01
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.8709677
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold02
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.9354839
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold03
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.8387097
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold04
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.7666667
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold05
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.9000000
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold06
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.8000000
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold07
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.8000000
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold08
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.7333333
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold09
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.7931034
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+Fold10
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+binary
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.9310345
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#visualize results
+cv_metrics_long_tbl %&amp;gt;% ggplot(aes(x = .metric, y = .estimate)) +
+  geom_boxplot(aes(fill = .metric), 
+               alpha = .6, 
+               fatten = .7) +
+  geom_jitter(alpha = 0.2, width = .05) +
+  labs(x = &amp;quot;&amp;quot;,
+       y = &amp;quot;&amp;quot;,
+       title = &amp;quot;Boxplots for Logistic Regression&amp;quot;,
+       subtitle = &amp;quot;Model Metrics, 10-Fold Cross Validation&amp;quot;) +
+  scale_fill_viridis_d() +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1) ) +
+  theme(legend.title = element_blank(),
+        axis.text.x  = element_blank(),
+        axis.ticks.x = element_blank()) &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-14-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#calculate the mean from all the folds for each metric
+cv_mean_metrics_tbl &amp;lt;- cv_metrics_long_tbl %&amp;gt;%
+                       group_by(.metric) %&amp;gt;%
+                       summarize(&amp;quot;Avg&amp;quot; = mean(.estimate)) %&amp;gt;%
+                       ungroup()
+  
+cv_mean_metrics_tbl %&amp;gt;% 
+  mutate(Average = Avg %&amp;gt;% signif(digits = 3)) %&amp;gt;% 
+  select(.metric,
+         Average) %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 2))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+.metric
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+Average
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+accuracy
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.837
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+f_meas
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.853
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+npv
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.852
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+ppv
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.839
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+sens
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.876
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+spec
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.790
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Got there! Average of .837 accuracy after 10-fold cross-validation. Not bad for a basic logistic regression. It is certainly possible that .837 is not sufficient for our purposes given that we are in the domain of health care where false classifications have dire consequences. Evaluating other algorithms would be a logical next step for improving the accuracy and reducing patient risk. Nevertheless, I’m ending it here for this session since I have work tomorrow.&lt;/p&gt;
+&lt;p&gt;Thanks for reading.&lt;/p&gt;
+&lt;div class=&#34;footnotes&#34;&gt;
+&lt;hr /&gt;
+&lt;ol&gt;
+&lt;li id=&#34;fn1&#34;&gt;&lt;p&gt;Image Credit: Shutterstock/Crevis&lt;a href=&#34;#fnref1&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn2&#34;&gt;&lt;p&gt;UCI Machine Learning Repository, &lt;a href=&#34;https://archive.ics.uci.edu/ml/datasets/Heart+Disease&#34; class=&#34;uri&#34;&gt;https://archive.ics.uci.edu/ml/datasets/Heart+Disease&lt;/a&gt;&lt;a href=&#34;#fnref2&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn3&#34;&gt;&lt;p&gt;Nuclear stress testing requires the injection of a tracer, commonly technicium 99M (Myoview or Cardiolyte), which is then taken up by healthy, viable myocardial cells. A camera (detector) is used afterwards to image the heart and compare segments. A coronary stenosis is detected when a myocardial segment takes up the nuclear tracer at rest, but not during cardiac stress. This is called a “reversible defect.” Scarred myocardium from prior infarct will not take up tracer at all and is referred to as a “fixed defect.”&lt;a href=&#34;#fnref3&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn4&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://stats.stackexchange.com/questions/3730/pearsons-or-spearmans-correlation-with-non-normal-data&#34; class=&#34;uri&#34;&gt;https://stats.stackexchange.com/questions/3730/pearsons-or-spearmans-correlation-with-non-normal-data&lt;/a&gt;&lt;a href=&#34;#fnref4&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn5&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://notast.netlify.com/post/explaining-predictions-interpretable-models-logistic-regression/&#34; class=&#34;uri&#34;&gt;https://notast.netlify.com/post/explaining-predictions-interpretable-models-logistic-regression/&lt;/a&gt;&lt;a href=&#34;#fnref5&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn6&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://notast.netlify.com/post/explaining-predictions-interpretable-models-logistic-regression/&#34; class=&#34;uri&#34;&gt;https://notast.netlify.com/post/explaining-predictions-interpretable-models-logistic-regression/&lt;/a&gt;&lt;a href=&#34;#fnref6&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn7&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://www.analyticsvidhya.com/blog/2019/08/11-important-model-evaluation-error-metrics/&#34; class=&#34;uri&#34;&gt;https://www.analyticsvidhya.com/blog/2019/08/11-important-model-evaluation-error-metrics/&lt;/a&gt;&lt;a href=&#34;#fnref7&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
+</description>
+  </item>
+  
+</channel>
+  </rss>

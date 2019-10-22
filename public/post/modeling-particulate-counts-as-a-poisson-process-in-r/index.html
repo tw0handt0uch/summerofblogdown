@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.56.1" />
+
+  <title>Modeling Particulate Counts as a Poisson Process in R &middot; [R]eliability</title>
+
+    
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.9.0/css/all.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+ 
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/img/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+  <a class="pure-menu-heading brand" href="/">Riley King</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/about/"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
+      
+        </li>
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/riley-king-9594247" rel="me" target="_blank"><i class="fab fa-linkedin"></i></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/tw0handt0uch" rel="me" target="_blank"><i class="fab fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2019. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+
+<div class="header">
+  <h1>Modeling Particulate Counts as a Poisson Process in R</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+    <i class="fa fa-calendar fa-fw"></i>
+    <time>18 Sep 2019</time>
+  </div>
+
+  
+
+  
+  
+  
+  
+
+  
+  
+  
+  <div>
+    <i class="fa fa-tags fa-fw"></i>
+    
+      <a class="post-taxonomy-tag" href="/tags/simulation">Simulation</a>&nbsp;&#47;
+    
+      <a class="post-taxonomy-tag" href="/tags/r">R</a>&nbsp;&#47;
+    
+      <a class="post-taxonomy-tag" href="/tags/stats">Stats</a>
+    
+  </div>
+  
+  
+
+</div>
+
+  
+<script src="/rmarkdown-libs/kePrint/kePrint.js"></script>
+
+
+<p>I’ve never really worked much with Poisson data and wanted to get my hands dirty. I thought that for this project I might combine a Poisson data set with the simple Bayesian methods that I’ve explored before since it turns out the Poisson rate parameter lambda also has a nice conjugate prior (more on that later). Poisson distributed data are counts per unit time or space - they are events that arrive at random intervals but that have a characteristic rate parameter which also equals the variance. This rate parameter is usually denoted as lambda. No-hitters in baseball are often modeled as Poisson data, as are certain types of processing defects in electronics and medical devices. A particularly relevant application is in particulate testing for implantable devices. Particulate shed is an unassuming but potentially costly and dangerous phenomenon.</p>
+<p>Particulate can be shed from the surface of medical devices even when the manufacturing environment is diligently controlled. The source of the particulate can vary: light particulate is attracted to the surface of sheaths and luers due to static charge; hydrophilic coatings may delaminate from the surface during delivery; therapeutic coating on the implant’s surface may degrade over time in the presence of blood.</p>
+<p>The clinical harms that the patient may face due to particulate shed include neurological events if the particulate migrates cranially or embolism it migrates caudally. The occurrence and severity of symptoms are understood to be functions of both size and quantity of particulate. In recent years, FDA and friends have been more stringent in requiring manufacturers to quantify and understand the nature of the particulate burden associated with their devices. In the analysis below, I’m going to simulate an experiment in which particulate data are collected for 20 devices.</p>
+<p>Before I get there, I want to remind myself of what Poisson data look like for different rate parameters. I set up a function to make a Poisson pdf based on number of events n and rate parameter lambda. The function then converts the information to a tibble for use with ggplot.</p>
+<pre class="r"><code>#Load libraries
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(tolerance)
+library(ggrepel)</code></pre>
+<pre class="r"><code>#Sequence from 0 to 24 by 1 (x-axis of plot)
+number_of_events &lt;- seq(0, 24, by = 1)
+
+#Function to make a Poisson density vector from n and lambda, convert into tibble
+pois_fcn &lt;- function(lambda){
+            pois_vector &lt;- dpois(x = number_of_events, lambda = lambda, log = FALSE)
+            pois_tbl    &lt;- tibble(&quot;num_of_events&quot; = number_of_events,
+                                  &quot;prob&quot;          = pois_vector,
+                                  &quot;lambda&quot;        = lambda)
+            }
+#Objects to hold tibbles for different Poisson rates
+pois_dist_1_tbl &lt;-  pois_fcn(lambda = 1)
+pois_dist_5_tbl &lt;-  pois_fcn(lambda = 5)
+pois_dist_15_tbl &lt;- pois_fcn(lambda = 15)
+
+#Combine in one df
+pois_total_tbl &lt;- bind_rows(pois_dist_1_tbl,
+                            pois_dist_5_tbl,
+                            pois_dist_15_tbl)
+
+#Convert lambda front int to factor so ggplot maps aesthetics as levels, not gradient
+pois_total_int_tbl &lt;- pois_total_tbl %&gt;% 
+  mutate(lambda = as_factor(lambda))
+
+#Make and store ggplot obj
+h1 &lt;- pois_total_int_tbl %&gt;% ggplot(aes(x = num_of_events, y = prob)) +
+  geom_col(aes(y = prob, fill = lambda), position = &quot;dodge&quot;, color = &quot;black&quot;) +
+  scale_fill_manual(values = c(&quot;#2C728EFF&quot;, &quot;#75D054FF&quot;, &quot;#FDE725FF&quot;)) +
+  labs(x        = &quot;Number of Events&quot;, 
+       y        = &quot;Probability&quot;,
+       title    = &quot;Probability Mass Function&quot;,
+       subtitle = &quot;Poisson Distributions with Different Rates (Lambda)&quot;)
+
+h1</code></pre>
+<p><img src="/post/2019-09-18-modeling-device-particulate-counts-as-a-poisson-process_files/figure-html/unnamed-chunk-2-1.png" width="100%" height="500px" /></p>
+<p>Cool - so when the rate is low it looks sort of like the discrete version of an exponential curve. It’s still not symmetric at lambda = 5 but by lambda = 15 it looks a lot like a binomial distribution.</p>
+<p>The data I simulate below are intended to represent the fluid collected during bench-top simulated use testing in a clean “flow loop” or vascular deployment model. The fluid would generally be passed through light obscuration censors to quantify the size and counts of particulate relative to a control. Particulate requirements for many endovascular devices are borrowed from USP &lt;788&gt;. According to that standard, no more than 60 particles greater than 25 micron effective diameter are acceptable. I want to know the probability of passing the test but don’t know the rate parameter lambda. The end goal is to understand what the most credible values for lambda are based on the bench-top data from multiple devices. First I’ll try to quantify the uncertainty in the rate parameter lambda. Each lambda can then be used to estimate a reliability. The large number of simulated lamdas will make a large set of simulated reliabilities. From there I should be able to extract any information needed regarding the uncertainty of the device reliability as it relates to particulate shed. That’s the plan! Note: I’m trying out knitr::kable() which generates html tables nicely. I’m not too good at it yet so bare with me please.</p>
+<p>Take a look at the data:</p>
+<pre class="r"><code>#Peek at some data
+particulate_data %&gt;% head(5) %&gt;%
+  kable() %&gt;% kable_styling(&quot;full_width&quot; = F)</code></pre>
+<table class="table" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:right;">
+x
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right;">
+46
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+58
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+38
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+50
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+62
+</td>
+</tr>
+</tbody>
+</table>
+<p>I’m using a Bayesian approach again - partially because I need practice and partially because the Poisson parameter lambda has a convenient conjugate prior: the gamma distribution. This means that some simple math can get me from the prior to the posterior. I love simple math. Using the gamma distribution to describe the prior belief in lambda, the posterior distribution for lambda is:</p>
+<p><span class="math display">\[\mbox{prior:  lambda ~ Gamma}(a, b)\]</span> As a reminder to myself, this is read as “lambda is distributed as a Gamma distribution with parameters a and b”.</p>
+<p><span class="math display">\[\mbox{posterior:  lambda ~ Gamma}(a + \sum_{i=1}^{n} x_i\ , b + n)\]</span> It is reasonable to use an relatively uninformed prior for lambda since I don’t have much preliminary knowledge about particulate data for my device design. Setting the shape a to 1 and the rate b to 0.1 provides allocates the credibility across a wide range of lambdas to start. To go from prior to posterior we need only sum up all the particulate counts in the data set and add the total to the shape a, then add the total number of devices tested (sample size n) to the rate b.</p>
+<pre class="r"><code>#Set parameters and constants
+a &lt;- 1
+b &lt;- 0.1
+n &lt;- length(particulate_data)
+total_particulate_count &lt;- sum(particulate_data)</code></pre>
+<p>I like to peek at the prior and posterior distributions of lambda since they are easy to visualize via the relationships above. We are back into continuous distribution mode because the rate parameter lambda can be any positive value even though the particulate counts the come from the process are discrete.</p>
+<pre class="r"><code>#Set sequence of x values; generate prior using a,b; generate posterior 
+x_values  &lt;- seq(0, 60, length.out = 1000)
+prior     &lt;- dgamma(x_values, shape = 1, rate = 0.1)
+posterior &lt;- dgamma(x_values, shape = a + total_particulate_count, rate = b + n)
+
+#Prior in tibble format
+prior_tbl &lt;- tibble(
+  &quot;x_values&quot; = x_values,
+  &quot;prob&quot;     = prior,
+  &quot;config&quot;   = &quot;prior&quot;
+)
+
+#Posterior in tibble format
+posterior_tbl &lt;- tibble(
+  &quot;x_values&quot; = x_values,
+  &quot;prob&quot;     = posterior,
+  &quot;config&quot;   = &quot;posterior&quot;
+)
+
+#Combine prior and posterior in 1 tibble
+prior_post_tbl &lt;- bind_rows(prior_tbl, posterior_tbl)
+
+#Visualize 
+prior_post_tbl %&gt;% ggplot(aes(x = x_values, y = prob)) +
+  geom_line(aes(color = config), size = 1.5, alpha = 0.8) +
+  scale_y_continuous(name=&quot;Density&quot;, limits=c(0, 0.3)) +
+  scale_color_manual(values = c(&quot;#75D054FF&quot;, &quot;#2C728EFF&quot;)) +
+  labs(
+    title    = &quot;Rate Parameter Lambda For Particle Counts&quot;,
+    subtitle = &quot;Modeled as Poisson Process&quot;,
+    x        = &quot;Lambda&quot;,
+    color    = &quot;&quot;
+  )</code></pre>
+<p><img src="/post/2019-09-18-modeling-device-particulate-counts-as-a-poisson-process_files/figure-html/unnamed-chunk-6-1.png" width="100%" height="500px" /></p>
+<p>Having access to the posterior distribution of lambda enables simulation of possible values of lambda by drawing random values from the distributions. The probability of drawing any particular value of lambda is based on the density shown on the y-axis (although the probability of any particular point is zero; we must calculate over a span of x via integration). Each of the values randomly drawn from the posterior can be used to simulate a distribution of particulate counts for comparison with the spec. The workflow is essentially a series of questions:</p>
+<ol style="list-style-type: decimal">
+<li><p>What might the values of the rate parameter lambda be based on the data? -&gt; Combine data with conjugate prior to generate the posterior distribution of credible lambdas. (Done and shown above)</p></li>
+<li><p>If a random value of lambda is pulled from the posterior distribution , what would we expect regarding the uncertainty of the original experiment? -&gt; Draw random values lambda and then evaluate what percentage of the cdf lies above the spec (could also run simulations for each random lambda and then count the number of simulated runs above the spec but this is time consuming (10,000 lambdas x 10,000 simulations to build out the particle count distribution for each one…)</p></li>
+<li><p>Combine each of these tail areas into a new distribution. This new distribution represents the uncertainty in the reliability estimate based on uncertainty in lambda. How to estimate the reliability of the real device while taking uncertainty into account? -&gt; Calculate the lower bound of the 95% credible interval by finding the .05 quantile from the set of simulated reliability values.</p></li>
+</ol>
+<p>Let’s do this!</p>
+<pre class="r"><code>#Sample and store 10000 random lambda values from posterior 
+n_posterior_samples &lt;- 10000
+sampled_posterior_lambda &lt;- rgamma(n_posterior_samples, shape = a + total_particulate_count, rate = b + n)
+
+#Initialize empty vector to hold reliability data
+reliability_vector &lt;- rep(NA, n_posterior_samples)
+
+#For each lambda value, calc cumulative probability of less than or equal to q particles shed from 1 sample?
+for(i in 1:n_posterior_samples){
+  reliability_vector[i] &lt;- ppois(q = 60, lambda = sampled_posterior_lambda[i])
+}
+
+#Visualize
+reliability_vector %&gt;% head() %&gt;% 
+  kable(align=rep(&#39;c&#39;)) %&gt;% kable_styling(&quot;full_width&quot; = F)</code></pre>
+<table class="table" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:center;">
+x
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+0.9147028
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.9506510
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.9431756
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.9700806
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.9546490
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.9540933
+</td>
+</tr>
+</tbody>
+</table>
+<p>Checking what the simulated reliabilities are:</p>
+<pre class="r"><code>#Convert reliability vector to tibble
+reliability_tbl &lt;- reliability_vector %&gt;% 
+  as_tibble() %&gt;%
+  mutate(&quot;reliability&quot; = value) %&gt;%
+  select(reliability)
+
+#Visualize with histogram
+reliability_tbl %&gt;% ggplot(aes(reliability)) +
+  geom_histogram(fill = &quot;#2c3e50&quot;, color = &quot;white&quot;, binwidth = .01, alpha = 0.8) +
+    labs(
+        x        = &quot;Reliability&quot;,
+        title    = &quot;Estimated Reliability Range for Particulate Shed Performance&quot;,
+        subtitle = &quot;Requirement: 60 or less of 25 um or larger&quot;
+    )</code></pre>
+<p><img src="/post/2019-09-18-modeling-device-particulate-counts-as-a-poisson-process_files/figure-html/unnamed-chunk-8-1.png" width="100%" height="500px" /></p>
+<p>The 95% credible interval for the reliability (conformance rate) is the .05 quantile of this distribution since the spec is 1-sided:</p>
+<pre class="r"><code>#Calculate .05 quantile
+reliability_tbl$reliability %&gt;% 
+  quantile(probs = .05)     %&gt;% 
+  signif(digits = 3)    </code></pre>
+<pre><code>##    5% 
+## 0.893</code></pre>
+<p>Finally, the answer! The lowest reliability expected is 89.3 % based on a 95% credible interval. This would likely not meet the product requirements (assigned based on risk of the harms that come from this particular failure mode) and we would likely need to improve our design or processes to reduce particulate shed from the product.</p>
+<p>This concludes the Bayesian inference of reliability in Poisson distributed particle counts. But hey, since we’re here… one of the things I love about R is the ability to easily check sensitivities, assumptions, and alternatives easily. What would this analysis look like using the conventional frequentist approach? I admit I’m not sure exactly but I assume we would extend the standard tolerance interval approach that is common in Class III medical device submissions. Tolerance intervals are easy to pull from tables or software but actually pretty tricky (for me at least) to derive. They involve uncertainty in both the mean and the variance. For simplicity (and because I’m not confident enough to derive the formula), I’ll use the tolerance package in R to calculate tolerance intervals for Poisson data. It turns out that there are 8 methods and I’ll use them all because I’m feeling a little wild and I want to see if they result in different results.</p>
+<pre class="r"><code>## 95%/95% 1-sided Poisson tolerance limits for future
+## occurrences in a period of length 1 part. All eight methods
+## are presented for comparison.
+tl_tab &lt;- poistol.int(x = sum_part_data, n = n, m = 1, alpha = 0.05, P = 0.95,
+side = 1, method = &quot;TAB&quot;) %&gt;% mutate(method = &quot;TAB&quot;) %&gt;% as_tibble() 
+
+tl_ls &lt;- poistol.int(x = sum_part_data, n = n, m = 1, alpha = 0.05, P = 0.95,
+side = 1, method = &quot;LS&quot;) %&gt;% mutate(method = &quot;LS&quot;) %&gt;% as_tibble() 
+
+tl_sc &lt;- poistol.int(x = sum_part_data, n = n, m = 1, alpha = 0.05, P = 0.95,
+side = 1, method = &quot;SC&quot;) %&gt;% mutate(method = &quot;SC&quot;) %&gt;% as_tibble() 
+
+tl_cc &lt;- poistol.int(x = sum_part_data, n = n, m = 1, alpha = 0.05, P = 0.95,
+side = 1, method = &quot;CC&quot;) %&gt;% mutate(method = &quot;CC&quot;) %&gt;% as_tibble()
+
+tl_vs &lt;- poistol.int(x = sum_part_data, n = n, m = 1, alpha = 0.05, P = 0.95,
+side = 1, method = &quot;VS&quot;) %&gt;% mutate(method = &quot;VS&quot;) %&gt;% as_tibble() 
+
+tl_rvs &lt;- poistol.int(x = sum_part_data, n = n, m = 1, alpha = 0.05, P = 0.95,
+side = 1, method = &quot;RVS&quot;) %&gt;% mutate(method = &quot;RVS&quot;) %&gt;% as_tibble() 
+
+tl_ft &lt;- poistol.int(x = sum_part_data, n = n, m = 1, alpha = 0.05, P = 0.95,
+side = 1, method = &quot;FT&quot;) %&gt;%mutate(method = &quot;FT&quot;) %&gt;% as_tibble() 
+
+tl_csc &lt;- poistol.int(x = sum_part_data, n = n, m = 1, alpha = 0.05, P = 0.95,
+side = 1, method = &quot;CSC&quot;) %&gt;% mutate(method = &quot;CSC&quot;) %&gt;% as_tibble() 
+
+tl_all_tbl &lt;-  bind_rows(tl_tab,
+                         tl_ls,
+                         tl_sc,
+                         tl_cc,
+                         tl_vs,
+                         tl_rvs,
+                         tl_ft,
+                         tl_csc)
+
+tl_all_tbl %&gt;% kable(align=rep(&#39;c&#39;, 5)) </code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+alpha
+</th>
+<th style="text-align:center;">
+P
+</th>
+<th style="text-align:center;">
+lambda.hat
+</th>
+<th style="text-align:center;">
+1-sided.lower
+</th>
+<th style="text-align:center;">
+1-sided.upper
+</th>
+<th style="text-align:center;">
+method
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+0.05
+</td>
+<td style="text-align:center;">
+0.95
+</td>
+<td style="text-align:center;">
+49.15
+</td>
+<td style="text-align:center;">
+36
+</td>
+<td style="text-align:center;">
+64
+</td>
+<td style="text-align:center;">
+TAB
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.05
+</td>
+<td style="text-align:center;">
+0.95
+</td>
+<td style="text-align:center;">
+49.15
+</td>
+<td style="text-align:center;">
+36
+</td>
+<td style="text-align:center;">
+64
+</td>
+<td style="text-align:center;">
+LS
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.05
+</td>
+<td style="text-align:center;">
+0.95
+</td>
+<td style="text-align:center;">
+49.15
+</td>
+<td style="text-align:center;">
+36
+</td>
+<td style="text-align:center;">
+64
+</td>
+<td style="text-align:center;">
+SC
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.05
+</td>
+<td style="text-align:center;">
+0.95
+</td>
+<td style="text-align:center;">
+49.15
+</td>
+<td style="text-align:center;">
+36
+</td>
+<td style="text-align:center;">
+64
+</td>
+<td style="text-align:center;">
+CC
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.05
+</td>
+<td style="text-align:center;">
+0.95
+</td>
+<td style="text-align:center;">
+49.15
+</td>
+<td style="text-align:center;">
+36
+</td>
+<td style="text-align:center;">
+64
+</td>
+<td style="text-align:center;">
+VS
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.05
+</td>
+<td style="text-align:center;">
+0.95
+</td>
+<td style="text-align:center;">
+49.15
+</td>
+<td style="text-align:center;">
+36
+</td>
+<td style="text-align:center;">
+64
+</td>
+<td style="text-align:center;">
+RVS
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.05
+</td>
+<td style="text-align:center;">
+0.95
+</td>
+<td style="text-align:center;">
+49.15
+</td>
+<td style="text-align:center;">
+36
+</td>
+<td style="text-align:center;">
+64
+</td>
+<td style="text-align:center;">
+FT
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.05
+</td>
+<td style="text-align:center;">
+0.95
+</td>
+<td style="text-align:center;">
+49.15
+</td>
+<td style="text-align:center;">
+36
+</td>
+<td style="text-align:center;">
+64
+</td>
+<td style="text-align:center;">
+CSC
+</td>
+</tr>
+</tbody>
+</table>
+<p>For this data set it can be seen that all 8 methods produce the same 1-sided 95/95 upper tolerance interval 64 counts per device. N=60 was the requirement - since the edge of our tolerance interval lies above the 1-sided spec we would fail this test. This conclusion is consistent with the Bayesian method that estimates the reliability below the 95% requirement.</p>
+<p>But what sort of reliability claim could our data support? For the Bayesian approach we concluded that the answer was 89.3% (lower bound of 1-sided 95% credible interval). For the frequentist method, we don’t have a posterior distribution to examine. We could try using the tolerance interval function above with various values of P to impute the value of P which coincides with the spec limit of 60.</p>
+<pre class="r"><code>#Sequence of reliability values for which to use as P 
+reliability_freq_tbl &lt;- tibble(
+  &quot;proportion_covered_P&quot; = seq(.40, .99, .01)
+)
+
+#Function that is just like poistol.int but extracts and reports only the upper limit
+#of the tolerance interval
+tol_interval_fcn &lt;- function(data_vec = sum_part_data, n=20, m=1, alpha=.05, P=.95, side=1, method=&quot;TAB&quot;){
+  holder &lt;- poistol.int(data_vec, n, m, alpha, P, side, method)
+  holder_2 &lt;- holder[1,5]
+}
+
+#Test the function
+test_1 &lt;- tol_interval_fcn(data_vec = sum_part_data, n=n, m=1, alpha = .05, P = .95, side = 1, method = &quot;TAB&quot;)
+
+#Test the function
+test_2 &lt;- tol_interval_fcn(P = .95)
+
+#Map the function across a vector of proportions
+#Note to future self: map() arguments are: the list of values map the fn over, the fn
+#itself, then all the additional arguments of the fn that you aren&#39;t mapping over (odd syntax)
+upper_tol_tbl &lt;- reliability_freq_tbl %&gt;% mutate(
+  particles_per_part = map(proportion_covered_P, tol_interval_fcn, data_vec = sum_part_data, n=n, m=1, alpha = .05, side = 1, method = &quot;TAB&quot;) %&gt;% as.integer() 
+)
+
+#View haead and tail of data
+upper_tol_tbl %&gt;% head(20) %&gt;% kable(align=rep(&#39;c&#39;, 2))</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+proportion_covered_P
+</th>
+<th style="text-align:center;">
+particles_per_part
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+0.40
+</td>
+<td style="text-align:center;">
+50
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.41
+</td>
+<td style="text-align:center;">
+50
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.42
+</td>
+<td style="text-align:center;">
+50
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.43
+</td>
+<td style="text-align:center;">
+50
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.44
+</td>
+<td style="text-align:center;">
+51
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.45
+</td>
+<td style="text-align:center;">
+51
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.46
+</td>
+<td style="text-align:center;">
+51
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.47
+</td>
+<td style="text-align:center;">
+51
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.48
+</td>
+<td style="text-align:center;">
+51
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.49
+</td>
+<td style="text-align:center;">
+51
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.50
+</td>
+<td style="text-align:center;">
+52
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.51
+</td>
+<td style="text-align:center;">
+52
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.52
+</td>
+<td style="text-align:center;">
+52
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.53
+</td>
+<td style="text-align:center;">
+52
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.54
+</td>
+<td style="text-align:center;">
+52
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.55
+</td>
+<td style="text-align:center;">
+53
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.56
+</td>
+<td style="text-align:center;">
+53
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.57
+</td>
+<td style="text-align:center;">
+53
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.58
+</td>
+<td style="text-align:center;">
+53
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.59
+</td>
+<td style="text-align:center;">
+53
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>upper_tol_tbl %&gt;% tail(20) %&gt;% kable(align=rep(&#39;c&#39;, 2))</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+proportion_covered_P
+</th>
+<th style="text-align:center;">
+particles_per_part
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+0.80
+</td>
+<td style="text-align:center;">
+58
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.81
+</td>
+<td style="text-align:center;">
+58
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.82
+</td>
+<td style="text-align:center;">
+58
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.83
+</td>
+<td style="text-align:center;">
+59
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.84
+</td>
+<td style="text-align:center;">
+59
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.85
+</td>
+<td style="text-align:center;">
+59
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.86
+</td>
+<td style="text-align:center;">
+60
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.87
+</td>
+<td style="text-align:center;">
+60
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.88
+</td>
+<td style="text-align:center;">
+60
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.89
+</td>
+<td style="text-align:center;">
+61
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.90
+</td>
+<td style="text-align:center;">
+61
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.91
+</td>
+<td style="text-align:center;">
+62
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.92
+</td>
+<td style="text-align:center;">
+62
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.93
+</td>
+<td style="text-align:center;">
+63
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.94
+</td>
+<td style="text-align:center;">
+63
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.95
+</td>
+<td style="text-align:center;">
+64
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.96
+</td>
+<td style="text-align:center;">
+65
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.97
+</td>
+<td style="text-align:center;">
+66
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.98
+</td>
+<td style="text-align:center;">
+67
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0.99
+</td>
+<td style="text-align:center;">
+69
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>#need this data to feed to gg_label_repel to tell it where to attach label
+point_tbl &lt;- tibble(x = .65, y = 60)
+
+#visualize 
+upper_tol_tbl %&gt;% ggplot(aes(x = proportion_covered_P, y = particles_per_part)) +
+  geom_line(color = &quot;#2c3e50&quot;,
+            size = 2.5) +
+    labs(x = &quot;Estimated Reliability at .95 Confidence Level&quot;,
+         y = &quot;Edge of 1-Sided Tolerance Interval (Particles per Device)&quot;,
+         title = &quot;Edge of Tolerance Interval vs. Specified Reliability&quot;,
+         subtitle = &quot;95% Confidence Level Using TAB Tolerance Technique&quot;) +
+  scale_y_continuous(breaks = seq(40, 70, 5)) +
+  geom_vline(xintercept = .88) +
+  geom_hline(yintercept = 60) +
+  geom_point(x = .65, y = 60, size = 0, alpha = 0) +
+  geom_label_repel(data = point_tbl, aes(x, y), 
+                   label = &quot;Spec Limit: 60 Particles Max&quot;,
+                   fill = &quot;#2c3e50&quot;, 
+                   color = &quot;white&quot;,
+                   segment.color = &quot;#2c3e50&quot;,
+                   segment.size = 1,
+                   min.segment.length = unit(1, &quot;lines&quot;),
+                   nudge_y = 2,
+                   nudge_x = .05)</code></pre>
+<p><img src="/post/2019-09-18-modeling-device-particulate-counts-as-a-poisson-process_files/figure-html/unnamed-chunk-12-1.png" width="100%" height="500px" /></p>
+<p>Here’s a plot that I’ve never made or seen before. For given set of data (in this case: particulate_data from earlier with n=20 from a Poisson distribution, lambda = 50), the x-axis shows the estimated reliability and the y-axis represents the number of particles at the edge the calculated tolerance interval using the TAB method. That is to say: the standard approaches to calculate the edge of the relevant tolerance interval for a specified proportion at a specified confidence level. For example, we could state we want to know the estimate for the 95th percentile at 95% confidence level - the answer would be 64 particles per device. Since the requirement for clinical safety is set at 60 particles max, we would not pass the test because we could not state with high confidence that 95 or more (out of 100) would pass. Usually it’s just a binary pass/fail decision.</p>
+<p>It’s obvious that the 95/95 edge of the tolerance interval is out of spec… but what would be the greatest reliability we could claim at 95% confidence? It ends up being .88 or 88% - very close to the predicted lower bound of the 95% credible interval calculated from the Bayesian method (which was 89.3%, from above)! In this case, the frequentist and Bayesian methods happen to be similar (even though they aren’t measuring the same thing). Interesting stuff!</p>
+
+  
+  <h4><i class="fa-share-alt" aria-hidden="true"></i>&nbsp;Share!</h4>
+<ul class="share-buttons">
+	<li><a href="https://www.facebook.com/sharer/sharer.php?u=%2fpost%2fmodeling-particulate-counts-as-a-poisson-process-in-r%2f" target="_blank" title="Share on Facebook"><i class="fa-facebook" aria-hidden="true"></i><span class="sr-only">Share on Facebook</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="https://twitter.com/intent/tweet?source=%2fpost%2fmodeling-particulate-counts-as-a-poisson-process-in-r%2f&via=HorribleGeek" target="_blank" title="Tweet"><i class="fa-twitter" aria-hidden="true"></i><span class="sr-only">Tweet</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="https://plus.google.com/share?url=%2fpost%2fmodeling-particulate-counts-as-a-poisson-process-in-r%2f" target="_blank" title="Share on Google+"><i class="fa-google-plus" aria-hidden="true"></i><span class="sr-only">Share on Google+</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="http://www.tumblr.com/share?v=3&u=%2fpost%2fmodeling-particulate-counts-as-a-poisson-process-in-r%2f" target="_blank" title="Post to Tumblr"><i class="fa-tumblr" aria-hidden="true"></i><span class="sr-only">Post to Tumblr</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="http://pinterest.com/pin/create/button/?url=%2fpost%2fmodeling-particulate-counts-as-a-poisson-process-in-r%2f" target="_blank" title="Pin it"><i class="fa-pinterest-p" aria-hidden="true"></i><span class="sr-only">Pin it</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="http://www.reddit.com/submit?url=%2fpost%2fmodeling-particulate-counts-as-a-poisson-process-in-r%2f" target="_blank" title="Submit to Reddit"><i class="fa-reddit-alien" aria-hidden="true"></i><span class="sr-only">Submit to Reddit</span></a>
+	</li>
+</ul>
+
+
+<style>
+	ul.share-buttons{
+	  list-style: none;
+	  padding: 0;
+	}
+
+	ul.share-buttons li{
+	  display: inline;
+	}
+
+	ul.share-buttons .sr-only{
+	  position: absolute;
+	  clip: rect(1px 1px 1px 1px);
+	  clip: rect(1px, 1px, 1px, 1px);
+	  padding: 0;
+	  border: 0;
+	  height: 1px;
+	  width: 1px;
+	  overflow: hidden;
+	}
+</style>
+
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/post/stopping-rules-for-significance-testing-in-r/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/post/stopping-rules-for-significance-testing-in-r/">Stopping Rules for Significance Testing in R</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/post/heart-disease-prediction-from-patient-data-in-r/">Heart Disease Prediction From Patient Data in R</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/post/heart-disease-prediction-from-patient-data-in-r/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+
+</div>
+
+</div>
+</div>
+<script src="/js/ui.js"></script>
+<script src="/js/menus.js"></script>
+
+
+<script>
+  
+  if (window.location.hostname != "localhost") {
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+    ga('create', 'Your Google Analytics tracking ID', 'auto');
+    ga('send', 'pageview');
+  }
+</script>
+
+
+
+
+
+<script src="/js/math-code.js"></script>
+  <script async src="//cdn.bootcss.com/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+  
+
+
+</body>
+</html>
+

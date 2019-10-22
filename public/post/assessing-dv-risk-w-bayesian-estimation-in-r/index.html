@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.56.1" />
+
+  <title>Assessing Design Verification Risk with Bayesian Estimation in R &middot; [R]eliability</title>
+
+    
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.9.0/css/all.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+ 
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/img/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+  <a class="pure-menu-heading brand" href="/">Riley King</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/about/"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
+      
+        </li>
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/riley-king-9594247" rel="me" target="_blank"><i class="fab fa-linkedin"></i></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/tw0handt0uch" rel="me" target="_blank"><i class="fab fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  </ul>
+</div>
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2019. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+
+<div class="header">
+  <h1>Assessing Design Verification Risk with Bayesian Estimation in R</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+    <i class="fa fa-calendar fa-fw"></i>
+    <time>23 Aug 2019</time>
+  </div>
+
+  
+
+  
+  
+  
+  
+
+  
+  
+  
+  <div>
+    <i class="fa fa-tags fa-fw"></i>
+    
+      <a class="post-taxonomy-tag" href="/tags/r">R</a>&nbsp;&#47;
+    
+      <a class="post-taxonomy-tag" href="/tags/stats">Stats</a>&nbsp;&#47;
+    
+      <a class="post-taxonomy-tag" href="/tags/simulation">Simulation</a>
+    
+  </div>
+  
+  
+
+</div>
+
+  
+
+
+<p>Suppose our team is preparing to freeze a new implant design. In order to move into the next phase of the PDP, it is common to perform a suite of formal “Design Freeze” testing. If the results of the Design Freeze testing are acceptable, the project can advance from Design Freeze (DF) into Design Verification (DV). DV is an expensive and resource intensive phase culminating in formal reports that are included in the regulatory submission. One key goal of DF is therefore to burn down enough risk to feel confident going into DV. Despite the high stakes, I haven’t ever seen a quantitative assessment of residual risk at the phase review. In this post we’ll attempt to use some simple Bayesian methods to quantify the DV risk as a function of DF sample size for a single, high-risk test.</p>
+<p>Consider the requirement for accelerated durability (sometimes called fatigue resistance). In this test, the device is subjected to cyclic loading for a number of cycles equal to the desired service life. For 10 years of loading due to systolic - diastolic pressure cycles, vascular implants must survive approximately 400 million cycles. Accelerated durability is usually treated as attribute type data because the results can be only pass (if no fractures observed) or fail (if fractures are observed). Each test specimen can therefore be considered a Bernoulli trial and the number of passing units in n samples can be modeled with the binomial.</p>
+<p><img src="/./img/fatigue.png" width="100%" height="500px" style="display: block; margin: auto;" /></p>
+<p>How many samples should we include in DF? We’ll set up some simulations to find out. In order to incorporate the outcome of the DF data into a statement about the probability of success for DV, we’ll need to apply Bayesian methods.</p>
+<p>First, load the libraries:</p>
+<pre class="r"><code>library(tidyverse)
+library(cowplot)
+library(gghighlight)
+library(knitr)
+library(kableExtra)</code></pre>
+<p>The simulation should start off before we even execute Design Freeze testing. If we’re going to use Bayesian techniques we need to express our uncertainty about the parameters in terms of probability. In this case, the parameter we care about is the reliability. Before seeing any DF data we might know very little about what the true reliability is for this design. If we were asked to indicate what we thought the reliability might be, we should probably state a wide range of possibilities. The design might be good but it might be quite poor. Our belief about the reliability before we do any testing at all is called the prior and we expess it as a probability density function, not a point estimate. We need a mathematical function to describe how we want to spread out our belief in the true reliability.</p>
+<p>The beta is a flexible distribution that can be adjusted to take a variety of different forms. By tweaking the two shape factors of the beta we can customize the probability density curve in many different ways. If we were super confident that every part we ever made would pass the durability testing, we could put a “spike” prior right on 1.0. This is like saying “there’s no way any part could ever fail”. But the whole point is to communicate uncertainty and in reality there is always a chance the reliability might only be 97%, or 94%, etc. Since we haven’t really seen any DF data, we should probably drop some of our credibility into many different possible values of the reliability. Let’s be very conservative here and just use the flat prior. By evenly binning all of our credibility across the full range of reliability from 0 to 1, we’re saying we don’t want our pre-conceived notions to influence the final estimated reliability much. We’ll instead use the DF data themselves to re-allocate the credibility across the range of reliabilities appropriately according to Bayes’ rule after looking at the Design Freeze results. The more DF data we observe, the more precise the posterior estimate.</p>
+<p>The mathematical way to turn the beta distribution into a straight line (flat prior) is to set the shape parameters alpha and beta to (1,1). Note the area under the curve must always sum to 1. The image on the left shows a flat prior generated from a beta density with parameters (1,1).</p>
+<p>Another way to display the prior is to build out the visualization manually by drawing random values from the beta(1,1) distribution and constructing a histogram. This method isn’t terribly useful since we already know the exact distribution we want to use but I like to include it to emphasize the idea of “binning” the credibility across different values of reliability. It’s also nice to see the uncertainty we might see when we start to randomly draw from the distribution (full disclosure: I also just to practice my coding).</p>
+<pre class="r"><code>#Plot flat prior using stat_function and ggplot
+p_1 &lt;- tibble(x_canvas=c(0,1)) %&gt;% ggplot(aes(x=x_canvas)) +
+    stat_function(fun   = dbeta,
+                  args  = list(1, 1),
+                  color = &quot;#2c3e50&quot;, 
+                  size  = 1,
+                  alpha = .8) +
+    ylim(c(0,1.5)) +
+    labs(
+        y = &quot;Density of Beta&quot;,
+        x = &quot;Reliability&quot;,
+        title = &quot;Credibility Allocation, Start of DF&quot;,
+        subtitle = &quot;Uninformed Prior with Beta (1,1)&quot;
+    )
+
+#Set the number of random draws from beta(1,1) to construct histogram flat prior
+set.seed(123)
+n_draws &lt;- 100000
+
+#Draw random values from beta(1,1), store in object
+prior_dist_sim &lt;- rbeta(n = n_draws, shape1 = 1, shape2 = 1)
+
+#Convert from vector to tibble
+prior_dist_sim_tbl &lt;- prior_dist_sim %&gt;% as_tibble()
+
+#Visualize with ggplot
+p_2 &lt;- prior_dist_sim_tbl %&gt;% ggplot(aes(x = value)) +
+    geom_histogram(
+        boundary = 1, 
+        binwidth = .05, 
+        color    = &quot;white&quot;,
+        fill     = &quot;#2c3e50&quot;,
+        alpha    = 0.8
+        ) +
+    xlim(c(-0.05, 1.05)) +
+    ylim(c(0, 7500)) +
+    labs(
+        y = &quot;Count&quot;,
+        title = &quot;Credibility Simulation , Start of DF&quot;,
+        subtitle = &quot;Uninformed Prior with Beta (1,1)&quot;,
+        x = &quot;Reliability&quot;
+    
+    ) 
+
+plot_grid(p_1,p_2)</code></pre>
+<p><img src="/post/2019-08-23-assessing-dv-risk-w-bayesian-estimation-in-r_files/figure-html/unnamed-chunk-2-1.png" width="100%" height="500px" /></p>
+<p>OK now the fun stuff. There is a cool, mathematical shortcut we can take to combine our simulated Design Freeze data with our flat prior to create the posterior distribution. It’s very simple: we just add the number of passing DF units to our alpha parameter and the number of failing DF units to our beta parameter. The reason why this works so well is beyond the scope of this post, but the main idea is that when the functional form of the prior (beta function in our case) is similar to the functional form of the likelihood function (Bernoulli in our case), then you can multiply them together easily and the product also takes a similar form. When this happens, the prior is said to be the “conjugate prior” of the likelihood function <a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> The beta and binomial are a special case that go together like peanut butter and jelly.</p>
+<p>Again, to understand how our belief in the reliability should be allocated after observing the DF data, all we need to do is update the beta function by adding the number of passing units from DF testing to alpha (Shape1 parameter) and the number of failing units to beta (Shape2 parameter).</p>
+<p><span class="math display">\[\mbox{Beta}(\alpha_0+\mbox{passes}, \beta_0+\mbox{fails})\]</span> We’re going to assume all units pass DF, so we only need to adjust the alpha parameter. The resulting beta distribution that we get after updating the alpha parameter represents our belief in where the true reliability may lie after observing the DF data. Remember, even though every unit passed, we can’t just say the reliability is 100% because we’re smart enough to know that if the sample size was, for example, n=15 - there is a reasonable chance that a product with true reliability of 97% could run off n=15 in a row without failing. Even 90% reliability might hit 15 straight every once in a while but it would be pretty unlikely.</p>
+<p>The code below looks at four different possible sample size options for DF: n=15, n=30, n=45, and a full n=59 (just like we plan for DV).</p>
+<pre class="r"><code>#Draw radomly from 4 different beta distributions. Alpha parameter is adjusted based on DF sample size
+posterior_dist_sim_15 &lt;- rbeta(n_draws, 16, 1)
+posterior_dist_sim_30 &lt;- rbeta(n_draws, 31, 1)
+posterior_dist_sim_45 &lt;- rbeta(n_draws, 46, 1)
+posterior_dist_sim_59 &lt;- rbeta(n_draws, 60, 1)
+
+#Function to convert vectors above into tibbles and add column for Sample Size 
+pds_clean_fcn &lt;- function(pds, s_size){
+    pds %&gt;% as_tibble() %&gt;% mutate(Sample_Size = s_size) %&gt;%
+    mutate(Sample_Size = factor(Sample_Size, levels = unique(Sample_Size)))}
+
+#Apply function to 4 vectors above
+posterior_dist_sim_15_tbl &lt;- pds_clean_fcn(posterior_dist_sim_15, 15)
+posterior_dist_sim_30_tbl &lt;- pds_clean_fcn(posterior_dist_sim_30, 30)
+posterior_dist_sim_45_tbl &lt;- pds_clean_fcn(posterior_dist_sim_45, 45)
+posterior_dist_sim_59_tbl &lt;- pds_clean_fcn(posterior_dist_sim_59, 59)
+
+#Combine the tibbles in a tidy format for visualization
+full_post_df_tbl &lt;- bind_rows(
+            posterior_dist_sim_15_tbl,
+            posterior_dist_sim_30_tbl, 
+            posterior_dist_sim_45_tbl, 
+            posterior_dist_sim_59_tbl
+            )
+
+#Visualize with density plot
+df_density_plt &lt;- full_post_df_tbl %&gt;% ggplot(aes(x = value, fill = Sample_Size)) +
+    geom_density(alpha = .6) +
+    xlim(c(0.85,1)) +
+    labs(x = &quot;&quot;,
+         y = &quot;Density of Beta&quot;,
+         title = &quot;Credibility Simulation, After Design Freeze&quot;,
+         subtitle = &quot;Updated Belief Modeled with Beta(1 + n,1)&quot;) +
+    scale_fill_manual(values = c(&quot;#2C728EFF&quot;, &quot;#20A486FF&quot;, &quot;#75D054FF&quot;, &quot;#FDE725FF&quot;)) 
+
+#Visualize with histogram 
+df_hist_plt &lt;- full_post_df_tbl %&gt;% ggplot(aes(x = value, fill = Sample_Size)) +
+    geom_histogram(alpha = .9,
+                   position = &quot;dodge&quot;,
+                   boundary = 1,
+                   color = &quot;black&quot;) +
+    xlim(c(0.85,1)) +
+    labs(x = &quot;Reliability&quot;,
+         y = &quot;Count&quot;) +
+    scale_fill_manual(values = c(&quot;#2C728EFF&quot;, &quot;#20A486FF&quot;, &quot;#75D054FF&quot;, &quot;#FDE725FF&quot;))
+
+plot_grid(df_density_plt, df_hist_plt, ncol = 1)</code></pre>
+<p><img src="/post/2019-08-23-assessing-dv-risk-w-bayesian-estimation-in-r_files/figure-html/unnamed-chunk-3-1.png" width="100%" height="500px" /></p>
+<p>If we unpack these charts a bit, we can see that if we only do n=15 in Design Freeze, we still need to allocate some credibility to reliability parameters below .90. For a full n=59, anything below .95 reliability is very unlikely, yet the 59 straight passing units could have very well come from a product with reliability = .98 or .97.</p>
+<p>We now have a good feel for our uncertainty about the reliability after DF, but what we really want to know is our likelihood of passing Design Verification. To answer this question, we’ll extend our simulation to perform many replicates of n=59 Bernoulli trials, each representing a round of Design Verification testing. The probability of failure will be randomly drawn from the distributions via Monte Carlo. Let’s see how many of these virtual DV tests end with 59/59 passing:</p>
+<pre class="r"><code>#Perform many sets of random binom runs, each with n=59 trials. p is taken from the probs previously generated 
+DV_acceptable_units_15 &lt;- rbinom(size = 59, n = n_draws, 
+                                 prob = (posterior_dist_sim_15_tbl$value))
+DV_acceptable_units_30 &lt;- rbinom(size = 59, n = n_draws, 
+                                 prob = (posterior_dist_sim_30_tbl$value))
+DV_acceptable_units_45 &lt;- rbinom(size = 59, n = n_draws, 
+                                 prob = (posterior_dist_sim_45_tbl$value))
+DV_acceptable_units_59 &lt;- rbinom(size = 59, n = n_draws, 
+                                 prob = (posterior_dist_sim_59_tbl$value))
+
+#Function to convert vectors to tibbles and add col for sample size
+setup_fcn &lt;- function(vec, ss){
+    vec %&gt;% as_tibble() %&gt;% mutate(DF_Sample_Size = ss) %&gt;%
+    mutate(DF_Sample_Size = factor(DF_Sample_Size, levels = unique(DF_Sample_Size)))}
+
+#Apply function
+DV_acceptable_units_15_tbl &lt;- setup_fcn(DV_acceptable_units_15, 15)
+DV_acceptable_units_30_tbl &lt;- setup_fcn(DV_acceptable_units_30, 30)
+DV_acceptable_units_45_tbl &lt;- setup_fcn(DV_acceptable_units_45, 45)
+DV_acceptable_units_59_tbl &lt;- setup_fcn(DV_acceptable_units_59, 59)
+
+#Combine the tibbles in a tidy format for visualization
+DV_acceptable_full_tbl &lt;- bind_rows(DV_acceptable_units_15_tbl,
+                                    DV_acceptable_units_30_tbl,
+                                    DV_acceptable_units_45_tbl,
+                                    DV_acceptable_units_59_tbl)
+
+#Visualize with ggplot.  Apply gghighlight where appropriate
+g1 &lt;- DV_acceptable_full_tbl %&gt;%
+   ggplot(aes(x = value)) +
+   geom_histogram(aes(fill = DF_Sample_Size),binwidth = 1, color = &quot;black&quot;, position = &quot;dodge&quot;, alpha = .9) +
+    xlim(c(45, 60)) +
+    scale_x_continuous(limits = c(45, 60), breaks=seq(45, 60, 1)) +
+    scale_fill_manual(values = c(&quot;#2C728EFF&quot;, &quot;#20A486FF&quot;, &quot;#75D054FF&quot;, &quot;#FDE725FF&quot;)) +
+    labs(
+        x = &quot;Passing Parts out of 59 total&quot;,
+        title = &quot;Simulated Design Verification Testing&quot;,
+        subtitle = &quot;100,000 Simulated DV Runs of n=59&quot;
+    )
+
+g2 &lt;- g1 +
+    gghighlight(value == 59, use_direct_label = FALSE) +
+    labs(
+        title = &quot;Simulations that PASSED Design Verification&quot;
+     )
+    
+g3 &lt;- g1 +
+    gghighlight(value &lt; 59, use_direct_label = FALSE) +
+    labs(
+        title = &quot;Simulations that FAILED Design Verification&quot;
+    )</code></pre>
+<p><img src="/post/2019-08-23-assessing-dv-risk-w-bayesian-estimation-in-r_files/figure-html/unnamed-chunk-5-1.png" width="100%" height="500px" /><img src="/post/2019-08-23-assessing-dv-risk-w-bayesian-estimation-in-r_files/figure-html/unnamed-chunk-5-2.png" width="100%" height="500px" /><img src="/post/2019-08-23-assessing-dv-risk-w-bayesian-estimation-in-r_files/figure-html/unnamed-chunk-5-3.png" width="100%" height="500px" /></p>
+<p>Taking into consideration the uncertainty of the true reliability after the DF testing, the percentage of times we expect to pass Design Verification is shown below. These percentages are calculated as the number of simulated DV runs that achieved 59/59 passing units divided by the total number of simulated DV runs. Any simulation with 58 or less passing units would have failed DV.</p>
+<p><span class="math display">\[\mbox{expected probability of passing DV  = (number of sims with n=59 pass) / (total sims) }\]</span></p>
+<pre class="r"><code>#Function to calculate how many DV simulations resulted in 59/59 passing units
+pct_pass_fct &lt;- function(tbl, n){
+    pct_dv_pass &lt;- tbl %&gt;% filter(value == 59) %&gt;% nrow() / n_draws
+    paste(&quot;DF with n = &quot;,n, &quot;(all pass): &quot;, pct_dv_pass %&gt;% scales::percent(), &quot;expected probability of next 59/59 passing DV&quot;)}</code></pre>
+<table>
+<tbody>
+<tr>
+<td style="text-align:center;">
+DF with n = 15 (all pass): 21.3% expected probability of next 59/59 passing DV
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+DF with n = 30 (all pass): 34.5% expected probability of next 59/59 passing DV
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+DF with n = 45 (all pass): 43.5% expected probability of next 59/59 passing DV
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+DF with n = 59 (all pass): 50.3% expected probability of next 59/59 passing DV
+</td>
+</tr>
+</tbody>
+</table>
+<p>The percentage of time we expect to pass Design Verification is shockingly low! Even when we did a full n=59 in Design Freeze, we still only be able to predict 50% success in DV! This is because even with 59/59 passes, we still must account for the possibility that the reliability isn’t 100%. We don’t have enough DF data to shift the credibility all the way near 100%, and when the credibility is spread to include possible reliabilities in the mid .90’s we should always be prepared for the possibility of failing Design Verification.</p>
+<p>We could just leave it at that but I have found that when discussing risk, stakeholders want more than just an estimation of the rate of bad outcomes. They want a recommendation and a mitigation plan. Here are a few ideas; can you think of any more?</p>
+<ul>
+<li>Maintain multiple design configurations as long as possible (often not feasible, but provides an out if 1 design fails)</li>
+<li>Perform durability testing as “fatigue-to-failure”. In this methodology, the devices are run to failure and the cycles to failure are treated as variable data. By varying the amplitude of the loading cycles, we can force the devices to fail and understand the uncertainty within the failure envelope. <a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a></li>
+<li>Fold in information from pre-DF testing, predicate testing, etc to inform the prior better. I will look at the sensitivity of the reliability estimations to the prior in a future post.</li>
+<li>Build redundant design cycles into the project schedule to accomodate additional design turns without falling behind the contracted timeline</li>
+</ul>
+<p>Thanks for reading!</p>
+<style>
+body {
+text-align: justify}
+</style>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Kruschke, Doing Bayesian Data Analysis, <a href="https://sites.google.com/site/doingbayesiandataanalysis/" class="uri">https://sites.google.com/site/doingbayesiandataanalysis/</a><a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>Fatigue-to Fracture ASTM Standard: <a href="https://www.astm.org/Standards/F3211.htm" class="uri">https://www.astm.org/Standards/F3211.htm</a><a href="#fnref2">↩</a></p></li>
+</ol>
+</div>
+
+  
+  <h4><i class="fa-share-alt" aria-hidden="true"></i>&nbsp;Share!</h4>
+<ul class="share-buttons">
+	<li><a href="https://www.facebook.com/sharer/sharer.php?u=%2fpost%2fassessing-dv-risk-w-bayesian-estimation-in-r%2f" target="_blank" title="Share on Facebook"><i class="fa-facebook" aria-hidden="true"></i><span class="sr-only">Share on Facebook</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="https://twitter.com/intent/tweet?source=%2fpost%2fassessing-dv-risk-w-bayesian-estimation-in-r%2f&via=HorribleGeek" target="_blank" title="Tweet"><i class="fa-twitter" aria-hidden="true"></i><span class="sr-only">Tweet</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="https://plus.google.com/share?url=%2fpost%2fassessing-dv-risk-w-bayesian-estimation-in-r%2f" target="_blank" title="Share on Google+"><i class="fa-google-plus" aria-hidden="true"></i><span class="sr-only">Share on Google+</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="http://www.tumblr.com/share?v=3&u=%2fpost%2fassessing-dv-risk-w-bayesian-estimation-in-r%2f" target="_blank" title="Post to Tumblr"><i class="fa-tumblr" aria-hidden="true"></i><span class="sr-only">Post to Tumblr</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="http://pinterest.com/pin/create/button/?url=%2fpost%2fassessing-dv-risk-w-bayesian-estimation-in-r%2f" target="_blank" title="Pin it"><i class="fa-pinterest-p" aria-hidden="true"></i><span class="sr-only">Pin it</span></a>
+	</li>&nbsp;&nbsp;&nbsp;
+	<li><a href="http://www.reddit.com/submit?url=%2fpost%2fassessing-dv-risk-w-bayesian-estimation-in-r%2f" target="_blank" title="Submit to Reddit"><i class="fa-reddit-alien" aria-hidden="true"></i><span class="sr-only">Submit to Reddit</span></a>
+	</li>
+</ul>
+
+
+<style>
+	ul.share-buttons{
+	  list-style: none;
+	  padding: 0;
+	}
+
+	ul.share-buttons li{
+	  display: inline;
+	}
+
+	ul.share-buttons .sr-only{
+	  position: absolute;
+	  clip: rect(1px 1px 1px 1px);
+	  clip: rect(1px, 1px, 1px, 1px);
+	  padding: 0;
+	  border: 0;
+	  height: 1px;
+	  width: 1px;
+	  overflow: hidden;
+	}
+</style>
+
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/post/permutation-test-for-nhst-of-2-samples-in-r/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/post/permutation-test-for-nhst-of-2-samples-in-r/">Permutation Test for NHST of 2 Samples in R</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="next">
+      <a href="/post/stopping-rules-for-significance-testing-in-r/">Stopping Rules for Significance Testing in R</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/post/stopping-rules-for-significance-testing-in-r/"><i class="fa fa-chevron-right"></i></a>
+    
+  </div>
+</div>
+
+
+
+  
+
+</div>
+
+</div>
+</div>
+<script src="/js/ui.js"></script>
+<script src="/js/menus.js"></script>
+
+
+<script>
+  
+  if (window.location.hostname != "localhost") {
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+    ga('create', 'Your Google Analytics tracking ID', 'auto');
+    ga('send', 'pageview');
+  }
+</script>
+
+
+
+
+
+<script src="/js/math-code.js"></script>
+  <script async src="//cdn.bootcss.com/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+  
+
+
+</body>
+</html>
+

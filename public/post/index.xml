@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Posts on [R]eliability</title>
+    <link>/post/</link>
+    <description>Recent content in Posts on [R]eliability</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2019. All rights reserved.</copyright>
+    <lastBuildDate>Sun, 29 Sep 2019 00:00:00 +0000</lastBuildDate>
+    
+	<atom:link href="/post/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Heart Disease Prediction From Patient Data in R</title>
+      <link>/post/heart-disease-prediction-from-patient-data-in-r/</link>
+      <pubDate>Sun, 29 Sep 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/post/heart-disease-prediction-from-patient-data-in-r/</guid>
+      <description>Test 1. In this post I’ll be attempting to leverage the parsnip package in R to run through some straightforward predictive analytics/machine learning. Parsnip provides a flexible and consistent interface to apply common regression and classification algorithms in R. I’ll be working with the Cleveland Clinic Heart Disease dataset which contains 13 variables related to patient diagnostics and one outcome variable indicating the presence or absence of heart disease.</description>
+    </item>
+    
+    <item>
+      <title>Modeling Particulate Counts as a Poisson Process in R</title>
+      <link>/post/modeling-particulate-counts-as-a-poisson-process-in-r/</link>
+      <pubDate>Wed, 18 Sep 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/post/modeling-particulate-counts-as-a-poisson-process-in-r/</guid>
+      <description>I’ve never really worked much with Poisson data and wanted to get my hands dirty. I thought that for this project I might combine a Poisson data set with the simple Bayesian methods that I’ve explored before since it turns out the Poisson rate parameter lambda also has a nice conjugate prior (more on that later). Poisson distributed data are counts per unit time or space - they are events that arrive at random intervals but that have a characteristic rate parameter which also equals the variance.</description>
+    </item>
+    
+    <item>
+      <title>Stopping Rules for Significance Testing in R</title>
+      <link>/post/stopping-rules-for-significance-testing-in-r/</link>
+      <pubDate>Fri, 06 Sep 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/post/stopping-rules-for-significance-testing-in-r/</guid>
+      <description>When doing comparative testing it can be tempting to stop when we see the result that we hoped for. In the case of null hypothesis significance testing (NHST), the desired outcome is often a p-value of &amp;lt; .05. In the medical device industry, bench top testing can cost a lot of money. Why not just recalculate the p-value after every test and stop when the p-value reaches .05? The reason is that the confidence statement attached to your testing is only valid for a specific stopping rule.</description>
+    </item>
+    
+    <item>
+      <title>Assessing Design Verification Risk with Bayesian Estimation in R</title>
+      <link>/post/assessing-dv-risk-w-bayesian-estimation-in-r/</link>
+      <pubDate>Fri, 23 Aug 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/post/assessing-dv-risk-w-bayesian-estimation-in-r/</guid>
+      <description>Suppose our team is preparing to freeze a new implant design. In order to move into the next phase of the PDP, it is common to perform a suite of formal “Design Freeze” testing. If the results of the Design Freeze testing are acceptable, the project can advance from Design Freeze (DF) into Design Verification (DV). DV is an expensive and resource intensive phase culminating in formal reports that are included in the regulatory submission.</description>
+    </item>
+    
+    <item>
+      <title>Permutation Test for NHST of 2 Samples in R</title>
+      <link>/post/permutation-test-for-nhst-of-2-samples-in-r/</link>
+      <pubDate>Sat, 10 Aug 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/post/permutation-test-for-nhst-of-2-samples-in-r/</guid>
+      <description>As engineers, it is not uncommon to be asked to determine whether or not two different configurations of a product perform the same. Perhaps we are asked to compare the durability of a next-generation prototype to the current generation. Sometimes we are testing the flexibility of our device versus a competitor for marketing purposes. Maybe we identify a new vendor for a raw material but must first understand whether the resultant finished product will perform any differently than when built using material from the standard supplier.</description>
+    </item>
+    
+  </channel>
+</rss>
