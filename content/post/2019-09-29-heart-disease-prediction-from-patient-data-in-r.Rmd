@@ -569,6 +569,6 @@ cv_mean_metrics_tbl %>%
          Average) %>%
   kable(align = rep("c", 2))
 ```
-Got there! Average of .837 accuracy after 10-fold cross-validation. Not bad for a basic logistic regression.  It is certainly possible that .837 is not sufficient for our purposes given that we are in the domain of health care where false classifications have dire consequences.  Evaluating other algorithms would be a logical next step for improving the accuracy and reducing patient risk.  Nevertheless, I'm ending it here for this session since I have work tomorrow.
+Got there! Average of .837 accuracy after 10-fold cross-validation. Not bad for a basic logistic regression.  It is certainly possible that .837 is not sufficient for our purposes given that we are in the domain of health care where false classifications have dire consequences.  Evaluating other algorithms would be a logical next step for improving the accuracy and reducing patient risk.  
 
 Thanks for reading.
