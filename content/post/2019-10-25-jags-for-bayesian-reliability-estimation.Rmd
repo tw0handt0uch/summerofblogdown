@@ -1,0 +1,57 @@
+---
+title: JAGS for Bayesian Reliability Estimation
+author: Riley
+date: '2019-10-25'
+slug: jags-for-bayesian-reliability-estimation
+categories:
+  - Bayesian
+  - R
+tags:
+  - Stats
+description: ''
+topics: []
+draft: TRUE
+
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    number_sections: yes
+    theme: none
+    toc: yes
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    echo = TRUE,
+    message = FALSE,
+    warning = FALSE,
+    out.width = "100%",
+    out.height = "500px",
+    fig.pos = "center",
+    dpi = 300)
+```
+Intro
+
+Load the libraries to be used.
+
+```{r}
+
+#Load libraries
+library(tidyverse)
+library(kableExtra)
+library(rsample)
+library(recipes)
+library(parsnip)
+library(yardstick)
+library(viridisLite)
+library(GGally)
+
+```
+
+

@@ -6,11 +6,34 @@
   <generator>Hugo -- gohugo.io</generator>
 <language>en-us</language>
 <copyright>&amp;copy; 2019. All rights reserved.</copyright>
-<lastBuildDate>Wed, 18 Sep 2019 00:00:00 +0000</lastBuildDate>
+<lastBuildDate>Fri, 25 Oct 2019 00:00:00 +0000</lastBuildDate>
 
 <atom:link href="/tags/stats/index.xml" rel="self" type="application/rss+xml" />
 
 
+<item>
+  <title>JAGS for Bayesian Reliability Estimation</title>
+  <link>/post/jags-for-bayesian-reliability-estimation/</link>
+  <pubDate>Fri, 25 Oct 2019 00:00:00 +0000</pubDate>
+  
+<guid>/post/jags-for-bayesian-reliability-estimation/</guid>
+  <description>
+
+
+&lt;p&gt;Intro&lt;/p&gt;
+&lt;p&gt;Load the libraries to be used.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#Load libraries
+library(tidyverse)
+library(kableExtra)
+library(rsample)
+library(recipes)
+library(parsnip)
+library(yardstick)
+library(viridisLite)
+library(GGally)&lt;/code&gt;&lt;/pre&gt;
+</description>
+  </item>
+  
 <item>
   <title>Modeling Particulate Counts as a Poisson Process in R</title>
   <link>/post/modeling-particulate-counts-as-a-poisson-process-in-r/</link>

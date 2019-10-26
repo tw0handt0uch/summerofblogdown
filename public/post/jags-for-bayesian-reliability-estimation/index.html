@@ -7,7 +7,7 @@
   <meta name="description" content="">
   <meta name="generator" content="Hugo 0.56.1" />
 
-  <title>Posts &middot; [R]eliability</title>
+  <title>JAGS for Bayesian Reliability Estimation &middot; [R]eliability</title>
 
     
 
@@ -41,9 +41,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
  
-  
-  <link rel="alternate" type="application/rss+xml" title="[R]eliability"
-    href='/post/index.xml' />
   
 
   
@@ -108,11 +105,6 @@
   <div class="pure-menu social">
   <ul class="pure-menu-list">
 
-    
-    <li class="pure-menu-item">
-      <a class="pure-menu-link" href='/post/index.xml'><i
-          class="fas fa-rss"></i>RSS</a>
-    </li>
     
 
     
@@ -216,33 +208,84 @@
 
 
 <div class="header">
-  <h1>Posts</h1>
+  <h1>JAGS for Bayesian Reliability Estimation</h1>
+  <h2></h2>
 </div>
 <div class="content">
-  
-  <h2>2019</h2>
-  <ul>
-  
-    <li><time>25 Oct 2019</time> - <a href="/post/jags-for-bayesian-reliability-estimation/">JAGS for Bayesian Reliability Estimation</a></li>
+
+  <div class="post-meta">
+
+  <div>
+    <i class="fa fa-calendar fa-fw"></i>
+    <time>25 Oct 2019</time>
+  </div>
 
   
-    <li><time>29 Sep 2019</time> - <a href="/post/heart-disease-prediction-from-patient-data-in-r/">Heart Disease Prediction From Patient Data in R</a></li>
 
   
-    <li><time>18 Sep 2019</time> - <a href="/post/modeling-particulate-counts-as-a-poisson-process-in-r/">Modeling Particulate Counts as a Poisson Process in R</a></li>
+  
+  
+  
 
   
-    <li><time>06 Sep 2019</time> - <a href="/post/stopping-rules-for-significance-testing-in-r/">Stopping Rules for Significance Testing in R</a></li>
+  
+  
+  <div>
+    <i class="fa fa-tags fa-fw"></i>
+    
+      <a class="post-taxonomy-tag" href="/tags/stats">Stats</a>
+    
+  </div>
+  
+  
+
+</div>
 
   
-    <li><time>23 Aug 2019</time> - <a href="/post/assessing-dv-risk-w-bayesian-estimation-in-r/">Assessing Design Verification Risk with Bayesian Estimation in R</a></li>
+
+
+<p>Intro</p>
+<p>Load the libraries to be used.</p>
+<pre class="r"><code>#Load libraries
+library(tidyverse)
+library(kableExtra)
+library(rsample)
+library(recipes)
+library(parsnip)
+library(yardstick)
+library(viridisLite)
+library(GGally)</code></pre>
 
   
-    <li><time>10 Aug 2019</time> - <a href="/post/permutation-test-for-nhst-of-2-samples-in-r/">Permutation Test for NHST of 2 Samples in R</a></li>
 
   
-  </ul>
-  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/post/heart-disease-prediction-from-patient-data-in-r/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/post/heart-disease-prediction-from-patient-data-in-r/">Heart Disease Prediction From Patient Data in R</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+  </div>
+</div>
+
+
+
+
 </div>
 
 </div>
