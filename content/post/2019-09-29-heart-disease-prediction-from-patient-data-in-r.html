@@ -341,7 +341,7 @@ hd_long_cont_tbl &lt;- heart_dataset_clean_tbl  %&gt;%
          value = &quot;value&quot;,
          -Diagnosis_Heart_Disease)
 
-#Visualize continuous variables as boxplots
+#Visualize numeric variables as boxplots
 hd_long_cont_tbl %&gt;% 
   ggplot(aes(y = value)) +
        geom_boxplot(aes(fill = Diagnosis_Heart_Disease),
@@ -349,7 +349,7 @@ hd_long_cont_tbl %&gt;%
                       fatten = .7) +
         labs(x = &quot;&quot;,
              y = &quot;&quot;,
-             title = &quot;Boxplots for Continuous Variables&quot;) +
+             title = &quot;Boxplots for Numeric Variables&quot;) +
       scale_fill_manual(
             values = c(&quot;#fde725ff&quot;, &quot;#20a486ff&quot;),
             name   = &quot;Heart\nDisease&quot;,
@@ -360,7 +360,7 @@ hd_long_cont_tbl %&gt;%
       facet_wrap(~ key, 
                  scales = &quot;free&quot;, 
                  ncol   = 2) </code></pre>
-<p><img src="/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-7-1.png" width="100%" height="500px" /> The faceted plots for categorical and continuous variables suggest the following conditions are associated with increased prevalence of heart disease (note: this does not mean the relationship is causal).</p>
+<p><img src="/post/2019-09-29-heart-disease-prediction-from-patient-data-in-r_files/figure-html/unnamed-chunk-7-1.png" width="100%" height="500px" /> The faceted plots for categorical and numeric variables suggest the following conditions are associated with increased prevalence of heart disease (note: this does not mean the relationship is causal).</p>
 <ul>
 <li>Asymptomatic angina chest pain (relative to typical angina chest pain, atypical angina pain, or non-angina pain)</li>
 <li>Presence of exercise induced angina</li>
@@ -416,7 +416,7 @@ train_tbl &lt;- train_test_split %&gt;% training()
 #pipe split obj to testing() fcn to create test set
 test_tbl &lt;- train_test_split %&gt;% testing()</code></pre>
 <p>We chose to do our data preparation early on during the cleaning phase. For more complicated modeling operations it may be desirable to set up a recipe to do the pre-processing in a repeatable and reversible fashion and I chose here to leave some placeholder lines commented out and available for future work. The recipe is the spot to transform, scale, or binarize the data. We have to tell the recipe() function what we want to model: Diagnosis_Heart_Disease as a function of all the other variables (not needed here since we took care of the necessary conversions). The training data should be used exclusively to train the recipe to avoid data leakage. After giving the model syntax to the recipe, the data is piped into the prep() function which will extract all the processing parameters (if we had implemented processing steps here). The trained recipe is stored as an object and bake function is used to apply the trained recipe to a new (test) data set.</p>
-<p>Juice() is a shortcut to extract the finalized training set which is already embedded in the recipe by default. Calling the bake() function and proving the recipe and a new data set will apply the processing steps to that dataframe.</p>
+<p>Juice() is a shortcut to extract the finalized training set which is already embedded in the recipe by default. Calling the bake() function and providing the recipe and a new data set will apply the processing steps to that dataframe.</p>
 <pre class="r"><code>#Set up recipe (use training data here to avoid leakage)
 the_recipe &lt;- recipe(Diagnosis_Heart_Disease ~ . , data = train_tbl) %&gt;%
               #[Processing Step 1]
@@ -852,7 +852,7 @@ Fasting_Blood_Sugar1
 </tr>
 </tbody>
 </table>
-<p>In the above code I’ve converted the estimate of the coefficient into the odds ratio. The odds ratio represents the odds that an outcome will occur given the presence of a specific predictor, compared to the odds of the outcome occurring in the absence of that predictor, assuming all other predictors remain constant. The odds ratio is calculated from the exponential function of the coefficient estimate based on a unit increase in the predictor. An example with a continuous variable: for 1 mm Hg increased in resting blood pressure rest_bp, the odds of having heart disease increases by a factor of 1.04.</p>
+<p>In the above code I’ve converted the estimate of the coefficient into the odds ratio. The odds ratio represents the odds that an outcome will occur given the presence of a specific predictor, compared to the odds of the outcome occurring in the absence of that predictor, assuming all other predictors remain constant. The odds ratio is calculated from the exponential function of the coefficient estimate based on a unit increase in the predictor. An example with a numeric variable: for 1 mm Hg increased in resting blood pressure rest_bp, the odds of having heart disease increases by a factor of 1.04.</p>
 <p>Now let’s feed the model the testing data that we held out from the fitting process. It’s the first time the model will have seen these data so we should get a fair assessment (absent of over-fitting). The new_data argument in the predict() function is used to supply the test data to the model and have it output a vector of predictions, one for each observation in the testing data. The results vector can be added as a column into the original dataframe to append the predictions next to the true values.</p>
 <pre class="r"><code>#Make predictions using testing set
 first_training_prediction &lt;- predict(log_regr_hd_model, 
