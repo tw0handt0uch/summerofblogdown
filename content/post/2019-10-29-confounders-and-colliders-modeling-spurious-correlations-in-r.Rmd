@@ -1,0 +1,264 @@
+---
+title: Confounders and Colliders - Modeling Spurious Correlations in R
+author: Riley
+date: '2019-10-29'
+slug: confounders-and-colliders-modeling-spurious-correlations-in-r
+categories:
+  - R
+  - Stats
+tags:
+  - Simulation
+  - Stats
+  - R
+  - DAG
+description: ''
+topics: []
+draft: TRUE
+---
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    number_sections: yes
+    theme: none
+    toc: yes
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  out.width = "100%",
+  out.height = "500px",
+  fig.pos = "center",
+  dpi = 300
+)
+```
+
+
+```{r}
+# Load libraries
+library(tidyverse)
+library(kableExtra)
+library(rsample)
+library(recipes)
+library(parsnip)
+library(yardstick)
+library(viridisLite)
+library(GGally)
+library(DiagrammeR)
+library(dagitty)
+library(ggdag)
+library(visreg)
+library(styler)
+library(cowplot)
+```
+
+```{r}
+
+g <- dagify(A ~ J,
+            X ~ J,
+            X ~ A)
+
+set.seed(100)
+g %>% 
+  tidy_dagitty() %>% 
+  mutate(x = c(0, 1, 1, 2)) %>% 
+  mutate(y = c(0, 2, 2, 0)) %>%
+  mutate(xend = c(2, 0, 2, NA)) %>%
+  mutate(yend = c(0, 0, 0, NA)) %>%
+  dag_label(labels = c("A" = "Independent\n Variable",
+                       "X" = "Dependent\n Variable",
+                       "J" = "The\n Confounder")) %>%
+  ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
+    geom_dag_edges(edge_colour = "#b8de29ff",
+                   edge_width = .8) +
+    geom_dag_node(color = "#2c3e50", 
+                  alpha = 0.8) +
+    geom_dag_text(color = "white") +
+    geom_dag_label_repel(aes(label = label),
+      col = "white",
+      label.size = .4,
+      fill = "#20a486ff", 
+      alpha = 0.8, 
+      show.legend = FALSE, 
+      nudge_x = .7, 
+      nudge_y = .3) +
+  labs(title = " Directed Acyclic Graph",
+       subtitle = " Two Variables of Interest with a Confounder") +
+  xlim(c(-1.5, 3.5)) +
+  ylim(c(-.33, 2.2)) +
+  geom_rect(xmin = -.5, 
+            xmax = 3.25, 
+            ymin = -.25, 
+            ymax = .65, 
+            alpha = .04,
+            fill = "white") +
+  theme_void() +
+  theme(plot.background=element_rect(fill = "#222222"),
+        plot.title = element_text(color = "white"),
+        plot.subtitle = element_text(color = "white")
+        )
+  
+```
+
+```{r}
+set.seed(805)
+n <- 1000
+
+confounding_var_J <- rnorm(n)
+independent_var_A <- 1.1 * confounding_var_J + rnorm(n)
+dependent_var_X <- 1.9 * confounding_var_J + rnorm(n)
+
+
+crude_model <- lm(dependent_var_X ~ independent_var_A)
+confounder_model <- lm(dependent_var_X ~ independent_var_A + confounding_var_J)
+
+crude_model_tbl <- summary(crude_model) %>% tidy()
+crude_model_kbl <- summary(crude_model) %>%
+  tidy() %>%
+  kable(align = rep("c", 5), digits = 3)
+crude_model_kbl
+
+confounder_model_tbl <- summary(confounder_model) %>% tidy()
+confounder_model_kbl <- summary(confounder_model) %>%
+  tidy() %>%
+  kable(align = rep("c", 5), digits = 3)
+confounder_model_kbl
+
+crude_model_tbl <- crude_model_tbl %>% mutate(model = "crude_model: no confounder")
+confounder_model_tbl <- confounder_model_tbl %>% mutate(model = "confounder_model: with confounder")
+
+confounder_model_summary_tbl <- bind_rows(crude_model_tbl, confounder_model_tbl)
+confounder_model_summary_tbl <- confounder_model_summary_tbl %>% select(model, everything())
+confounder_model_summary_tbl %>% kable(align = rep("c", 6), digits = 3)
+
+
+
+v1 <- visreg(crude_model, 
+       'independent_var_A',
+       gg = TRUE, 
+       line = list(col = '#E66101')) +
+  labs(title = "Relationship Between A and X",
+       subtitle = "Neglecting Confounder Variable J") +
+  ylim(-6,6) +
+  theme(plot.subtitle = element_text(face="bold", color="#404788FF"))
+
+v2 <- visreg(confounder_model, 
+       'independent_var_A', 
+       gg = TRUE, 
+       line = list(col = "#E66101")) +
+  labs(title = "Relationship Between A and X",
+       subtitle = "Considering Confounder Variable J") +
+  ylim(-6,6) +
+  theme(plot.subtitle = element_text(face="bold", color="#20a486ff"))
+  
+plot_grid(v1,v2)
+    
+```
+
+```{r}
+
+h <- dagify(K ~ B + Y,
+            Y ~ B)
+
+set.seed(100)
+h %>% 
+  tidy_dagitty() %>% 
+  mutate(x = c(0, 0, 2, 1)) %>% 
+  mutate(y = c(0, 0, 0, 2)) %>%
+  mutate(xend = c(1, 2, 1, NA)) %>%
+  mutate(yend = c(2, 0, 2, NA)) %>%
+  dag_label(labels = c("B" = "Independent\n Variable",
+                       "Y" = "Dependent\n Variable",
+                       "K" = "The\n Collider")) %>%
+  ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
+    geom_dag_edges(edge_colour = "#b8de29ff",
+                   edge_width = .8) +
+    geom_dag_node(color = "#2c3e50", 
+                  alpha = 0.8) +
+    geom_dag_text(color = "white") +
+    geom_dag_label_repel(aes(label = label),
+      col = "white", 
+      label.size = .4,
+      fill = "#20a486ff", 
+      alpha = 0.8, 
+      show.legend = FALSE, 
+      nudge_x = .7, 
+      nudge_y = .3) +
+  labs(title = " Directed Acyclic Graph",
+       subtitle = " Two Variables of Interest with a Collider") +
+  xlim(c(-1.5, 3.5)) +
+  ylim(c(-.33, 2.2)) +
+  geom_rect(xmin = -.5, 
+            xmax = 3.25, 
+            ymin = -.25, 
+            ymax = .65, 
+            alpha = .04,
+            fill = "white") +
+  theme_void() +
+  theme(plot.background = element_rect(fill = "#222222"),
+        plot.title = element_text(color = "white"),
+        plot.subtitle = element_text(color = "white")
+        )
+
+
+```
+
+
+```{r}
+
+independent_var_B <- rnorm(n)
+dependent_var_Y <- .3 * independent_var_B + rnorm(n)
+collider_var_K <- 1.2 * independent_var_B + 0.9 * dependent_var_Y + rnorm(n)
+
+crude_model_b  <- lm(dependent_var_Y ~ independent_var_B)
+collider_model <- lm(dependent_var_Y ~ independent_var_B + collider_var_K)
+
+crude_model_b_kbl <- summary(crude_model_b) %>%
+  tidy() %>%
+  kable(align = rep("c", 5), digits = 3)
+crude_model_b_tbl <- summary(crude_model_b) %>% tidy()
+crude_model_b_kbl
+
+collider_model_kbl <- summary(collider_model) %>%
+  tidy() %>%
+  kable(align = rep("c", 5), digits = 3)
+collider_model_tbl <- summary(collider_model) %>% tidy()
+collider_model_kbl
+
+crude_model_b_tbl <- crude_model_b_tbl %>% mutate(model = "crude_model_b: no collider")
+collider_model_tbl <- collider_model_tbl %>% mutate(model = "collider_model: with collider")
+
+collider_model_summary_tbl <- bind_rows(crude_model_b_tbl, collider_model_tbl)
+collider_model_summary_tbl <- collider_model_summary_tbl %>% select(model, everything())
+collider_model_summary_tbl %>% kable(align = rep("c", 6), digits = 3)
+
+v3 <- visreg(crude_model_b, 
+       'independent_var_B',
+       gg = TRUE, 
+       line = list(col = '#E66101')) +
+  labs(title = "Relationship Between B and Y",
+       subtitle = "Neglecting Collider Variable K") +
+  ylim(-6,6) +
+  theme(plot.subtitle = element_text(face="bold", color="#f68f46b2"))
+
+v4 <- visreg(collider_model, 
+       'independent_var_B', 
+       gg = TRUE, 
+       line = list(col = "#E66101")) +
+  labs(title = "Relationship Between B and Y",
+       subtitle = "Considering Collider Variable K") +
+  ylim(-6,6) +
+  theme(plot.subtitle = element_text(face="bold", color="#403891b2"))
+  
+plot_grid(v3,v4)
+
+
+```

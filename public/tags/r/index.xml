@@ -1,23 +1,742 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-  <title>R on [R]eliability</title>
-  <link>/tags/r/</link>
-  <description>Recent content in R on [R]eliability</description>
-  <generator>Hugo -- gohugo.io</generator>
-<language>en-us</language>
-<copyright>&amp;copy; 2019. All rights reserved.</copyright>
-<lastBuildDate>Sun, 29 Sep 2019 00:00:00 +0000</lastBuildDate>
+    <title>R on [R]eliability</title>
+    <link>/tags/r/</link>
+    <description>Recent content in R on [R]eliability</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2019. All rights reserved.</copyright>
+    <lastBuildDate>Tue, 29 Oct 2019 00:00:00 +0000</lastBuildDate>
+    
+        <atom:link href="/tags/r/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Confounders and Colliders - Modeling Spurious Correlations in R</title>
+      <link>/post/confounders-and-colliders-modeling-spurious-correlations-in-r/</link>
+      <pubDate>Tue, 29 Oct 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/post/confounders-and-colliders-modeling-spurious-correlations-in-r/</guid>
+      <description>
 
-<atom:link href="/tags/r/index.xml" rel="self" type="application/rss+xml" />
+
+&lt;p&gt;output: pdf_document: toc: yes toc_depth: ‘2’ html_document: code_folding: hide df_print: paged highlight: tango number_sections: yes theme: none toc: yes toc_depth: 2 —&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# Load libraries
+library(tidyverse)
+library(kableExtra)
+library(rsample)
+library(recipes)
+library(parsnip)
+library(yardstick)
+library(viridisLite)
+library(GGally)
+library(DiagrammeR)
+library(dagitty)
+library(ggdag)
+library(visreg)
+library(styler)
+library(cowplot)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;g &amp;lt;- dagify(A ~ J,
+            X ~ J,
+            X ~ A)
+
+set.seed(100)
+g %&amp;gt;% 
+  tidy_dagitty() %&amp;gt;% 
+  mutate(x = c(0, 1, 1, 2)) %&amp;gt;% 
+  mutate(y = c(0, 2, 2, 0)) %&amp;gt;%
+  mutate(xend = c(2, 0, 2, NA)) %&amp;gt;%
+  mutate(yend = c(0, 0, 0, NA)) %&amp;gt;%
+  dag_label(labels = c(&amp;quot;A&amp;quot; = &amp;quot;Independent\n Variable&amp;quot;,
+                       &amp;quot;X&amp;quot; = &amp;quot;Dependent\n Variable&amp;quot;,
+                       &amp;quot;J&amp;quot; = &amp;quot;The\n Confounder&amp;quot;)) %&amp;gt;%
+  ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
+    geom_dag_edges(edge_colour = &amp;quot;#b8de29ff&amp;quot;,
+                   edge_width = .8) +
+    geom_dag_node(color = &amp;quot;#2c3e50&amp;quot;, 
+                  alpha = 0.8) +
+    geom_dag_text(color = &amp;quot;white&amp;quot;) +
+    geom_dag_label_repel(aes(label = label),
+      col = &amp;quot;white&amp;quot;,
+      label.size = .4,
+      fill = &amp;quot;#20a486ff&amp;quot;, 
+      alpha = 0.8, 
+      show.legend = FALSE, 
+      nudge_x = .7, 
+      nudge_y = .3) +
+  labs(title = &amp;quot; Directed Acyclic Graph&amp;quot;,
+       subtitle = &amp;quot; Two Variables of Interest with a Confounder&amp;quot;) +
+  xlim(c(-1.5, 3.5)) +
+  ylim(c(-.33, 2.2)) +
+  geom_rect(xmin = -.5, 
+            xmax = 3.25, 
+            ymin = -.25, 
+            ymax = .65, 
+            alpha = .04,
+            fill = &amp;quot;white&amp;quot;) +
+  theme_void() +
+  theme(plot.background=element_rect(fill = &amp;quot;#222222&amp;quot;),
+        plot.title = element_text(color = &amp;quot;white&amp;quot;),
+        plot.subtitle = element_text(color = &amp;quot;white&amp;quot;)
+        )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-10-29-confounders-and-colliders-modeling-spurious-correlations-in-r_files/figure-html/unnamed-chunk-2-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(805)
+n &amp;lt;- 1000
+
+confounding_var_J &amp;lt;- rnorm(n)
+independent_var_A &amp;lt;- 1.1 * confounding_var_J + rnorm(n)
+dependent_var_X &amp;lt;- 1.9 * confounding_var_J + rnorm(n)
 
 
-<item>
-  <title>Heart Disease Prediction From Patient Data in R</title>
-  <link>/post/heart-disease-prediction-from-patient-data-in-r/</link>
-  <pubDate>Sun, 29 Sep 2019 00:00:00 +0000</pubDate>
+crude_model &amp;lt;- lm(dependent_var_X ~ independent_var_A)
+confounder_model &amp;lt;- lm(dependent_var_X ~ independent_var_A + confounding_var_J)
+
+crude_model_tbl &amp;lt;- summary(crude_model) %&amp;gt;% tidy()
+crude_model_kbl &amp;lt;- summary(crude_model) %&amp;gt;%
+  tidy() %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 5), digits = 3)
+crude_model_kbl&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+term
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+estimate
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+std.error
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+statistic
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+p.value
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+(Intercept)
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.007
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.051
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.135
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.893
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+independent_var_A
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.967
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.034
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+28.415
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.000
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;confounder_model_tbl &amp;lt;- summary(confounder_model) %&amp;gt;% tidy()
+confounder_model_kbl &amp;lt;- summary(confounder_model) %&amp;gt;%
+  tidy() %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 5), digits = 3)
+confounder_model_kbl&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+term
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+estimate
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+std.error
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+statistic
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+p.value
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+(Intercept)
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.005
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.032
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.151
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.880
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+independent_var_A
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.005
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.033
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.153
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.878
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+confounding_var_J
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.860
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.048
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+38.460
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.000
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;crude_model_tbl &amp;lt;- crude_model_tbl %&amp;gt;% mutate(model = &amp;quot;crude_model: no confounder&amp;quot;)
+confounder_model_tbl &amp;lt;- confounder_model_tbl %&amp;gt;% mutate(model = &amp;quot;confounder_model: with confounder&amp;quot;)
+
+confounder_model_summary_tbl &amp;lt;- bind_rows(crude_model_tbl, confounder_model_tbl)
+confounder_model_summary_tbl &amp;lt;- confounder_model_summary_tbl %&amp;gt;% select(model, everything())
+confounder_model_summary_tbl %&amp;gt;% kable(align = rep(&amp;quot;c&amp;quot;, 6), digits = 3)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+model
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+term
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+estimate
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+std.error
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+statistic
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+p.value
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+crude_model: no confounder
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+(Intercept)
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.007
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.051
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.135
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.893
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+crude_model: no confounder
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+independent_var_A
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.967
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.034
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+28.415
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.000
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+confounder_model: with confounder
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+(Intercept)
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.005
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.032
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.151
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.880
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+confounder_model: with confounder
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+independent_var_A
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.005
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.033
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.153
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.878
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+confounder_model: with confounder
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+confounding_var_J
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+1.860
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.048
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+38.460
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.000
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;v1 &amp;lt;- visreg(crude_model, 
+       &amp;#39;independent_var_A&amp;#39;,
+       gg = TRUE, 
+       line = list(col = &amp;#39;#E66101&amp;#39;)) +
+  labs(title = &amp;quot;Relationship Between A and X&amp;quot;,
+       subtitle = &amp;quot;Neglecting Confounder Variable J&amp;quot;) +
+  ylim(-6,6) +
+  theme(plot.subtitle = element_text(face=&amp;quot;bold&amp;quot;, color=&amp;quot;#404788FF&amp;quot;))
+
+v2 &amp;lt;- visreg(confounder_model, 
+       &amp;#39;independent_var_A&amp;#39;, 
+       gg = TRUE, 
+       line = list(col = &amp;quot;#E66101&amp;quot;)) +
+  labs(title = &amp;quot;Relationship Between A and X&amp;quot;,
+       subtitle = &amp;quot;Considering Confounder Variable J&amp;quot;) +
+  ylim(-6,6) +
+  theme(plot.subtitle = element_text(face=&amp;quot;bold&amp;quot;, color=&amp;quot;#20a486ff&amp;quot;))
   
-<guid>/post/heart-disease-prediction-from-patient-data-in-r/</guid>
-  <description>
+plot_grid(v1,v2)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-10-29-confounders-and-colliders-modeling-spurious-correlations-in-r_files/figure-html/unnamed-chunk-3-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;h &amp;lt;- dagify(K ~ B + Y,
+            Y ~ B)
+
+set.seed(100)
+h %&amp;gt;% 
+  tidy_dagitty() %&amp;gt;% 
+  mutate(x = c(0, 0, 2, 1)) %&amp;gt;% 
+  mutate(y = c(0, 0, 0, 2)) %&amp;gt;%
+  mutate(xend = c(1, 2, 1, NA)) %&amp;gt;%
+  mutate(yend = c(2, 0, 2, NA)) %&amp;gt;%
+  dag_label(labels = c(&amp;quot;B&amp;quot; = &amp;quot;Independent\n Variable&amp;quot;,
+                       &amp;quot;Y&amp;quot; = &amp;quot;Dependent\n Variable&amp;quot;,
+                       &amp;quot;K&amp;quot; = &amp;quot;The\n Collider&amp;quot;)) %&amp;gt;%
+  ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
+    geom_dag_edges(edge_colour = &amp;quot;#b8de29ff&amp;quot;,
+                   edge_width = .8) +
+    geom_dag_node(color = &amp;quot;#2c3e50&amp;quot;, 
+                  alpha = 0.8) +
+    geom_dag_text(color = &amp;quot;white&amp;quot;) +
+    geom_dag_label_repel(aes(label = label),
+      col = &amp;quot;white&amp;quot;, 
+      label.size = .4,
+      fill = &amp;quot;#20a486ff&amp;quot;, 
+      alpha = 0.8, 
+      show.legend = FALSE, 
+      nudge_x = .7, 
+      nudge_y = .3) +
+  labs(title = &amp;quot; Directed Acyclic Graph&amp;quot;,
+       subtitle = &amp;quot; Two Variables of Interest with a Collider&amp;quot;) +
+  xlim(c(-1.5, 3.5)) +
+  ylim(c(-.33, 2.2)) +
+  geom_rect(xmin = -.5, 
+            xmax = 3.25, 
+            ymin = -.25, 
+            ymax = .65, 
+            alpha = .04,
+            fill = &amp;quot;white&amp;quot;) +
+  theme_void() +
+  theme(plot.background = element_rect(fill = &amp;quot;#222222&amp;quot;),
+        plot.title = element_text(color = &amp;quot;white&amp;quot;),
+        plot.subtitle = element_text(color = &amp;quot;white&amp;quot;)
+        )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-10-29-confounders-and-colliders-modeling-spurious-correlations-in-r_files/figure-html/unnamed-chunk-4-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;independent_var_B &amp;lt;- rnorm(n)
+dependent_var_Y &amp;lt;- .3 * independent_var_B + rnorm(n)
+collider_var_K &amp;lt;- 1.2 * independent_var_B + 0.9 * dependent_var_Y + rnorm(n)
+
+crude_model_b  &amp;lt;- lm(dependent_var_Y ~ independent_var_B)
+collider_model &amp;lt;- lm(dependent_var_Y ~ independent_var_B + collider_var_K)
+
+crude_model_b_kbl &amp;lt;- summary(crude_model_b) %&amp;gt;%
+  tidy() %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 5), digits = 3)
+crude_model_b_tbl &amp;lt;- summary(crude_model_b) %&amp;gt;% tidy()
+crude_model_b_kbl&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+term
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+estimate
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+std.error
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+statistic
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+p.value
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+(Intercept)
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.021
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.032
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.666
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.506
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+independent_var_B
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.247
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.032
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+7.820
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.000
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;collider_model_kbl &amp;lt;- summary(collider_model) %&amp;gt;%
+  tidy() %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 5), digits = 3)
+collider_model_tbl &amp;lt;- summary(collider_model) %&amp;gt;% tidy()
+collider_model_kbl&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+term
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+estimate
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+std.error
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+statistic
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+p.value
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+(Intercept)
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.011
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.023
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.453
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.651
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+independent_var_B
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.481
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.034
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-14.250
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.000
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+collider_var_K
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.519
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.018
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+29.510
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.000
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;crude_model_b_tbl &amp;lt;- crude_model_b_tbl %&amp;gt;% mutate(model = &amp;quot;crude_model_b: no collider&amp;quot;)
+collider_model_tbl &amp;lt;- collider_model_tbl %&amp;gt;% mutate(model = &amp;quot;collider_model: with collider&amp;quot;)
+
+collider_model_summary_tbl &amp;lt;- bind_rows(crude_model_b_tbl, collider_model_tbl)
+collider_model_summary_tbl &amp;lt;- collider_model_summary_tbl %&amp;gt;% select(model, everything())
+collider_model_summary_tbl %&amp;gt;% kable(align = rep(&amp;quot;c&amp;quot;, 6), digits = 3)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+model
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+term
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+estimate
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+std.error
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+statistic
+&lt;/th&gt;
+&lt;th style=&#34;text-align:center;&#34;&gt;
+p.value
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+crude_model_b: no collider
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+(Intercept)
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.021
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.032
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.666
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.506
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+crude_model_b: no collider
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+independent_var_B
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.247
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.032
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+7.820
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.000
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+collider_model: with collider
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+(Intercept)
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.011
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.023
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.453
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.651
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+collider_model: with collider
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+independent_var_B
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-0.481
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.034
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+-14.250
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.000
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+collider_model: with collider
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+collider_var_K
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.519
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.018
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+29.510
+&lt;/td&gt;
+&lt;td style=&#34;text-align:center;&#34;&gt;
+0.000
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;v3 &amp;lt;- visreg(crude_model_b, 
+       &amp;#39;independent_var_B&amp;#39;,
+       gg = TRUE, 
+       line = list(col = &amp;#39;#E66101&amp;#39;)) +
+  labs(title = &amp;quot;Relationship Between B and Y&amp;quot;,
+       subtitle = &amp;quot;Neglecting Collider Variable K&amp;quot;) +
+  ylim(-6,6) +
+  theme(plot.subtitle = element_text(face=&amp;quot;bold&amp;quot;, color=&amp;quot;#f68f46b2&amp;quot;))
+
+v4 &amp;lt;- visreg(collider_model, 
+       &amp;#39;independent_var_B&amp;#39;, 
+       gg = TRUE, 
+       line = list(col = &amp;quot;#E66101&amp;quot;)) +
+  labs(title = &amp;quot;Relationship Between B and Y&amp;quot;,
+       subtitle = &amp;quot;Considering Collider Variable K&amp;quot;) +
+  ylim(-6,6) +
+  theme(plot.subtitle = element_text(face=&amp;quot;bold&amp;quot;, color=&amp;quot;#403891b2&amp;quot;))
+  
+plot_grid(v3,v4)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-10-29-confounders-and-colliders-modeling-spurious-correlations-in-r_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Heart Disease Prediction From Patient Data in R</title>
+      <link>/post/heart-disease-prediction-from-patient-data-in-r/</link>
+      <pubDate>Sun, 29 Sep 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/post/heart-disease-prediction-from-patient-data-in-r/</guid>
+      <description>
 &lt;script src=&#34;/rmarkdown-libs/kePrint/kePrint.js&#34;&gt;&lt;/script&gt;
 
 
@@ -1530,15 +2249,15 @@ spec
 &lt;/ol&gt;
 &lt;/div&gt;
 </description>
-  </item>
-  
-<item>
-  <title>Modeling Particulate Counts as a Poisson Process in R</title>
-  <link>/post/modeling-particulate-counts-as-a-poisson-process-in-r/</link>
-  <pubDate>Wed, 18 Sep 2019 00:00:00 +0000</pubDate>
-  
-<guid>/post/modeling-particulate-counts-as-a-poisson-process-in-r/</guid>
-  <description>
+    </item>
+    
+    <item>
+      <title>Modeling Particulate Counts as a Poisson Process in R</title>
+      <link>/post/modeling-particulate-counts-as-a-poisson-process-in-r/</link>
+      <pubDate>Wed, 18 Sep 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/post/modeling-particulate-counts-as-a-poisson-process-in-r/</guid>
+      <description>
 &lt;script src=&#34;/rmarkdown-libs/kePrint/kePrint.js&#34;&gt;&lt;/script&gt;
 
 
@@ -2389,15 +3108,15 @@ upper_tol_tbl %&amp;gt;% ggplot(aes(x = proportion_covered_P, y = particles_per_
 &lt;p&gt;Here’s a plot that I’ve never made or seen before. For given set of data (in this case: particulate_data from earlier with n=20 from a Poisson distribution, lambda = 50), the x-axis shows the estimated reliability and the y-axis represents the number of particles at the edge the calculated tolerance interval using the TAB method. That is to say: the standard approaches to calculate the edge of the relevant tolerance interval for a specified proportion at a specified confidence level. For example, we could state we want to know the estimate for the 95th percentile at 95% confidence level - the answer would be 64 particles per device. Since the requirement for clinical safety is set at 60 particles max, we would not pass the test because we could not state with high confidence that 95 or more (out of 100) would pass. Usually it’s just a binary pass/fail decision.&lt;/p&gt;
 &lt;p&gt;It’s obvious that the 95/95 edge of the tolerance interval is out of spec… but what would be the greatest reliability we could claim at 95% confidence? It ends up being .88 or 88% - very close to the predicted lower bound of the 95% credible interval calculated from the Bayesian method (which was 89.3%, from above)! In this case, the frequentist and Bayesian methods happen to be similar (even though they aren’t measuring the same thing). Interesting stuff!&lt;/p&gt;
 </description>
-  </item>
-  
-<item>
-  <title>Stopping Rules for Significance Testing in R</title>
-  <link>/post/stopping-rules-for-significance-testing-in-r/</link>
-  <pubDate>Fri, 06 Sep 2019 00:00:00 +0000</pubDate>
-  
-<guid>/post/stopping-rules-for-significance-testing-in-r/</guid>
-  <description>
+    </item>
+    
+    <item>
+      <title>Stopping Rules for Significance Testing in R</title>
+      <link>/post/stopping-rules-for-significance-testing-in-r/</link>
+      <pubDate>Fri, 06 Sep 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/post/stopping-rules-for-significance-testing-in-r/</guid>
+      <description>
 &lt;script src=&#34;/rmarkdown-libs/kePrint/kePrint.js&#34;&gt;&lt;/script&gt;
 
 
@@ -3484,15 +4203,15 @@ lp_3&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;All these differences in means would be considered significant if we don’t observe our pre-determined stopping rule. This could be a big deal. We might claim a performance benefit when there is none, or waste precious time and money trying to figure out why we can’t replicate an earlier experiment!&lt;/p&gt;
 &lt;p&gt;Thanks for reading.&lt;/p&gt;
 </description>
-  </item>
-  
-<item>
-  <title>Assessing Design Verification Risk with Bayesian Estimation in R</title>
-  <link>/post/assessing-dv-risk-w-bayesian-estimation-in-r/</link>
-  <pubDate>Fri, 23 Aug 2019 00:00:00 +0000</pubDate>
-  
-<guid>/post/assessing-dv-risk-w-bayesian-estimation-in-r/</guid>
-  <description>
+    </item>
+    
+    <item>
+      <title>Assessing Design Verification Risk with Bayesian Estimation in R</title>
+      <link>/post/assessing-dv-risk-w-bayesian-estimation-in-r/</link>
+      <pubDate>Fri, 23 Aug 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/post/assessing-dv-risk-w-bayesian-estimation-in-r/</guid>
+      <description>
 
 
 &lt;p&gt;Suppose our team is preparing to freeze a new implant design. In order to move into the next phase of the PDP, it is common to perform a suite of formal “Design Freeze” testing. If the results of the Design Freeze testing are acceptable, the project can advance from Design Freeze (DF) into Design Verification (DV). DV is an expensive and resource intensive phase culminating in formal reports that are included in the regulatory submission. One key goal of DF is therefore to burn down enough risk to feel confident going into DV. Despite the high stakes, I haven’t ever seen a quantitative assessment of residual risk at the phase review. In this post we’ll attempt to use some simple Bayesian methods to quantify the DV risk as a function of DF sample size for a single, high-risk test.&lt;/p&gt;
@@ -3712,15 +4431,15 @@ text-align: justify}
 &lt;/ol&gt;
 &lt;/div&gt;
 </description>
-  </item>
-  
-<item>
-  <title>Permutation Test for NHST of 2 Samples in R</title>
-  <link>/post/permutation-test-for-nhst-of-2-samples-in-r/</link>
-  <pubDate>Sat, 10 Aug 2019 00:00:00 +0000</pubDate>
-  
-<guid>/post/permutation-test-for-nhst-of-2-samples-in-r/</guid>
-  <description>
+    </item>
+    
+    <item>
+      <title>Permutation Test for NHST of 2 Samples in R</title>
+      <link>/post/permutation-test-for-nhst-of-2-samples-in-r/</link>
+      <pubDate>Sat, 10 Aug 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/post/permutation-test-for-nhst-of-2-samples-in-r/</guid>
+      <description>
 
 
 &lt;p&gt;As engineers, it is not uncommon to be asked to determine whether or not two different configurations of a product perform the same. Perhaps we are asked to compare the durability of a next-generation prototype to the current generation. Sometimes we are testing the flexibility of our device versus a competitor for marketing purposes. Maybe we identify a new vendor for a raw material but must first understand whether the resultant finished product will perform any differently than when built using material from the standard supplier. All of these situations call for a comparison between two groups culminating in a statistically supported recommendation.&lt;/p&gt;
@@ -4151,7 +4870,7 @@ text-align: justify}
 &lt;/ol&gt;
 &lt;/div&gt;
 </description>
-  </item>
-  
-</channel>
-  </rss> 
+    </item>
+    
+  </channel>
+</rss>

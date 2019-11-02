@@ -1,23 +1,23 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-  <title>Machine-Learning on [R]eliability</title>
-  <link>/tags/machine-learning/</link>
-  <description>Recent content in Machine-Learning on [R]eliability</description>
-  <generator>Hugo -- gohugo.io</generator>
-<language>en-us</language>
-<copyright>&amp;copy; 2019. All rights reserved.</copyright>
-<lastBuildDate>Sun, 29 Sep 2019 00:00:00 +0000</lastBuildDate>
-
-<atom:link href="/tags/machine-learning/index.xml" rel="self" type="application/rss+xml" />
-
-
-<item>
-  <title>Heart Disease Prediction From Patient Data in R</title>
-  <link>/post/heart-disease-prediction-from-patient-data-in-r/</link>
-  <pubDate>Sun, 29 Sep 2019 00:00:00 +0000</pubDate>
-  
-<guid>/post/heart-disease-prediction-from-patient-data-in-r/</guid>
-  <description>
+    <title>Machine-Learning on [R]eliability</title>
+    <link>/tags/machine-learning/</link>
+    <description>Recent content in Machine-Learning on [R]eliability</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2019. All rights reserved.</copyright>
+    <lastBuildDate>Sun, 29 Sep 2019 00:00:00 +0000</lastBuildDate>
+    
+        <atom:link href="/tags/machine-learning/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Heart Disease Prediction From Patient Data in R</title>
+      <link>/post/heart-disease-prediction-from-patient-data-in-r/</link>
+      <pubDate>Sun, 29 Sep 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/post/heart-disease-prediction-from-patient-data-in-r/</guid>
+      <description>
 &lt;script src=&#34;/rmarkdown-libs/kePrint/kePrint.js&#34;&gt;&lt;/script&gt;
 
 
@@ -1530,7 +1530,7 @@ spec
 &lt;/ol&gt;
 &lt;/div&gt;
 </description>
-  </item>
-  
-</channel>
-  </rss> 
+    </item>
+    
+  </channel>
+</rss>

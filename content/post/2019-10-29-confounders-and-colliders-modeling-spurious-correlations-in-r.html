@@ -1,0 +1,727 @@
+---
+title: Confounders and Colliders - Modeling Spurious Correlations in R
+author: Riley
+date: '2019-10-29'
+slug: confounders-and-colliders-modeling-spurious-correlations-in-r
+categories:
+  - R
+  - Stats
+tags:
+  - Simulation
+  - Stats
+  - R
+  - DAG
+description: ''
+topics: []
+draft: TRUE
+---
+
+
+
+<p>output: pdf_document: toc: yes toc_depth: ‘2’ html_document: code_folding: hide df_print: paged highlight: tango number_sections: yes theme: none toc: yes toc_depth: 2 —</p>
+<pre class="r"><code># Load libraries
+library(tidyverse)
+library(kableExtra)
+library(rsample)
+library(recipes)
+library(parsnip)
+library(yardstick)
+library(viridisLite)
+library(GGally)
+library(DiagrammeR)
+library(dagitty)
+library(ggdag)
+library(visreg)
+library(styler)
+library(cowplot)</code></pre>
+<pre class="r"><code>g &lt;- dagify(A ~ J,
+            X ~ J,
+            X ~ A)
+
+set.seed(100)
+g %&gt;% 
+  tidy_dagitty() %&gt;% 
+  mutate(x = c(0, 1, 1, 2)) %&gt;% 
+  mutate(y = c(0, 2, 2, 0)) %&gt;%
+  mutate(xend = c(2, 0, 2, NA)) %&gt;%
+  mutate(yend = c(0, 0, 0, NA)) %&gt;%
+  dag_label(labels = c(&quot;A&quot; = &quot;Independent\n Variable&quot;,
+                       &quot;X&quot; = &quot;Dependent\n Variable&quot;,
+                       &quot;J&quot; = &quot;The\n Confounder&quot;)) %&gt;%
+  ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
+    geom_dag_edges(edge_colour = &quot;#b8de29ff&quot;,
+                   edge_width = .8) +
+    geom_dag_node(color = &quot;#2c3e50&quot;, 
+                  alpha = 0.8) +
+    geom_dag_text(color = &quot;white&quot;) +
+    geom_dag_label_repel(aes(label = label),
+      col = &quot;white&quot;,
+      label.size = .4,
+      fill = &quot;#20a486ff&quot;, 
+      alpha = 0.8, 
+      show.legend = FALSE, 
+      nudge_x = .7, 
+      nudge_y = .3) +
+  labs(title = &quot; Directed Acyclic Graph&quot;,
+       subtitle = &quot; Two Variables of Interest with a Confounder&quot;) +
+  xlim(c(-1.5, 3.5)) +
+  ylim(c(-.33, 2.2)) +
+  geom_rect(xmin = -.5, 
+            xmax = 3.25, 
+            ymin = -.25, 
+            ymax = .65, 
+            alpha = .04,
+            fill = &quot;white&quot;) +
+  theme_void() +
+  theme(plot.background=element_rect(fill = &quot;#222222&quot;),
+        plot.title = element_text(color = &quot;white&quot;),
+        plot.subtitle = element_text(color = &quot;white&quot;)
+        )</code></pre>
+<p><img src="/post/2019-10-29-confounders-and-colliders-modeling-spurious-correlations-in-r_files/figure-html/unnamed-chunk-2-1.png" width="100%" height="500px" /></p>
+<pre class="r"><code>set.seed(805)
+n &lt;- 1000
+
+confounding_var_J &lt;- rnorm(n)
+independent_var_A &lt;- 1.1 * confounding_var_J + rnorm(n)
+dependent_var_X &lt;- 1.9 * confounding_var_J + rnorm(n)
+
+
+crude_model &lt;- lm(dependent_var_X ~ independent_var_A)
+confounder_model &lt;- lm(dependent_var_X ~ independent_var_A + confounding_var_J)
+
+crude_model_tbl &lt;- summary(crude_model) %&gt;% tidy()
+crude_model_kbl &lt;- summary(crude_model) %&gt;%
+  tidy() %&gt;%
+  kable(align = rep(&quot;c&quot;, 5), digits = 3)
+crude_model_kbl</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+term
+</th>
+<th style="text-align:center;">
+estimate
+</th>
+<th style="text-align:center;">
+std.error
+</th>
+<th style="text-align:center;">
+statistic
+</th>
+<th style="text-align:center;">
+p.value
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+(Intercept)
+</td>
+<td style="text-align:center;">
+-0.007
+</td>
+<td style="text-align:center;">
+0.051
+</td>
+<td style="text-align:center;">
+-0.135
+</td>
+<td style="text-align:center;">
+0.893
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+independent_var_A
+</td>
+<td style="text-align:center;">
+0.967
+</td>
+<td style="text-align:center;">
+0.034
+</td>
+<td style="text-align:center;">
+28.415
+</td>
+<td style="text-align:center;">
+0.000
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>confounder_model_tbl &lt;- summary(confounder_model) %&gt;% tidy()
+confounder_model_kbl &lt;- summary(confounder_model) %&gt;%
+  tidy() %&gt;%
+  kable(align = rep(&quot;c&quot;, 5), digits = 3)
+confounder_model_kbl</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+term
+</th>
+<th style="text-align:center;">
+estimate
+</th>
+<th style="text-align:center;">
+std.error
+</th>
+<th style="text-align:center;">
+statistic
+</th>
+<th style="text-align:center;">
+p.value
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+(Intercept)
+</td>
+<td style="text-align:center;">
+-0.005
+</td>
+<td style="text-align:center;">
+0.032
+</td>
+<td style="text-align:center;">
+-0.151
+</td>
+<td style="text-align:center;">
+0.880
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+independent_var_A
+</td>
+<td style="text-align:center;">
+0.005
+</td>
+<td style="text-align:center;">
+0.033
+</td>
+<td style="text-align:center;">
+0.153
+</td>
+<td style="text-align:center;">
+0.878
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+confounding_var_J
+</td>
+<td style="text-align:center;">
+1.860
+</td>
+<td style="text-align:center;">
+0.048
+</td>
+<td style="text-align:center;">
+38.460
+</td>
+<td style="text-align:center;">
+0.000
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>crude_model_tbl &lt;- crude_model_tbl %&gt;% mutate(model = &quot;crude_model: no confounder&quot;)
+confounder_model_tbl &lt;- confounder_model_tbl %&gt;% mutate(model = &quot;confounder_model: with confounder&quot;)
+
+confounder_model_summary_tbl &lt;- bind_rows(crude_model_tbl, confounder_model_tbl)
+confounder_model_summary_tbl &lt;- confounder_model_summary_tbl %&gt;% select(model, everything())
+confounder_model_summary_tbl %&gt;% kable(align = rep(&quot;c&quot;, 6), digits = 3)</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+model
+</th>
+<th style="text-align:center;">
+term
+</th>
+<th style="text-align:center;">
+estimate
+</th>
+<th style="text-align:center;">
+std.error
+</th>
+<th style="text-align:center;">
+statistic
+</th>
+<th style="text-align:center;">
+p.value
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+crude_model: no confounder
+</td>
+<td style="text-align:center;">
+(Intercept)
+</td>
+<td style="text-align:center;">
+-0.007
+</td>
+<td style="text-align:center;">
+0.051
+</td>
+<td style="text-align:center;">
+-0.135
+</td>
+<td style="text-align:center;">
+0.893
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+crude_model: no confounder
+</td>
+<td style="text-align:center;">
+independent_var_A
+</td>
+<td style="text-align:center;">
+0.967
+</td>
+<td style="text-align:center;">
+0.034
+</td>
+<td style="text-align:center;">
+28.415
+</td>
+<td style="text-align:center;">
+0.000
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+confounder_model: with confounder
+</td>
+<td style="text-align:center;">
+(Intercept)
+</td>
+<td style="text-align:center;">
+-0.005
+</td>
+<td style="text-align:center;">
+0.032
+</td>
+<td style="text-align:center;">
+-0.151
+</td>
+<td style="text-align:center;">
+0.880
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+confounder_model: with confounder
+</td>
+<td style="text-align:center;">
+independent_var_A
+</td>
+<td style="text-align:center;">
+0.005
+</td>
+<td style="text-align:center;">
+0.033
+</td>
+<td style="text-align:center;">
+0.153
+</td>
+<td style="text-align:center;">
+0.878
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+confounder_model: with confounder
+</td>
+<td style="text-align:center;">
+confounding_var_J
+</td>
+<td style="text-align:center;">
+1.860
+</td>
+<td style="text-align:center;">
+0.048
+</td>
+<td style="text-align:center;">
+38.460
+</td>
+<td style="text-align:center;">
+0.000
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>v1 &lt;- visreg(crude_model, 
+       &#39;independent_var_A&#39;,
+       gg = TRUE, 
+       line = list(col = &#39;#E66101&#39;)) +
+  labs(title = &quot;Relationship Between A and X&quot;,
+       subtitle = &quot;Neglecting Confounder Variable J&quot;) +
+  ylim(-6,6) +
+  theme(plot.subtitle = element_text(face=&quot;bold&quot;, color=&quot;#404788FF&quot;))
+
+v2 &lt;- visreg(confounder_model, 
+       &#39;independent_var_A&#39;, 
+       gg = TRUE, 
+       line = list(col = &quot;#E66101&quot;)) +
+  labs(title = &quot;Relationship Between A and X&quot;,
+       subtitle = &quot;Considering Confounder Variable J&quot;) +
+  ylim(-6,6) +
+  theme(plot.subtitle = element_text(face=&quot;bold&quot;, color=&quot;#20a486ff&quot;))
+  
+plot_grid(v1,v2)</code></pre>
+<p><img src="/post/2019-10-29-confounders-and-colliders-modeling-spurious-correlations-in-r_files/figure-html/unnamed-chunk-3-1.png" width="100%" height="500px" /></p>
+<pre class="r"><code>h &lt;- dagify(K ~ B + Y,
+            Y ~ B)
+
+set.seed(100)
+h %&gt;% 
+  tidy_dagitty() %&gt;% 
+  mutate(x = c(0, 0, 2, 1)) %&gt;% 
+  mutate(y = c(0, 0, 0, 2)) %&gt;%
+  mutate(xend = c(1, 2, 1, NA)) %&gt;%
+  mutate(yend = c(2, 0, 2, NA)) %&gt;%
+  dag_label(labels = c(&quot;B&quot; = &quot;Independent\n Variable&quot;,
+                       &quot;Y&quot; = &quot;Dependent\n Variable&quot;,
+                       &quot;K&quot; = &quot;The\n Collider&quot;)) %&gt;%
+  ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
+    geom_dag_edges(edge_colour = &quot;#b8de29ff&quot;,
+                   edge_width = .8) +
+    geom_dag_node(color = &quot;#2c3e50&quot;, 
+                  alpha = 0.8) +
+    geom_dag_text(color = &quot;white&quot;) +
+    geom_dag_label_repel(aes(label = label),
+      col = &quot;white&quot;, 
+      label.size = .4,
+      fill = &quot;#20a486ff&quot;, 
+      alpha = 0.8, 
+      show.legend = FALSE, 
+      nudge_x = .7, 
+      nudge_y = .3) +
+  labs(title = &quot; Directed Acyclic Graph&quot;,
+       subtitle = &quot; Two Variables of Interest with a Collider&quot;) +
+  xlim(c(-1.5, 3.5)) +
+  ylim(c(-.33, 2.2)) +
+  geom_rect(xmin = -.5, 
+            xmax = 3.25, 
+            ymin = -.25, 
+            ymax = .65, 
+            alpha = .04,
+            fill = &quot;white&quot;) +
+  theme_void() +
+  theme(plot.background = element_rect(fill = &quot;#222222&quot;),
+        plot.title = element_text(color = &quot;white&quot;),
+        plot.subtitle = element_text(color = &quot;white&quot;)
+        )</code></pre>
+<p><img src="/post/2019-10-29-confounders-and-colliders-modeling-spurious-correlations-in-r_files/figure-html/unnamed-chunk-4-1.png" width="100%" height="500px" /></p>
+<pre class="r"><code>independent_var_B &lt;- rnorm(n)
+dependent_var_Y &lt;- .3 * independent_var_B + rnorm(n)
+collider_var_K &lt;- 1.2 * independent_var_B + 0.9 * dependent_var_Y + rnorm(n)
+
+crude_model_b  &lt;- lm(dependent_var_Y ~ independent_var_B)
+collider_model &lt;- lm(dependent_var_Y ~ independent_var_B + collider_var_K)
+
+crude_model_b_kbl &lt;- summary(crude_model_b) %&gt;%
+  tidy() %&gt;%
+  kable(align = rep(&quot;c&quot;, 5), digits = 3)
+crude_model_b_tbl &lt;- summary(crude_model_b) %&gt;% tidy()
+crude_model_b_kbl</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+term
+</th>
+<th style="text-align:center;">
+estimate
+</th>
+<th style="text-align:center;">
+std.error
+</th>
+<th style="text-align:center;">
+statistic
+</th>
+<th style="text-align:center;">
+p.value
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+(Intercept)
+</td>
+<td style="text-align:center;">
+-0.021
+</td>
+<td style="text-align:center;">
+0.032
+</td>
+<td style="text-align:center;">
+-0.666
+</td>
+<td style="text-align:center;">
+0.506
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+independent_var_B
+</td>
+<td style="text-align:center;">
+0.247
+</td>
+<td style="text-align:center;">
+0.032
+</td>
+<td style="text-align:center;">
+7.820
+</td>
+<td style="text-align:center;">
+0.000
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>collider_model_kbl &lt;- summary(collider_model) %&gt;%
+  tidy() %&gt;%
+  kable(align = rep(&quot;c&quot;, 5), digits = 3)
+collider_model_tbl &lt;- summary(collider_model) %&gt;% tidy()
+collider_model_kbl</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+term
+</th>
+<th style="text-align:center;">
+estimate
+</th>
+<th style="text-align:center;">
+std.error
+</th>
+<th style="text-align:center;">
+statistic
+</th>
+<th style="text-align:center;">
+p.value
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+(Intercept)
+</td>
+<td style="text-align:center;">
+-0.011
+</td>
+<td style="text-align:center;">
+0.023
+</td>
+<td style="text-align:center;">
+-0.453
+</td>
+<td style="text-align:center;">
+0.651
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+independent_var_B
+</td>
+<td style="text-align:center;">
+-0.481
+</td>
+<td style="text-align:center;">
+0.034
+</td>
+<td style="text-align:center;">
+-14.250
+</td>
+<td style="text-align:center;">
+0.000
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+collider_var_K
+</td>
+<td style="text-align:center;">
+0.519
+</td>
+<td style="text-align:center;">
+0.018
+</td>
+<td style="text-align:center;">
+29.510
+</td>
+<td style="text-align:center;">
+0.000
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>crude_model_b_tbl &lt;- crude_model_b_tbl %&gt;% mutate(model = &quot;crude_model_b: no collider&quot;)
+collider_model_tbl &lt;- collider_model_tbl %&gt;% mutate(model = &quot;collider_model: with collider&quot;)
+
+collider_model_summary_tbl &lt;- bind_rows(crude_model_b_tbl, collider_model_tbl)
+collider_model_summary_tbl &lt;- collider_model_summary_tbl %&gt;% select(model, everything())
+collider_model_summary_tbl %&gt;% kable(align = rep(&quot;c&quot;, 6), digits = 3)</code></pre>
+<table>
+<thead>
+<tr>
+<th style="text-align:center;">
+model
+</th>
+<th style="text-align:center;">
+term
+</th>
+<th style="text-align:center;">
+estimate
+</th>
+<th style="text-align:center;">
+std.error
+</th>
+<th style="text-align:center;">
+statistic
+</th>
+<th style="text-align:center;">
+p.value
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+crude_model_b: no collider
+</td>
+<td style="text-align:center;">
+(Intercept)
+</td>
+<td style="text-align:center;">
+-0.021
+</td>
+<td style="text-align:center;">
+0.032
+</td>
+<td style="text-align:center;">
+-0.666
+</td>
+<td style="text-align:center;">
+0.506
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+crude_model_b: no collider
+</td>
+<td style="text-align:center;">
+independent_var_B
+</td>
+<td style="text-align:center;">
+0.247
+</td>
+<td style="text-align:center;">
+0.032
+</td>
+<td style="text-align:center;">
+7.820
+</td>
+<td style="text-align:center;">
+0.000
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+collider_model: with collider
+</td>
+<td style="text-align:center;">
+(Intercept)
+</td>
+<td style="text-align:center;">
+-0.011
+</td>
+<td style="text-align:center;">
+0.023
+</td>
+<td style="text-align:center;">
+-0.453
+</td>
+<td style="text-align:center;">
+0.651
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+collider_model: with collider
+</td>
+<td style="text-align:center;">
+independent_var_B
+</td>
+<td style="text-align:center;">
+-0.481
+</td>
+<td style="text-align:center;">
+0.034
+</td>
+<td style="text-align:center;">
+-14.250
+</td>
+<td style="text-align:center;">
+0.000
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+collider_model: with collider
+</td>
+<td style="text-align:center;">
+collider_var_K
+</td>
+<td style="text-align:center;">
+0.519
+</td>
+<td style="text-align:center;">
+0.018
+</td>
+<td style="text-align:center;">
+29.510
+</td>
+<td style="text-align:center;">
+0.000
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>v3 &lt;- visreg(crude_model_b, 
+       &#39;independent_var_B&#39;,
+       gg = TRUE, 
+       line = list(col = &#39;#E66101&#39;)) +
+  labs(title = &quot;Relationship Between B and Y&quot;,
+       subtitle = &quot;Neglecting Collider Variable K&quot;) +
+  ylim(-6,6) +
+  theme(plot.subtitle = element_text(face=&quot;bold&quot;, color=&quot;#f68f46b2&quot;))
+
+v4 &lt;- visreg(collider_model, 
+       &#39;independent_var_B&#39;, 
+       gg = TRUE, 
+       line = list(col = &quot;#E66101&quot;)) +
+  labs(title = &quot;Relationship Between B and Y&quot;,
+       subtitle = &quot;Considering Collider Variable K&quot;) +
+  ylim(-6,6) +
+  theme(plot.subtitle = element_text(face=&quot;bold&quot;, color=&quot;#403891b2&quot;))
+  
+plot_grid(v3,v4)</code></pre>
+<p><img src="/post/2019-10-29-confounders-and-colliders-modeling-spurious-correlations-in-r_files/figure-html/unnamed-chunk-5-1.png" width="100%" height="500px" /></p>
