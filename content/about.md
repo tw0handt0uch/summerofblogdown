@@ -11,11 +11,11 @@ text-align: justify}
 </style>
 
 
-Hi! I'm Riley and I have been designing and developing Class III medical devices for over 13 years. My comfort zone is stents and stent grafts but my current project is an ablation catheter for treating chronic hypertension.  Recently I've become interested in coding and predictive modeling and have been teaching myself the basics of the R programming language.  My hope is to use this site to share tools, concepts, and stray thoughts related to device development. Thanks for taking a look!
+Hi! I'm Riley and I have been designing and developing Class III medical devices for over 13 years. My comfort zone is stents and stent grafts but my current project is an ablation catheter for treating chronic hypertension.  Recently I've become interested in coding and predictive modeling and have been teaching myself the basics of the R programming language.  My hope is to use this site to share tools, concepts, and stray thoughts related to R and device development. Thanks for taking a look!
 
 Unless otherwise stated, data sets are simulated, publicly available, or fictitious.  
 
-__Any opinions expressed here are my own and do not necessarily represent those of my employer.__
+__Any opinions expressed here are my own and do not necessarily represent those of my employer.  Please view posts written on this site through the lens of the "eager student" rather than the "learned professor" - I share things I'm trying to get better at, not things I've mastered.__
 
 Devices that are near and dear to my heart:
 

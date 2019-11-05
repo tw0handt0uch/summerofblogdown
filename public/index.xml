@@ -20,77 +20,110 @@
       <description>
 
 
-&lt;p&gt;output: pdf_document: toc: yes toc_depth: ‘2’ html_document: code_folding: hide df_print: paged highlight: tango number_sections: yes theme: none toc: yes toc_depth: 2 —&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/./img/dag.png&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;A lot of my testing experience to date has been in the comfy confines of Designed Experiments and Response Surfaces. Variables and levels are carefully selected and it is assumed that each variable can be set to the specific values described by the design matrix. I’m learning now that there’s a whole wide world out there beyond the lab bench where the relationships between variables are a lot more complicated.&lt;a href=&#34;#fn1&#34; class=&#34;footnoteRef&#34; id=&#34;fnref1&#34;&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt; Colliders, confounders, causal diagrams, M-bias - these concepts are all relatively new to me and I want to understand them better. In this post I will attempt to create some simple structural causal models (SCMs) using the Dagitty and GGDag packages and then show the potential effects of confounders and colliders on a simulated experiment adapted from here.&lt;a href=&#34;#fn2&#34; class=&#34;footnoteRef&#34; id=&#34;fnref2&#34;&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;It turns out that it is not as simple as identifying lurking variables and holding them constant while we conduct the experiment of interest (as I was always taught).&lt;/p&gt;
+&lt;p&gt;First, load the libraries.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# Load libraries
 library(tidyverse)
 library(kableExtra)
-library(rsample)
-library(recipes)
-library(parsnip)
-library(yardstick)
+library(tidymodels)
 library(viridisLite)
 library(GGally)
-library(DiagrammeR)
 library(dagitty)
 library(ggdag)
 library(visreg)
 library(styler)
 library(cowplot)&lt;/code&gt;&lt;/pre&gt;
-&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;g &amp;lt;- dagify(A ~ J,
-            X ~ J,
-            X ~ A)
+&lt;p&gt;A structural causal model (SCM) is a type of directed acyclic graph (DAG) the maps causal assumptions onto a simple model of experimental variables. In the figure below, each node(blue dot) represents a variable. The edges(yellow lines) between nodes represent assumed causal effects.&lt;/p&gt;
+&lt;p&gt;Dagitty uses the dafigy() function to create the relationships in the DAG. These are stored in a DAG object which is provided to ggplot and can then be customized and adjusted.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# create DAG object
+g &amp;lt;- dagify(
+  A ~ J,
+  X ~ J,
+  X ~ A
+)
 
+# tidy the dag object and supply to ggplot
 set.seed(100)
-g %&amp;gt;% 
-  tidy_dagitty() %&amp;gt;% 
-  mutate(x = c(0, 1, 1, 2)) %&amp;gt;% 
+g %&amp;gt;%
+  tidy_dagitty() %&amp;gt;%
+  mutate(x = c(0, 1, 1, 2)) %&amp;gt;%
   mutate(y = c(0, 2, 2, 0)) %&amp;gt;%
   mutate(xend = c(2, 0, 2, NA)) %&amp;gt;%
   mutate(yend = c(0, 0, 0, NA)) %&amp;gt;%
-  dag_label(labels = c(&amp;quot;A&amp;quot; = &amp;quot;Independent\n Variable&amp;quot;,
-                       &amp;quot;X&amp;quot; = &amp;quot;Dependent\n Variable&amp;quot;,
-                       &amp;quot;J&amp;quot; = &amp;quot;The\n Confounder&amp;quot;)) %&amp;gt;%
+  dag_label(labels = c(
+    &amp;quot;A&amp;quot; = &amp;quot;Independent\n Variable&amp;quot;,
+    &amp;quot;X&amp;quot; = &amp;quot;Dependent\n Variable&amp;quot;,
+    &amp;quot;J&amp;quot; = &amp;quot;The\n Confounder&amp;quot;
+  )) %&amp;gt;%
   ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
-    geom_dag_edges(edge_colour = &amp;quot;#b8de29ff&amp;quot;,
-                   edge_width = .8) +
-    geom_dag_node(color = &amp;quot;#2c3e50&amp;quot;, 
-                  alpha = 0.8) +
-    geom_dag_text(color = &amp;quot;white&amp;quot;) +
-    geom_dag_label_repel(aes(label = label),
-      col = &amp;quot;white&amp;quot;,
-      label.size = .4,
-      fill = &amp;quot;#20a486ff&amp;quot;, 
-      alpha = 0.8, 
-      show.legend = FALSE, 
-      nudge_x = .7, 
-      nudge_y = .3) +
-  labs(title = &amp;quot; Directed Acyclic Graph&amp;quot;,
-       subtitle = &amp;quot; Two Variables of Interest with a Confounder&amp;quot;) +
+  geom_dag_edges(
+    edge_colour = &amp;quot;#b8de29ff&amp;quot;,
+    edge_width = .8
+  ) +
+  geom_dag_node(
+    color = &amp;quot;#2c3e50&amp;quot;,
+    alpha = 0.8
+  ) +
+  geom_dag_text(color = &amp;quot;white&amp;quot;) +
+  geom_dag_label_repel(aes(label = label),
+    col = &amp;quot;white&amp;quot;,
+    label.size = .4,
+    fill = &amp;quot;#20a486ff&amp;quot;,
+    alpha = 0.8,
+    show.legend = FALSE,
+    nudge_x = .7,
+    nudge_y = .3
+  ) +
+  labs(
+    title = &amp;quot; Directed Acyclic Graph&amp;quot;,
+    subtitle = &amp;quot; Two Variables of Interest with a Confounder&amp;quot;
+  ) +
   xlim(c(-1.5, 3.5)) +
   ylim(c(-.33, 2.2)) +
-  geom_rect(xmin = -.5, 
-            xmax = 3.25, 
-            ymin = -.25, 
-            ymax = .65, 
-            alpha = .04,
-            fill = &amp;quot;white&amp;quot;) +
+  geom_rect(
+    xmin = -.5,
+    xmax = 3.25,
+    ymin = -.25,
+    ymax = .65,
+    alpha = .04,
+    fill = &amp;quot;white&amp;quot;
+  ) +
   theme_void() +
-  theme(plot.background=element_rect(fill = &amp;quot;#222222&amp;quot;),
-        plot.title = element_text(color = &amp;quot;white&amp;quot;),
-        plot.subtitle = element_text(color = &amp;quot;white&amp;quot;)
-        )&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-10-29-confounders-and-colliders-modeling-spurious-correlations-in-r_files/figure-html/unnamed-chunk-2-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
-&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(805)
+  theme(
+    plot.background = element_rect(fill = &amp;quot;#222222&amp;quot;),
+    plot.title = element_text(color = &amp;quot;white&amp;quot;),
+    plot.subtitle = element_text(color = &amp;quot;white&amp;quot;)
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-10-29-confounders-and-colliders-modeling-spurious-correlations-in-r_files/figure-html/unnamed-chunk-3-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt; The relationship of interest is captured in the lower rectangle: we want to change the value of independent variable &lt;strong&gt;A&lt;/strong&gt; and record the effect on dependent variable &lt;strong&gt;X&lt;/strong&gt; (in epidemiology these might be called “treatment” and “outcome”). There also happens to be a confounding variable &lt;strong&gt;J&lt;/strong&gt; that has a causal effect on both &lt;strong&gt;A&lt;/strong&gt; and &lt;strong&gt;X&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;We can set up a simulated experiment that follows the structure of the SCM above:&lt;/p&gt;
+&lt;p&gt;Each variable will have n=1000 values. &lt;strong&gt;J&lt;/strong&gt; is generated by drawing randomly from a standard normal distribution. We want &lt;strong&gt;J&lt;/strong&gt; to be a cause of &lt;strong&gt;A&lt;/strong&gt; so we use &lt;strong&gt;J&lt;/strong&gt; in the creation of &lt;strong&gt;A&lt;/strong&gt; along with a random error term to represent noise. The model above shows a causal link from &lt;strong&gt;A&lt;/strong&gt; to &lt;strong&gt;X&lt;/strong&gt; but we don’t actually know if this exists - that’s the point of the experiment. It may or may not be there (from the point of view of the experimenter/engineer). For the purposes of demonstration we will structure the simulation such that there is &lt;strong&gt;no&lt;/strong&gt; causal relationship between &lt;strong&gt;A&lt;/strong&gt; and &lt;strong&gt;X&lt;/strong&gt; (&lt;strong&gt;A&lt;/strong&gt; will not be used in the creation of the variable &lt;strong&gt;J&lt;/strong&gt;). Again we need &lt;strong&gt;J&lt;/strong&gt; as a cause of &lt;strong&gt;X&lt;/strong&gt; so we use &lt;strong&gt;J&lt;/strong&gt; in the creation of the &lt;strong&gt;dependent_var_X&lt;/strong&gt; object along with a random noise component.&lt;/p&gt;
+&lt;p&gt;The simulation is now set up to model an experiment where the experimenter/engineer wants to understand the effect of &lt;strong&gt;A&lt;/strong&gt; on &lt;strong&gt;X&lt;/strong&gt; but the true effect is zero. Meanwhile, there is a confounding variable &lt;strong&gt;J&lt;/strong&gt; that is a parent to both &lt;strong&gt;A&lt;/strong&gt; and &lt;strong&gt;X&lt;/strong&gt;.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# set seed for repeatability
+set.seed(805)
+
+# n = 1000 points for the simulation
 n &amp;lt;- 1000
 
+# create variables
+# J is random draws from standard normal (mean = 0, stdev = 1)
 confounding_var_J &amp;lt;- rnorm(n)
+
+# J is used in creation of A since it is a cause of A (confounder)
 independent_var_A &amp;lt;- 1.1 * confounding_var_J + rnorm(n)
-dependent_var_X &amp;lt;- 1.9 * confounding_var_J + rnorm(n)
 
-
+# J is used in creation of X since it is a cause of X (confounder)
+dependent_var_X &amp;lt;- 1.9 * confounding_var_J + rnorm(n)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;In reality, the experimenter may or may not be aware of the parent confounder &lt;strong&gt;J&lt;/strong&gt;. We will create two different regression models below. In the first, denoted &lt;strong&gt;crude_model&lt;/strong&gt;, we will assume the experimenter was unaware of the confounder. The model is then created with &lt;strong&gt;A&lt;/strong&gt; as the only predictor variable of &lt;strong&gt;X&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;In the second, denoted &lt;strong&gt;confounder_model&lt;/strong&gt;, we will assume the experimenter was aware of the confounder and chose to include it in their model. This version is created with &lt;strong&gt;A&lt;/strong&gt; and &lt;strong&gt;J&lt;/strong&gt; as predictors of &lt;strong&gt;X&lt;/strong&gt;.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# create crude regression model with A predicting X.  J is omitted
 crude_model &amp;lt;- lm(dependent_var_X ~ independent_var_A)
+
+# create confounder model with A and J predicting X
 confounder_model &amp;lt;- lm(dependent_var_X ~ independent_var_A + confounding_var_J)
 
+# tidy the crude model and examine it
 crude_model_tbl &amp;lt;- summary(crude_model) %&amp;gt;% tidy()
 crude_model_kbl &amp;lt;- summary(crude_model) %&amp;gt;%
   tidy() %&amp;gt;%
@@ -153,7 +186,8 @@ independent_var_A
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;confounder_model_tbl &amp;lt;- summary(confounder_model) %&amp;gt;% tidy()
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# Tidy the confounder model and examine it
+confounder_model_tbl &amp;lt;- summary(confounder_model) %&amp;gt;% tidy()
 confounder_model_kbl &amp;lt;- summary(confounder_model) %&amp;gt;%
   tidy() %&amp;gt;%
   kable(align = rep(&amp;quot;c&amp;quot;, 5), digits = 3)
@@ -232,9 +266,11 @@ confounding_var_J
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;crude_model_tbl &amp;lt;- crude_model_tbl %&amp;gt;% mutate(model = &amp;quot;crude_model: no confounder&amp;quot;)
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# add column for labels
+crude_model_tbl &amp;lt;- crude_model_tbl %&amp;gt;% mutate(model = &amp;quot;crude_model: no confounder&amp;quot;)
 confounder_model_tbl &amp;lt;- confounder_model_tbl %&amp;gt;% mutate(model = &amp;quot;confounder_model: with confounder&amp;quot;)
 
+# combine into a single kable
 confounder_model_summary_tbl &amp;lt;- bind_rows(crude_model_tbl, confounder_model_tbl)
 confounder_model_summary_tbl &amp;lt;- confounder_model_summary_tbl %&amp;gt;% select(model, everything())
 confounder_model_summary_tbl %&amp;gt;% kable(align = rep(&amp;quot;c&amp;quot;, 6), digits = 3)&lt;/code&gt;&lt;/pre&gt;
@@ -364,76 +400,116 @@ confounding_var_J
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;v1 &amp;lt;- visreg(crude_model, 
-       &amp;#39;independent_var_A&amp;#39;,
-       gg = TRUE, 
-       line = list(col = &amp;#39;#E66101&amp;#39;)) +
-  labs(title = &amp;quot;Relationship Between A and X&amp;quot;,
-       subtitle = &amp;quot;Neglecting Confounder Variable J&amp;quot;) +
-  ylim(-6,6) +
-  theme(plot.subtitle = element_text(face=&amp;quot;bold&amp;quot;, color=&amp;quot;#404788FF&amp;quot;))
+&lt;p&gt;The combined summary table above provides the effect sizes and the difference between the two models is striking. Conditional plots are a way to visualize regression models. The visreg package creates conditional plots by supplying a model object and a predictor variable to the visreg() function. The x-axis shows the value of the predictor variable and the y-axis shows change in the response variable. All other variables are held constant at their medians.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# visualize conditional plot of A vs X, crude model
+v1 &amp;lt;- visreg(crude_model,
+  &amp;quot;independent_var_A&amp;quot;,
+  gg = TRUE,
+  line = list(col = &amp;quot;#E66101&amp;quot;)
+) +
+  labs(
+    title = &amp;quot;Relationship Between A and X&amp;quot;,
+    subtitle = &amp;quot;Neglecting Confounder Variable J&amp;quot;
+  ) +
+  ylab(&amp;quot;Change in Response X&amp;quot;) +
+  ylim(-6, 6) +
+  theme(plot.subtitle = element_text(face = &amp;quot;bold&amp;quot;, color = &amp;quot;#404788FF&amp;quot;))
 
-v2 &amp;lt;- visreg(confounder_model, 
-       &amp;#39;independent_var_A&amp;#39;, 
-       gg = TRUE, 
-       line = list(col = &amp;quot;#E66101&amp;quot;)) +
-  labs(title = &amp;quot;Relationship Between A and X&amp;quot;,
-       subtitle = &amp;quot;Considering Confounder Variable J&amp;quot;) +
-  ylim(-6,6) +
-  theme(plot.subtitle = element_text(face=&amp;quot;bold&amp;quot;, color=&amp;quot;#20a486ff&amp;quot;))
-  
-plot_grid(v1,v2)&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-10-29-confounders-and-colliders-modeling-spurious-correlations-in-r_files/figure-html/unnamed-chunk-3-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
-&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;h &amp;lt;- dagify(K ~ B + Y,
-            Y ~ B)
+# visualize conditional plot of A vs X, confounder model
+v2 &amp;lt;- visreg(confounder_model,
+  &amp;quot;independent_var_A&amp;quot;,
+  gg = TRUE,
+  line = list(col = &amp;quot;#E66101&amp;quot;)
+) +
+  labs(
+    title = &amp;quot;Relationship Between A and X&amp;quot;,
+    subtitle = &amp;quot;Considering Confounder Variable J&amp;quot;
+  ) +
+  ylab(&amp;quot;Change in Response X&amp;quot;) +
+  ylim(-6, 6) +
+  theme(plot.subtitle = element_text(face = &amp;quot;bold&amp;quot;, color = &amp;quot;#20a486ff&amp;quot;))
 
+plot_grid(v1, v2)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-10-29-confounders-and-colliders-modeling-spurious-correlations-in-r_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We know from creating the simulated data that &lt;strong&gt;A&lt;/strong&gt; has no real effect on the outcome &lt;strong&gt;X&lt;/strong&gt;. &lt;strong&gt;X&lt;/strong&gt; was created using only &lt;strong&gt;J&lt;/strong&gt; and some noise. But the left plot shows a large, positive slope and significant coefficient! How can this be? This faulty estimate of the true effect is biased; more specifically we are seeing “confounder bias” or “omitted variable bias”. Adding &lt;strong&gt;J&lt;/strong&gt; to the regression model has the effect of conditioning on &lt;strong&gt;J&lt;/strong&gt; and revealing the true relationship between &lt;strong&gt;A&lt;/strong&gt; and &lt;strong&gt;X&lt;/strong&gt;: no effect of &lt;strong&gt;A&lt;/strong&gt; on &lt;strong&gt;X&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;So we always want to include every variable we know about in our regression models, right? Wrong. Here is a case that looks similar to confounder scenario but is slightly different. The experiment is the same: evaluate the effect of on predictor &lt;strong&gt;B&lt;/strong&gt; on the outcome &lt;strong&gt;Y&lt;/strong&gt;. Again, there is a 3rd variable at play. But this time, the third variable is caused by both &lt;strong&gt;B&lt;/strong&gt; and &lt;strong&gt;Y&lt;/strong&gt; rather than being itself the common cause.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# assign DAG object
+h &amp;lt;- dagify(
+  K ~ B + Y,
+  Y ~ B
+)
+
+# tidy the dag object and suppply to ggplot
 set.seed(100)
-h %&amp;gt;% 
-  tidy_dagitty() %&amp;gt;% 
-  mutate(x = c(0, 0, 2, 1)) %&amp;gt;% 
+h %&amp;gt;%
+  tidy_dagitty() %&amp;gt;%
+  mutate(x = c(0, 0, 2, 1)) %&amp;gt;%
   mutate(y = c(0, 0, 0, 2)) %&amp;gt;%
   mutate(xend = c(1, 2, 1, NA)) %&amp;gt;%
   mutate(yend = c(2, 0, 2, NA)) %&amp;gt;%
-  dag_label(labels = c(&amp;quot;B&amp;quot; = &amp;quot;Independent\n Variable&amp;quot;,
-                       &amp;quot;Y&amp;quot; = &amp;quot;Dependent\n Variable&amp;quot;,
-                       &amp;quot;K&amp;quot; = &amp;quot;The\n Collider&amp;quot;)) %&amp;gt;%
+  dag_label(labels = c(
+    &amp;quot;B&amp;quot; = &amp;quot;Independent\n Variable&amp;quot;,
+    &amp;quot;Y&amp;quot; = &amp;quot;Dependent\n Variable&amp;quot;,
+    &amp;quot;K&amp;quot; = &amp;quot;The\n Collider&amp;quot;
+  )) %&amp;gt;%
   ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +
-    geom_dag_edges(edge_colour = &amp;quot;#b8de29ff&amp;quot;,
-                   edge_width = .8) +
-    geom_dag_node(color = &amp;quot;#2c3e50&amp;quot;, 
-                  alpha = 0.8) +
-    geom_dag_text(color = &amp;quot;white&amp;quot;) +
-    geom_dag_label_repel(aes(label = label),
-      col = &amp;quot;white&amp;quot;, 
-      label.size = .4,
-      fill = &amp;quot;#20a486ff&amp;quot;, 
-      alpha = 0.8, 
-      show.legend = FALSE, 
-      nudge_x = .7, 
-      nudge_y = .3) +
-  labs(title = &amp;quot; Directed Acyclic Graph&amp;quot;,
-       subtitle = &amp;quot; Two Variables of Interest with a Collider&amp;quot;) +
+  geom_dag_edges(
+    edge_colour = &amp;quot;#b8de29ff&amp;quot;,
+    edge_width = .8
+  ) +
+  geom_dag_node(
+    color = &amp;quot;#2c3e50&amp;quot;,
+    alpha = 0.8
+  ) +
+  geom_dag_text(color = &amp;quot;white&amp;quot;) +
+  geom_dag_label_repel(aes(label = label),
+    col = &amp;quot;white&amp;quot;,
+    label.size = .4,
+    fill = &amp;quot;#20a486ff&amp;quot;,
+    alpha = 0.8,
+    show.legend = FALSE,
+    nudge_x = .7,
+    nudge_y = .3
+  ) +
+  labs(
+    title = &amp;quot; Directed Acyclic Graph&amp;quot;,
+    subtitle = &amp;quot; Two Variables of Interest with a Collider&amp;quot;
+  ) +
   xlim(c(-1.5, 3.5)) +
   ylim(c(-.33, 2.2)) +
-  geom_rect(xmin = -.5, 
-            xmax = 3.25, 
-            ymin = -.25, 
-            ymax = .65, 
-            alpha = .04,
-            fill = &amp;quot;white&amp;quot;) +
+  geom_rect(
+    xmin = -.5,
+    xmax = 3.25,
+    ymin = -.25,
+    ymax = .65,
+    alpha = .04,
+    fill = &amp;quot;white&amp;quot;
+  ) +
   theme_void() +
-  theme(plot.background = element_rect(fill = &amp;quot;#222222&amp;quot;),
-        plot.title = element_text(color = &amp;quot;white&amp;quot;),
-        plot.subtitle = element_text(color = &amp;quot;white&amp;quot;)
-        )&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-10-29-confounders-and-colliders-modeling-spurious-correlations-in-r_files/figure-html/unnamed-chunk-4-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
-&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;independent_var_B &amp;lt;- rnorm(n)
-dependent_var_Y &amp;lt;- .3 * independent_var_B + rnorm(n)
-collider_var_K &amp;lt;- 1.2 * independent_var_B + 0.9 * dependent_var_Y + rnorm(n)
+  theme(
+    plot.background = element_rect(fill = &amp;quot;#222222&amp;quot;),
+    plot.title = element_text(color = &amp;quot;white&amp;quot;),
+    plot.subtitle = element_text(color = &amp;quot;white&amp;quot;)
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-10-29-confounders-and-colliders-modeling-spurious-correlations-in-r_files/figure-html/unnamed-chunk-7-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;A variable like this is called a collider because the causal arrows from from &lt;strong&gt;B&lt;/strong&gt; and &lt;strong&gt;Y&lt;/strong&gt; collide at &lt;strong&gt;K&lt;/strong&gt;. &lt;strong&gt;K&lt;/strong&gt; is created in the simulation below using both &lt;strong&gt;B&lt;/strong&gt; and &lt;strong&gt;Y&lt;/strong&gt; plus random noise. This time, the outcome &lt;strong&gt;Y&lt;/strong&gt; is created using &lt;strong&gt;B&lt;/strong&gt; as an input, thereby assigning a causal relation with an effect size of 0.3.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# create variables
+# B is random draws from standard normal (mean = 0, stdev = 1)
+independent_var_B &amp;lt;- rnorm(n)
 
-crude_model_b  &amp;lt;- lm(dependent_var_Y ~ independent_var_B)
+# Y is created with B and noise. Effect size of B on Y is 0.3
+dependent_var_Y &amp;lt;- .3 * independent_var_B + rnorm(n)
+
+# K (collider) is created with B and Y + noise
+collider_var_K &amp;lt;- 1.2 * independent_var_B + 0.9 * dependent_var_Y + rnorm(n)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Let’s assume that the experimenter knows about possible collider variable &lt;strong&gt;K&lt;/strong&gt;. What should they do with it when they go to create their regression model? Let’s create two models again to compare results. Following the nomenclature from before: &lt;strong&gt;crude_model_b&lt;/strong&gt; uses only &lt;strong&gt;B&lt;/strong&gt; to predict &lt;strong&gt;Y&lt;/strong&gt; and &lt;strong&gt;collider_model&lt;/strong&gt; uses both &lt;strong&gt;B&lt;/strong&gt; and &lt;strong&gt;K&lt;/strong&gt; to predict &lt;strong&gt;Y&lt;/strong&gt;.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# create crude regression model with B predicting Y.  K is omitted
+crude_model_b &amp;lt;- lm(dependent_var_Y ~ independent_var_B)
+
+# create collider model with B and K predicting Y
 collider_model &amp;lt;- lm(dependent_var_Y ~ independent_var_B + collider_var_K)
 
+# tidy the crude model and examine it
 crude_model_b_kbl &amp;lt;- summary(crude_model_b) %&amp;gt;%
   tidy() %&amp;gt;%
   kable(align = rep(&amp;quot;c&amp;quot;, 5), digits = 3)
@@ -496,7 +572,8 @@ independent_var_B
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;collider_model_kbl &amp;lt;- summary(collider_model) %&amp;gt;%
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# tidy the collider model and examine it
+collider_model_kbl &amp;lt;- summary(collider_model) %&amp;gt;%
   tidy() %&amp;gt;%
   kable(align = rep(&amp;quot;c&amp;quot;, 5), digits = 3)
 collider_model_tbl &amp;lt;- summary(collider_model) %&amp;gt;% tidy()
@@ -575,9 +652,11 @@ collider_var_K
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;crude_model_b_tbl &amp;lt;- crude_model_b_tbl %&amp;gt;% mutate(model = &amp;quot;crude_model_b: no collider&amp;quot;)
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# add label column
+crude_model_b_tbl &amp;lt;- crude_model_b_tbl %&amp;gt;% mutate(model = &amp;quot;crude_model_b: no collider&amp;quot;)
 collider_model_tbl &amp;lt;- collider_model_tbl %&amp;gt;% mutate(model = &amp;quot;collider_model: with collider&amp;quot;)
 
+# combine and examine
 collider_model_summary_tbl &amp;lt;- bind_rows(crude_model_b_tbl, collider_model_tbl)
 collider_model_summary_tbl &amp;lt;- collider_model_summary_tbl %&amp;gt;% select(model, everything())
 collider_model_summary_tbl %&amp;gt;% kable(align = rep(&amp;quot;c&amp;quot;, 6), digits = 3)&lt;/code&gt;&lt;/pre&gt;
@@ -707,26 +786,45 @@ collider_var_K
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;v3 &amp;lt;- visreg(crude_model_b, 
-       &amp;#39;independent_var_B&amp;#39;,
-       gg = TRUE, 
-       line = list(col = &amp;#39;#E66101&amp;#39;)) +
-  labs(title = &amp;quot;Relationship Between B and Y&amp;quot;,
-       subtitle = &amp;quot;Neglecting Collider Variable K&amp;quot;) +
-  ylim(-6,6) +
-  theme(plot.subtitle = element_text(face=&amp;quot;bold&amp;quot;, color=&amp;quot;#f68f46b2&amp;quot;))
+&lt;p&gt;This time, omitting the collider variable is the proper way to recover the true effect of &lt;strong&gt;B&lt;/strong&gt; on &lt;strong&gt;Y&lt;/strong&gt;. Let’s verify with conditional plots as before. Again, we know the true slope should be around 0.3.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# create conditional plot with crude_model_b and B
+v3 &amp;lt;- visreg(crude_model_b,
+  &amp;quot;independent_var_B&amp;quot;,
+  gg = TRUE,
+  line = list(col = &amp;quot;#E66101&amp;quot;)
+) +
+  labs(
+    title = &amp;quot;Relationship Between B and Y&amp;quot;,
+    subtitle = &amp;quot;Neglecting Collider Variable K&amp;quot;
+  ) +
+  ylab(&amp;quot;Change in Response Y&amp;quot;) +
+  ylim(-6, 6) +
+  theme(plot.subtitle = element_text(face = &amp;quot;bold&amp;quot;, color = &amp;quot;#f68f46b2&amp;quot;))
 
-v4 &amp;lt;- visreg(collider_model, 
-       &amp;#39;independent_var_B&amp;#39;, 
-       gg = TRUE, 
-       line = list(col = &amp;quot;#E66101&amp;quot;)) +
-  labs(title = &amp;quot;Relationship Between B and Y&amp;quot;,
-       subtitle = &amp;quot;Considering Collider Variable K&amp;quot;) +
-  ylim(-6,6) +
-  theme(plot.subtitle = element_text(face=&amp;quot;bold&amp;quot;, color=&amp;quot;#403891b2&amp;quot;))
-  
-plot_grid(v3,v4)&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-10-29-confounders-and-colliders-modeling-spurious-correlations-in-r_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+# create conditional plot with collider_model and B
+v4 &amp;lt;- visreg(collider_model,
+  &amp;quot;independent_var_B&amp;quot;,
+  gg = TRUE,
+  line = list(col = &amp;quot;#E66101&amp;quot;)
+) +
+  labs(
+    title = &amp;quot;Relationship Between B and Y&amp;quot;,
+    subtitle = &amp;quot;Considering Collider Variable K&amp;quot;
+  ) +
+  ylab(&amp;quot;Change in Response Y&amp;quot;) +
+  ylim(-6, 6) +
+  theme(plot.subtitle = element_text(face = &amp;quot;bold&amp;quot;, color = &amp;quot;#403891b2&amp;quot;))
+
+plot_grid(v3, v4)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-10-29-confounders-and-colliders-modeling-spurious-correlations-in-r_files/figure-html/unnamed-chunk-10-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt; Incredibly, the conclusion one draws about the relationship between &lt;strong&gt;B&lt;/strong&gt; and &lt;strong&gt;Y&lt;/strong&gt; completely reverses depending upon which model is used. The true effect is positive (we only know this for sure because we created the data) but by including the collider variable in the model we observe it as negative. &lt;strong&gt;We should not control for a collider variable!&lt;/strong&gt; Controlling for a confounder reduces bias but controlling for a collider increases it - a simple summary that I will try to remember as I design future experiments or attempt to derive meaning from observational studies. These are the simple insights that make learning this stuff really fun (for me at least)!&lt;/p&gt;
+&lt;p&gt;Thanks for reading.&lt;/p&gt;
+&lt;div class=&#34;footnotes&#34;&gt;
+&lt;hr /&gt;
+&lt;ol&gt;
+&lt;li id=&#34;fn1&#34;&gt;&lt;p&gt;&lt;a href=&#34;http://bayes.cs.ucla.edu/WHY/&#34; class=&#34;uri&#34;&gt;http://bayes.cs.ucla.edu/WHY/&lt;/a&gt;&lt;a href=&#34;#fnref1&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn2&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://scholar.harvard.edu/files/malf/files/ijeluquecollider.pdf&#34; class=&#34;uri&#34;&gt;https://scholar.harvard.edu/files/malf/files/ijeluquecollider.pdf&lt;/a&gt;&lt;a href=&#34;#fnref2&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
 </description>
     </item>
     
@@ -4906,11 +5004,11 @@ body {
 text-align: justify}
 &lt;/style&gt;
 
-&lt;p&gt;Hi! I&amp;rsquo;m Riley and I have been designing and developing Class III medical devices for over 13 years. My comfort zone is stents and stent grafts but my current project is an ablation catheter for treating chronic hypertension.  Recently I&amp;rsquo;ve become interested in coding and predictive modeling and have been teaching myself the basics of the R programming language.  My hope is to use this site to share tools, concepts, and stray thoughts related to device development. Thanks for taking a look!&lt;/p&gt;
+&lt;p&gt;Hi! I&amp;rsquo;m Riley and I have been designing and developing Class III medical devices for over 13 years. My comfort zone is stents and stent grafts but my current project is an ablation catheter for treating chronic hypertension.  Recently I&amp;rsquo;ve become interested in coding and predictive modeling and have been teaching myself the basics of the R programming language.  My hope is to use this site to share tools, concepts, and stray thoughts related to R and device development. Thanks for taking a look!&lt;/p&gt;
 
 &lt;p&gt;Unless otherwise stated, data sets are simulated, publicly available, or fictitious.&lt;/p&gt;
 
-&lt;p&gt;&lt;strong&gt;Any opinions expressed here are my own and do not necessarily represent those of my employer.&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Any opinions expressed here are my own and do not necessarily represent those of my employer.  Please view posts written on this site through the lens of the &amp;ldquo;eager student&amp;rdquo; rather than the &amp;ldquo;learned professor&amp;rdquo; - I share things I&amp;rsquo;m trying to get better at, not things I&amp;rsquo;ve mastered.&lt;/strong&gt;&lt;/p&gt;
 
 &lt;p&gt;Devices that are near and dear to my heart:&lt;/p&gt;
 

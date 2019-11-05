@@ -118,6 +118,10 @@
     
 
     
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/tw0handt0uch1" rel="me" target="_blank"><i class="fab fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
 
     
 
@@ -267,8 +271,7 @@
   </header>
 
   <p>
-  output: pdf_document: toc: yes toc_depth: ‘2’ html_document: code_folding: hide df_print: paged highlight: tango number_sections: yes theme: none toc: yes toc_depth: 2 —
-# Load librarieslibrary(tidyverse)library(kableExtra)library(rsample)library(recipes)library(parsnip)library(yardstick)library(viridisLite)library(GGally)library(DiagrammeR)library(dagitty)library(ggdag)library(visreg)library(styler)library(cowplot)g &lt;- dagify(A ~ J,X ~ J,X ~ A)set.seed(100)g %&gt;% tidy_dagitty() %&gt;% mutate(x = c(0, 1, 1, 2)) %&gt;% mutate(y = c(0, 2, 2, 0)) %&gt;%mutate(xend = c(2, 0, 2, NA)) %&gt;%mutate(yend = c(0, 0, 0, NA)) %&gt;%dag_label(labels = c(&quot;A&quot; = &quot;Independent\n Variable&quot;,&quot;X&quot; = &quot;Dependent\n Variable&quot;,&quot;J&quot; = &quot;The\n Confounder&quot;)) %&gt;%ggplot(aes(x = x, y = y, xend = xend, yend = yend)) +geom_dag_edges(edge_colour = &quot;#b8de29ff&quot;,edge_width = .
+  A lot of my testing experience to date has been in the comfy confines of Designed Experiments and Response Surfaces. Variables and levels are carefully selected and it is assumed that each variable can be set to the specific values described by the design matrix. I’m learning now that there’s a whole wide world out there beyond the lab bench where the relationships between variables are a lot more complicated.
   </p>
 
   
