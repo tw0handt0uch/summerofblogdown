@@ -226,6 +226,10 @@ plot_grid(v1, v2)
 
 We know from creating the simulated data that __A__ has no real effect on the outcome __X__.  __X__ was created using only __J__ and some noise.  But the left plot shows a large, positive slope and significant coefficient!  How can this be?  This faulty estimate of the true effect is biased; more specifically we are seeing "confounder bias" or "omitted variable bias".  Adding __J__ to the regression model has the effect of conditioning on __J__ and revealing the true relationship between __A__ and __X__: no effect of __A__ on __X__. 
 
+Confounding is pretty easy to understand. "Correlation does not imply causation" has been drilled into most of our heads effectively. Still, confounders that aren't anticipated can derail studies and confuse observers. For example, the first generation of drug eluting stents was released in the early 2000's.  They showed great promise but their long-term risk profile was still vague. Single-clinic and observational studies indicated an improved mortality rate for drug-eluting stents relative to their bare-metal counterparts.  However, the performance benefit could not be replicated in randomized trials.^[https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3681250/]
+
+The disconnect was eventually linked (at least in part) to a confounding factors.  Outside of a RCT, clinicians take into account the health of the patient going into the procedures.  Specifically, if the patient was scheduled for a pending surgery or had a history of clotting then the clinician would hedge towards a bare-metal stent (since early gen DES tended to have thrombotic events at a greater frequency than BMS).  Over the long term, these sicker patients were assigned BMS disproportionately, biasing the effect of stent type on long-term mortality via patient health as a confounder.
+
 So we always want to include every variable we know about in our regression models, right?  Wrong.  Here is a case that looks similar to confounder scenario but is slightly different. The experiment is the same: evaluate the effect of on predictor __B__ on the outcome __Y__.  Again, there is a 3rd variable at play.  But this time, the third variable is caused by both __B__ and __Y__ rather than being itself the common cause.
 
 ```{r}
@@ -371,7 +375,9 @@ v4 <- visreg(collider_model,
 
 plot_grid(v3, v4)
 ```
-Incredibly, the conclusion one draws about the relationship between __B__ and __Y__ completely reverses depending upon which model is used.  The true effect is positive (we only know this for sure because we created the data) but by including the collider variable in the model we observe it as negative.  __We should not control for a collider variable!__ Controlling for a confounder reduces bias but controlling for a collider increases it - a simple summary that I will try to remember as I design future experiments or attempt to derive meaning from observational studies.  These are the simple insights that make learning this stuff really fun (for me at least)!
+Incredibly, the conclusion one draws about the relationship between __B__ and __Y__ completely reverses depending upon which model is used.  The true effect is positive (we only know this for sure because we created the data) but by including the collider variable in the model we observe it as negative.  __We should not control for a collider variable!__ 
+
+Controlling for a confounder reduces bias but controlling for a collider increases it - a simple summary that I will try to remember as I design future experiments or attempt to derive meaning from observational studies.  These are the simple insights that make learning this stuff really fun (for me at least)!
 
 Thanks for reading.
 
