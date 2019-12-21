@@ -571,7 +571,7 @@ I've been looking for a good time to fire up the rayshader package and I'm not t
 knitr::include_graphics(path = "/./img/3d_params.png")
 ```
 
-If you want more, this code below renders a video guaranteed to impress small children and executives.
+If you want more, this code below renders a video guaranteed to impress small children and executives. I borrowed this code from Joey Stanley who borrowed it from Morgan Wall.^[3D Vowel Plots with Rayshader, http://joeystanley.com/blog/3d-vowel-plots-with-rayshader]
 
 ```{r eval=FALSE}
 #install.packages("av")
