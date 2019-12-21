@@ -6,10 +6,723 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>&amp;copy; 2019. All rights reserved.</copyright>
-    <lastBuildDate>Tue, 29 Oct 2019 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Sun, 01 Dec 2019 00:00:00 +0000</lastBuildDate>
     
         <atom:link href="/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title> Creating and Using a Simple, Bayesian Linear Model (in brms and R)</title>
+      <link>/post/creating-and-using-a-simple-bayesian-linear-model-in-brms-and-r/</link>
+      <pubDate>Sun, 01 Dec 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/post/creating-and-using-a-simple-bayesian-linear-model-in-brms-and-r/</guid>
+      <description>
+&lt;script src=&#34;/rmarkdown-libs/htmlwidgets/htmlwidgets.js&#34;&gt;&lt;/script&gt;
+&lt;script src=&#34;/rmarkdown-libs/viz/viz.js&#34;&gt;&lt;/script&gt;
+&lt;link href=&#34;/rmarkdown-libs/DiagrammeR-styles/styles.css&#34; rel=&#34;stylesheet&#34; /&gt;
+&lt;script src=&#34;/rmarkdown-libs/grViz-binding/grViz.js&#34;&gt;&lt;/script&gt;
+
+
+&lt;p&gt;This post is my good-faith effort to create a simple linear model using the Bayesian framework and workflow described by Richard McElreath in his Statistical Rethinking book.&lt;a href=&#34;#fn1&#34; class=&#34;footnoteRef&#34; id=&#34;fnref1&#34;&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt; As always - please view this post through the lens of the eager student and not the learned master - this stuff is hard. I did my best to check my work, but it’s entirely possible that something was missed. Please let me know - I won’t take it personally. As McElreath notes in his lectures - “if you’re confused, it’s because you’re paying attention and I thank you for your attention”. And sometimes I get confused. Disclaimer over - let’s get to it.&lt;/p&gt;
+&lt;p&gt;I’m playing around with a bunch of fun libraries in the one.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(tidyverse)
+library(styler)
+library(ggExtra)
+library(knitr)
+library(brms)
+library(cowplot)
+library(gridExtra)
+library(skimr)
+library(DiagrammeR)
+library(rayshader)
+library(av)
+library(rgl)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;I made up this data set. It represents hypothetical values of ablation time and tissue impedance as measured by sensors embedded in a RF ablation catheter. This type of device is designed to apply RF or thermal energy to the vessel wall. The result is a lesion that can aid in improve arythmia, reduce hypertension, or provide some other desired outcome.&lt;/p&gt;
+&lt;p&gt;In RF ablations, the tissue heats up over the course of the RF cycle, resulting in a drop in impedance that varies over time. As described above, the goal will be to see how much of the variation in impedance is described by time (over some limited range) and then communicate the uncertainty in the predictions visually. This is what an ablation catheter system looks like:&lt;a href=&#34;#fn2&#34; class=&#34;footnoteRef&#34; id=&#34;fnref2&#34;&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/./img/rf_cath.jpg&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;To get things started, load the data and give it a look with skim(). There are no missing values.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;ablation_dta_tbl &amp;lt;- read.csv(file = &amp;quot;abl_data_2.csv&amp;quot;)
+ablation_dta_tbl &amp;lt;- ablation_dta_tbl %&amp;gt;% select(temp, time)
+ablation_dta_tbl %&amp;gt;% skim()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Skim summary statistics
+##  n obs: 331 
+##  n variables: 2 
+## 
+## -- Variable type:numeric ---------------------------------------------------------------------------------------------------------------
+##  variable missing complete   n  mean   sd    p0   p25   p50   p75  p100
+##      temp       0      331 331 77.37 3.9  68.26 74.61 77.15 80.33 89.53
+##      time       0      331 331 22.57 3.22 15.83 20.22 22.54 24.69 31.5 
+##      hist
+##  &amp;lt;U+2581&amp;gt;&amp;lt;U+2585&amp;gt;&amp;lt;U+2587&amp;gt;&amp;lt;U+2586&amp;gt;&amp;lt;U+2586&amp;gt;&amp;lt;U+2583&amp;gt;&amp;lt;U+2581&amp;gt;&amp;lt;U+2581&amp;gt;
+##  &amp;lt;U+2582&amp;gt;&amp;lt;U+2586&amp;gt;&amp;lt;U+2587&amp;gt;&amp;lt;U+2587&amp;gt;&amp;lt;U+2587&amp;gt;&amp;lt;U+2583&amp;gt;&amp;lt;U+2582&amp;gt;&amp;lt;U+2581&amp;gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Let’s start with a simple visualization. The code below builds out a scatterplot with marginal histograms which I think is a nice, clean way to evaluate scatter data.&lt;a href=&#34;#fn3&#34; class=&#34;footnoteRef&#34; id=&#34;fnref3&#34;&gt;&lt;sup&gt;3&lt;/sup&gt;&lt;/a&gt; These data seem plausible since the impedance will typically drop as the tissue heats up during the procedure. In reality the impedence asymptotes we’ll work over a limited range of time where the behavior might reasonably be linear.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;scatter_1_fig &amp;lt;- ablation_dta_tbl %&amp;gt;% ggplot(aes(x = time, y = temp)) +
+  geom_point(
+    colour = &amp;quot;#2c3e50&amp;quot;,
+    fill = &amp;quot;#2c3e50&amp;quot;,
+    size = 2,
+    alpha = 0.4
+  ) +
+  labs(
+    x = &amp;quot;Ablation Time (seconds)&amp;quot;,
+    y = &amp;quot;Tissue Temperature (deg C)&amp;quot;,
+    title = &amp;quot;Ablation Time vs. Tissue Temperature&amp;quot;,
+    subtitle = &amp;quot;Simulated Catheter RF Ablation&amp;quot;
+  )
+
+scatter_hist_1_fig &amp;lt;- ggMarginal(scatter_1_fig,
+  type = &amp;quot;histogram&amp;quot;,
+  color = &amp;quot;white&amp;quot;,
+  alpha = 0.7,
+  fill = &amp;quot;#2c3e50&amp;quot;,
+  xparams = list(binwidth = 1),
+  yparams = list(binwidth = 2.5)
+)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# ggExtra needs these explit calls to display in Markdown docs *shrug*
+grid::grid.newpage()
+grid::grid.draw(scatter_hist_1_fig)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-01-creating-and-using-a-simple-bayesian-linear-model-in-brms-and-r_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;It always helps to state clearly what the objective of this analysis even is. As best I can distill it…&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;grViz(&amp;quot;digraph flowchart {
+      # node definitions with substituted label text
+      node [fontname = Helvetica, shape = rectangle, fillcolor = yellow]        
+      tab1 [label = &amp;#39;Step 1: Propose a distribution for the response variable \n Choose a maximum entropy distribution given the constraints you understand&amp;#39;]
+      tab2 [label = &amp;#39;Step 2: Parameterize the mean \n The mean of the response distribution will vary linearly across the range of predictor values&amp;#39;]
+      tab3 [label = &amp;#39;Step 3: Set priors \n Simulate what the model knows before seeing the data.  Use domain knowledge as constraints.&amp;#39;]
+      tab4 [label = &amp;#39;Step 4: Define the model \n Create the model using the observed data, the likelihood function, and the priors&amp;#39;]
+      tab5 [label = &amp;#39;Step 5: Draw from the posterior \n Plot plausible lines using parameters visited by the Markov chains&amp;#39;]
+      tab6 [label = &amp;#39;Step 6: Push it back through the model \n Simulate real data from plausible combinations of mean and sigma&amp;#39;]
+      # edge definitions with the node IDs
+      tab1 -&amp;gt; tab2 -&amp;gt; tab3 -&amp;gt; tab4 -&amp;gt; tab5 -&amp;gt; tab6;
+      }
+      &amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;htmlwidget-1&#34; style=&#34;width:100%;height:500px;&#34; class=&#34;grViz html-widget&#34;&gt;&lt;/div&gt;
+&lt;script type=&#34;application/json&#34; data-for=&#34;htmlwidget-1&#34;&gt;{&#34;x&#34;:{&#34;diagram&#34;:&#34;digraph flowchart {\n      # node definitions with substituted label text\n      node [fontname = Helvetica, shape = rectangle, fillcolor = yellow]        \n      tab1 [label = \&#34;Step 1: Propose a distribution for the response variable \n Choose a maximum entropy distribution given the constraints you understand\&#34;]\n      tab2 [label = \&#34;Step 2: Parameterize the mean \n The mean of the response distribution will vary linearly across the range of predictor values\&#34;]\n      tab3 [label = \&#34;Step 3: Set priors \n Simulate what the model knows before seeing the data.  Use domain knowledge as constraints.\&#34;]\n      tab4 [label = \&#34;Step 4: Define the model \n Create the model using the observed data, the likelihood function, and the priors\&#34;]\n      tab5 [label = \&#34;Step 5: Draw from the posterior \n Plot plausible lines using parameters visited by the Markov chains\&#34;]\n      tab6 [label = \&#34;Step 6: Push it back through the model \n Simulate real data from plausible combinations of mean and sigma\&#34;]\n      # edge definitions with the node IDs\n      tab1 -&gt; tab2 -&gt; tab3 -&gt; tab4 -&gt; tab5 -&gt; tab6;\n      }\n      &#34;,&#34;config&#34;:{&#34;engine&#34;:&#34;dot&#34;,&#34;options&#34;:null}},&#34;evals&#34;:[],&#34;jsHooks&#34;:[]}&lt;/script&gt;
+&lt;div id=&#34;step-1-propose-a-distribution-for-the-response-variable&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Step 1: Propose a distribution for the response variable&lt;/h1&gt;
+&lt;p&gt;A Gaussian model is reasonable for the outcome variable &lt;em&gt;temperature&lt;/em&gt; as we know it is a measured from the thermocouples on the distal end of the catheter. According to McElreath (pg 75):&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;&lt;em&gt;Measurement errors, variations in growth, and the velocities of molecules all tend towards Gaussian distributions. These processes do this because at their heart, these processes add together fluctuations. And repeatedly adding finite fluctuations results in a distribution of sums that have shed all information about the underlying process, aside from mean and spread.&lt;/em&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Here’s us formally asserting Temperature as a normal distritbution with mean and standard deviation . These two parameters are all that is needed to completely describe the distribution and also pin down the likelihood function.&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(T_i \sim \text{Normal}(\mu_i, \sigma)\)&lt;/span&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;step-2-parameterize-the-mean&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Step 2: Parameterize the mean&lt;/h1&gt;
+&lt;p&gt;If we further parameterize , we can do some neat things like move the mean around with the predictor variable. This is a pretty key concept - &lt;em&gt;you move the mean of the outcome variable around by parameterizing it. If we make it a line then it will move linearly with the predictor variable.&lt;/em&gt; The real data will still have a spread once the terms is folded back in, but we can thing of the whole distirbution shifting up and down based on the properties of the line.&lt;/p&gt;
+&lt;p&gt;Here’s us asserting we want mu to move linearly with changes in the predictor variable (time).&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\mu_i = \alpha + \beta (x_i - \bar{x})\)&lt;/span&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;/div&gt;
+&lt;div id=&#34;step-3-set-priors&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Step 3: Set priors&lt;/h1&gt;
+&lt;p&gt;We know some things about these data. Temperature is a continuous variable so we want a continuous distribution. We also know from the nature of the treatment that there isn’t really any physical mechanism within the device that would be expected to cool down the tissue below normal body temperature. Since only heating is expected, the slope should be positive or zero.&lt;/p&gt;
+&lt;p&gt;McElreath emphasizes simulating from the priors to “see what the model knows before it sees the data”. Here are some priors to consider. Let’s evaluate visually.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# Set seed for repeatability
+set.seed(1999)
+
+# number of sims
+n &amp;lt;- 150
+
+# random draws from the specified prior distributions
+a &amp;lt;- rnorm(n, 75, 15)
+a_ &amp;lt;- rnorm(n, 0, 2)
+b &amp;lt;- rnorm(n, 0, 1)
+b_ &amp;lt;- rlnorm(n, 0, 0.8)
+
+# calc mean of time and temp for later use
+mean_temp &amp;lt;- mean(ablation_dta_tbl$temp)
+mean_time &amp;lt;- mean(ablation_dta_tbl$time)
+
+# dummy tibble to feed ggplot()
+empty_tbl &amp;lt;- tibble(x = 0)
+
+# y = b(x - mean(var_1)) + a is equivalent to:
+# y = bx + (a - b * mean(var_1))
+
+# in this fig we use the uninformed prior that generates some unrealistic values
+prior_fig_1 &amp;lt;- empty_tbl %&amp;gt;% ggplot() +
+  geom_abline(
+    intercept = a - b * mean_time,
+    slope = b,
+    color = &amp;quot;#2c3e50&amp;quot;,
+    alpha = 0.3,
+    size = 1
+  ) +
+  ylim(c(0, 150)) +
+  xlim(c(0, 150)) +
+  labs(
+    x = &amp;quot;time (sec)&amp;quot;,
+    y = &amp;quot;Temp (C)&amp;quot;,
+    title = &amp;quot;Prior Predictive Simulations&amp;quot;,
+    subtitle = &amp;quot;Uninformed Informed&amp;quot;
+  )
+
+# in this fig we confine the slopes to broad ranges informed by what we know about the domain
+prior_fig_2 &amp;lt;- empty_tbl %&amp;gt;% ggplot() +
+  geom_abline(
+    intercept = a - b_ * mean_time,
+    slope = b_,
+    color = &amp;quot;#2c3e50&amp;quot;,
+    alpha = 0.3,
+    size = 1
+  ) +
+  ylim(c(0, 150)) +
+  xlim(c(0, 150)) +
+  labs(
+    x = &amp;quot;time (sec)&amp;quot;,
+    y = &amp;quot;Temp (C)&amp;quot;,
+    title = &amp;quot;Prior Predictive Simulations&amp;quot;,
+    subtitle = &amp;quot;Mildly Informed Prior&amp;quot;
+  )
+
+plot_grid(prior_fig_1, prior_fig_2)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-01-creating-and-using-a-simple-bayesian-linear-model-in-brms-and-r_files/figure-html/unnamed-chunk-7-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;The plots above show what the model thinks before seeing the data for two different sets of priors. In both cases, I have centered the data by subtracting the mean of the time from each individual value of time. This means the intercept has the meaning of the expected temperature at the mean of time. The family of lines on the right seem a lot more realistic despite having some slopes that predict strange values out of sample (blood coagulates at ~90C). Choosing a lognormal distribution for time ensures positives slopes. You could probably go even tighter on these priors but for this exercise I’m feeling good about proceeding.&lt;/p&gt;
+&lt;p&gt;Looking only at the time window of the original observations and the Temp window bounded by body temperature (lower bound) and water boiling (upper bound).&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;empty_tbl %&amp;gt;% ggplot() +
+  geom_abline(
+    intercept = a - b_ * mean_time,
+    slope = b_,
+    color = &amp;quot;#2c3e50&amp;quot;,
+    alpha = 0.3,
+    size = 1
+  ) +
+  ylim(c(37, 100)) +
+  xlim(c(15, 40)) +
+  labs(
+    x = &amp;quot;time (sec)&amp;quot;,
+    y = &amp;quot;Temp (C)&amp;quot;,
+    title = &amp;quot;Prior Predictive Simulations&amp;quot;,
+    subtitle = &amp;quot;Mildly Informed Prior, Original Data Range&amp;quot;
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-01-creating-and-using-a-simple-bayesian-linear-model-in-brms-and-r_files/figure-html/unnamed-chunk-8-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Here are the prior distributions selected to go forward.&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\alpha \sim \text{Normal}(75, 15)\)&lt;/span&gt;: &lt;code&gt;prior(normal(75, 15), class = Intercept&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\beta \sim \text{LogNormal}(0, .6)\)&lt;/span&gt;: &lt;code&gt;prior(lognormal(0, .6), class = b)&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\sigma \sim \text{Uniform}(0, 1)\)&lt;/span&gt;: &lt;code&gt;prior(uniform(0, 30), class = sigma)&lt;/code&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;step-4-define-the-model&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Step 4: Define the model&lt;/h1&gt;
+&lt;p&gt;Here I model up what I’m creatively calling “model_1”. This one uses the un-centered data for time. I’m using a lot of warmup cycles because I’ve heard chains for the uniform priors on sigma can take a long time to converge.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#model_1 &amp;lt;-
+#  brm(
+#    data = ablation_dta_tbl, family = gaussian,
+#    temp ~ 1 + time,
+#    prior = c(
+#      prior(normal(75, 15), class = Intercept),
+#      prior(lognormal(0, .8), class = b),
+#      prior(uniform(0, 30), class = sigma)
+#    ),
+#    iter = 41000, warmup = 40000, chains = 4, cores = 4,
+#    seed = 4
+#  )&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#saveRDS(model_1, file = &amp;quot;blr_rethinking_model_1.rds&amp;quot;)
+model_1 &amp;lt;- readRDS(file = &amp;quot;blr_rethinking_model_1.rds&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;step-5-draw-from-the-posterior&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Step 5: Draw from the posterior&lt;/h1&gt;
+&lt;p&gt;The fruits of all my labor! The posterior holds credible combinations for sigma and the slope and intercept (which together describe the mean of the outcome variable we care about). Let’s take a look.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;post_samplesM1_tbl &amp;lt;-
+  posterior_samples(model_1) %&amp;gt;%
+  select(-lp__) %&amp;gt;%
+  round(digits = 3)
+
+post_samplesM1_tbl %&amp;gt;%
+  head(10) %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 3))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;b_Intercept&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;b_time&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;sigma&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;58.509&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.841&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.682&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;55.983&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.949&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.648&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;56.195&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.937&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.540&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;56.661&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.919&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.474&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;55.143&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.978&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.593&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;55.170&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.977&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.667&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;54.908&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.996&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.621&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;58.453&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.836&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.534&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;54.134&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.031&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.647&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;58.713&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.828&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.707&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;The plotting function in brms is pretty sweet. I’m not expert in MCMC diagnostics but I do know the “fuzzy caterpillar”&amp;quot; look of the trace plots is desirable.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;plot(model_1)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-01-creating-and-using-a-simple-bayesian-linear-model-in-brms-and-r_files/figure-html/unnamed-chunk-12-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Posterior_summary() can grab the model results in table form.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;mod_1_summary_tbl &amp;lt;-
+  posterior_summary(model_1) %&amp;gt;%
+  as.data.frame() %&amp;gt;%
+  rownames_to_column() %&amp;gt;%
+  as_tibble() %&amp;gt;%
+  mutate_if(is.numeric, funs(as.character(signif(., 2)))) %&amp;gt;%
+  mutate_at(.vars = c(2:5), funs(as.numeric(.)))
+
+mod_1_summary_tbl %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 5))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;rowname&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;Estimate&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;Est.Error&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;Q2.5&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;Q97.5&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;b_Intercept&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;57.00&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.000&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;55.00&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;59.0&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;b_time&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.91&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.045&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.83&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.0&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;sigma&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.60&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.100&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.40&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.8&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;lp__&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-790.00&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.300&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-790.00&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-790.0&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Now let’s see what changes if the time data is centered. Everything is the same here in model_2 except the time_c data which is the normal time data minus the mean.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;ablation_dta_tbl &amp;lt;- ablation_dta_tbl %&amp;gt;% mutate(time_c = time - mean(time))&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#model_2 &amp;lt;-
+#  brm(
+#    data = ablation_dta_tbl, family = gaussian,
+#    temp ~ 1 + time_c,
+#    prior = c(
+#      prior(normal(75, 15), class = Intercept),
+#      prior(lognormal(0, .8), class = b),
+#      prior(uniform(0, 30), class = sigma)
+#    ),
+#    iter = 41000, warmup = 40000, chains = 4, cores = 4,
+#    seed = 4
+#  )&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#33saveRDS(model_2, file = &amp;quot;blr_rethinking_model_2.rds&amp;quot;)
+model_2 &amp;lt;- readRDS(file = &amp;quot;blr_rethinking_model_2.rds&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Plotting model_2 to compare with the output of model_1 above.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;plot_mod_2_fig &amp;lt;- plot(model_2)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-01-creating-and-using-a-simple-bayesian-linear-model-in-brms-and-r_files/figure-html/unnamed-chunk-17-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;The slope B and sigma are very similar. The intercept is the only difference with model_1 ranging from low to high 50’s. Model 2 is tight around 77. We should visualize the lines proposed by the parameters in the poseriors of our models to understand the uncertainty associated with the mean and also understand why the intercepts are different between models. First, store the posterior samples as a tibble in anticipation for ggplot.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;post_samplesM2_tbl &amp;lt;-
+  posterior_samples(model_2) %&amp;gt;%
+  select(-lp__) %&amp;gt;%
+  round(digits = 3)
+
+post_samplesM2_tbl %&amp;gt;%
+  head(10) %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 3))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;b_Intercept&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;b_time_c&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;sigma&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;77.323&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.894&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.350&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;77.430&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.881&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.516&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;77.335&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.957&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.571&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;77.011&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.947&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.776&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;77.209&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.013&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.691&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;77.517&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.820&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.488&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;77.335&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.881&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.682&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;77.313&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.857&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.538&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;77.423&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.873&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.569&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;77.302&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.926&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.340&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Visualize the original data (centered and un-centered versions) along with plausible values for regression line of the mean:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;mean_regressionM1_fig &amp;lt;-
+  ablation_dta_tbl %&amp;gt;%
+  ggplot(aes(x = time, y = temp)) +
+  geom_point(
+    colour = &amp;quot;#481567FF&amp;quot;,
+    size = 2,
+    alpha = 0.6
+  ) +
+  geom_abline(aes(intercept = b_Intercept, slope = b_time),
+    data = post_samplesM1_tbl,
+    alpha = 0.1, color = &amp;quot;gray50&amp;quot;
+  ) +
+  geom_abline(
+    slope = mean(post_samplesM1_tbl$b_time),
+    intercept = mean(post_samplesM1_tbl$b_Intercept),
+    color = &amp;quot;blue&amp;quot;, size = 1
+  ) +
+  labs(
+    title = &amp;quot;Regression Line Representing Mean of Slope&amp;quot;,
+    subtitle = &amp;quot;Data is As-Observed (No Centering of Predictor)&amp;quot;,
+    x = &amp;quot;Time (s)&amp;quot;,
+    y = &amp;quot;Temperature (C)&amp;quot;
+  )
+
+mean_regressionM2_fig &amp;lt;-
+  ablation_dta_tbl %&amp;gt;%
+  ggplot(aes(x = time_c, y = temp)) +
+  geom_point(
+    color = &amp;quot;#55C667FF&amp;quot;,
+    size = 2,
+    alpha = 0.6
+  ) +
+  geom_abline(aes(intercept = b_Intercept, slope = b_time_c),
+    data = post_samplesM2_tbl,
+    alpha = 0.1, color = &amp;quot;gray50&amp;quot;
+  ) +
+  geom_abline(
+    slope = mean(post_samplesM2_tbl$b_time_c),
+    intercept = mean(post_samplesM2_tbl$b_Intercept),
+    color = &amp;quot;blue&amp;quot;, size = 1
+  ) +
+  labs(
+    title = &amp;quot;Regression Line Representing Mean of Slope&amp;quot;,
+    subtitle = &amp;quot;Predictor Data (Time) is Centered&amp;quot;,
+    x = &amp;quot;Time (Difference from Mean Time in seconds)&amp;quot;,
+    y = &amp;quot;Temperature (C)&amp;quot;
+  )
+
+
+combined_mean_fig &amp;lt;-
+  ablation_dta_tbl %&amp;gt;%
+  ggplot(aes(x = time, y = temp)) +
+  geom_point(
+    colour = &amp;quot;#481567FF&amp;quot;,
+    size = 2,
+    alpha = 0.6
+  ) +
+  geom_point(
+    data = ablation_dta_tbl, aes(x = time_c, y = temp),
+    colour = &amp;quot;#55C667FF&amp;quot;,
+    size = 2,
+    alpha = 0.6
+  ) +
+  geom_abline(aes(intercept = b_Intercept, slope = b_time),
+    data = post_samplesM1_tbl,
+    alpha = 0.1, color = &amp;quot;gray50&amp;quot;
+  ) +
+  geom_abline(
+    slope = mean(post_samplesM1_tbl$b_time),
+    intercept = mean(post_samplesM1_tbl$b_Intercept),
+    color = &amp;quot;blue&amp;quot;, size = 1
+  ) +
+  geom_abline(aes(intercept = b_Intercept, slope = b_time_c),
+    data = post_samplesM2_tbl,
+    alpha = 0.1, color = &amp;quot;gray50&amp;quot;
+  ) +
+  geom_abline(
+    slope = mean(post_samplesM2_tbl$b_time_c),
+    intercept = mean(post_samplesM2_tbl$b_Intercept),
+    color = &amp;quot;blue&amp;quot;, size = 1
+  ) +
+  labs(
+    title = &amp;quot;Regression Line Representing Mean of Slope&amp;quot;,
+    subtitle = &amp;quot;Centered and Un-Centered Predictor Data&amp;quot;,
+    x = &amp;quot;Time (s)&amp;quot;,
+    y = &amp;quot;Temperature (C)&amp;quot;
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;combined_predicts_fig &amp;lt;- combined_mean_fig + 
+  ylim(c(56,90)) +
+  labs(title = &amp;quot;Points Represent Observed Data (Green is Centered)&amp;quot;,
+       subtitle = &amp;quot;Regression Line Represents Rate of Change of Mean (Grey Bands are Uncertainty)&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/./img/combined_predicts_fig.png&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Now everything is clear. The slopes are exactly the same (as we saw in the density plots between model_1 and model_2 in summary()). The intercepts are different because in the centered data (green) the intercept occurs when the predictor equals 0 (its new mean). The outcome variable temp must therefore also be at its mean value in the “knot” of the bowtie.&lt;/p&gt;
+&lt;p&gt;For the un-centered data (purple), the intercept is the value of Temperature when the un-adjusted time is at 0. The slope of the regression line for the mean is much more uncertain here.&lt;/p&gt;
+&lt;p&gt;Another way to look at the differences is as a map of the plausible parameter space. We need a plot that can represent 3 parameters: intercept, slope, and sigma. Each point will be a credible combination of the three parameters as observed in 1 row of the posterior distribution tibble(s).&lt;/p&gt;
+&lt;p&gt;First, the un-centered model.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;p_spaceM1_fig &amp;lt;- 
+  post_samplesM1_tbl[1:1000, ] %&amp;gt;%
+  ggplot(aes(x = b_time, y = b_Intercept, color = sigma)) +
+  geom_point(alpha = 0.5) +
+  geom_density2d(color = &amp;quot;gray30&amp;quot;) +
+  scale_color_viridis_c() +
+  labs(
+    title = &amp;quot;Parameter Space - Model 1 (Un-Centered)&amp;quot;,
+    subtitle = &amp;quot;Intercept Represents the Expected Temp at Time = 0&amp;quot;
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/./img/p_spaceM1_fig.png&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Now the centered version:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;p_spaceM2_fig &amp;lt;- 
+  post_samplesM2_tbl[1:1000, ] %&amp;gt;%
+  ggplot(aes(x = b_time_c, y = b_Intercept, color = sigma)) +
+  geom_point(alpha = 0.5) +
+  geom_density2d(color = &amp;quot;gray30&amp;quot;) +
+  scale_color_viridis_c() +
+  labs(
+    title = &amp;quot;Parameter Space - Model 2 (Centered)&amp;quot;,
+    subtitle = &amp;quot;Intercept Represents the Expected Temp at Mean Time&amp;quot;
+  )
+
+#p_spaceM2_fig 
+#ggsave(filename = &amp;quot;p_spaceM2_fig.png&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/./img/p_spaceM2_fig.png&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;These look way different, but part of it is an illusion of the scaling on the y-axis. Remember how the credible values of the intercept were much tighter for the centered model? If we plot them both on the same canvas we can understand better, and it’s pretty (to my eye at least).&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;p_spaceC_tbl &amp;lt;- 
+  post_samplesM2_tbl[1:1000, ] %&amp;gt;%
+  ggplot(aes(x = b_time_c, y = b_Intercept, color = sigma)) +
+  geom_point(alpha = 0.5) +
+  geom_point(data = post_samplesM1_tbl, aes(x = b_time, y = b_Intercept, color = sigma), alpha = 0.5) +
+  scale_color_viridis_c() +
+  labs(
+    title = &amp;quot;Credible Parameter Values for Models 1 and 2&amp;quot;,
+    subtitle = &amp;quot;Model 1 is Un-Centered, Model 2 is Centered&amp;quot;,
+    x = expression(beta[&amp;quot;time&amp;quot;]),
+    y = expression(alpha[&amp;quot;Intercept&amp;quot;])) +
+  ylim(c(54, 80))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/./img/p_spaceC_tbl.png&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Now we see they aren’t as different as they first seemed. They cover very similar ranges for the slope and the uncentered model covers a wider range of plausible intercepts.&lt;/p&gt;
+&lt;p&gt;I’ve been looking for a good time to fire up rayshader and I’m not throwing away my shot. Plotting with rayshader feels like a superpower that I shouldn’t be allowed to have. It’s silly how easy it is to make these rediculous visuals. First, a fancy 3d plot providing some perspective on the relative “heights” of theta.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#par(mfrow = c(1, 1))
+#plot_gg(p_spaceC_tbl, width = 5, height = 4, scale = 300, multicore = TRUE, windowsize = c(1200, 960),
+#        fov = 70, zoom = 0.45, theta = 330, phi = 40)
+
+#Sys.sleep(0.2)
+#render_depth(focus = 0.7, focallength = 200)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/./img/3d_params.png&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;If you want more, this code below renders a video guaranteed to impress small childen and executives.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#install.packages(&amp;quot;av&amp;quot;)
+#library(av)
+
+# Set up the camera position and angle
+#phivechalf = 30 + 60 * 1/(1 + exp(seq(-7, 20, length.out = 180)/2))
+#phivecfull = c(phivechalf, rev(phivechalf))
+#thetavec = 0 + 60 * sin(seq(0,359,length.out = 360) * pi/180)
+#zoomvec = 0.45 + 0.2 * 1/(1 + exp(seq(-5, 20, length.out = 180)))
+#zoomvecfull = c(zoomvec, rev(zoomvec))
+
+# Actually render the video.
+#render_movie(filename = &amp;quot;hex_plot_fancy_2&amp;quot;, type = &amp;quot;custom&amp;quot;, 
+#            frames = 360,  phi = phivecfull, zoom = zoomvecfull, theta = thetavec)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/./img/hex_plot_fancy_2.gif&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;time_seq_tbl   &amp;lt;- tibble(pred_time   = seq(from = -15, to = 60, by = 1))
+time_seq_tbl_2 &amp;lt;- tibble(pred_time_2 = seq(from = -15, to = 60, by = 1))
+
+#time_seq_tbl &amp;lt;- tibble(pred_time = seq(from = -15, to = 70, by = 1))
+#time_seq_tbl_2 &amp;lt;- 
+#  time_seq_tbl %&amp;gt;% 
+#  mutate(pred_time_2 = pred_time - mean(ablation_dta_tbl$time))
+  
+
+rk_predict &amp;lt;- 
+function(time_to_sim){
+  rnorm(n = nrow(post_samplesM1_tbl),
+        mean = post_samplesM1_tbl$b_Intercept + post_samplesM1_tbl$b_time*time_to_sim,
+        sd = post_samplesM1_tbl$sigma
+  )
+}
+
+rk_predict2 &amp;lt;- 
+function(time_to_sim){
+  rnorm(n = nrow(post_samplesM2_tbl),
+        mean = post_samplesM2_tbl$b_Intercept + post_samplesM2_tbl$b_time_c*time_to_sim,
+        sd = post_samplesM2_tbl$sigma
+  )
+}
+
+predicts_m1_tbl &amp;lt;- time_seq_tbl %&amp;gt;%
+  mutate(preds_for_this_time = map(pred_time, rk_predict)) %&amp;gt;%
+  mutate(percentile_2.5  = map_dbl(preds_for_this_time, ~quantile(., .025))) %&amp;gt;%
+  mutate(percentile_97.5 = map_dbl(preds_for_this_time, ~quantile(., .975)))
+    
+predicts_m2_tbl &amp;lt;- time_seq_tbl_2 %&amp;gt;%
+  mutate(preds_for_this_time = map(pred_time_2, rk_predict2)) %&amp;gt;%
+  mutate(percentile_2.5  = map_dbl(preds_for_this_time, ~quantile(., .025))) %&amp;gt;%
+  mutate(percentile_97.5 = map_dbl(preds_for_this_time, ~quantile(., .975)))   
+
+
+test_array &amp;lt;- predicts_m2_tbl[1, 2] %&amp;gt;% unnest(cols = c(preds_for_this_time))
+test_array %&amp;gt;% 
+  round(digits = 2) %&amp;gt;%
+  head(5) %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;, 1))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th&gt;preds_for_this_time&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td&gt;65.69&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td&gt;68.66&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td&gt;64.82&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td&gt;65.90&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td&gt;62.61&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;big_enchilada &amp;lt;- 
+  tibble(h=0) %&amp;gt;%
+  ggplot() +
+  geom_point(
+    data = ablation_dta_tbl, aes(x = time, y = temp),
+    colour = &amp;quot;#481567FF&amp;quot;,
+    size = 2,
+    alpha = 0.6
+  ) +
+  geom_point(
+    data = ablation_dta_tbl, aes(x = time_c, y = temp),
+    colour = &amp;quot;#55C667FF&amp;quot;,
+    size = 2,
+    alpha = 0.6
+  ) +
+  geom_abline(aes(intercept = b_Intercept, slope = b_time),
+    data = post_samplesM1_tbl,
+    alpha = 0.1, color = &amp;quot;gray50&amp;quot;
+  ) +
+  geom_abline(
+    slope = mean(post_samplesM1_tbl$b_time),
+    intercept = mean(post_samplesM1_tbl$b_Intercept),
+    color = &amp;quot;blue&amp;quot;, size = 1
+  ) +
+  geom_abline(aes(intercept = b_Intercept, slope = b_time_c),
+    data = post_samplesM2_tbl,
+    alpha = 0.1, color = &amp;quot;gray50&amp;quot;
+  ) +
+  geom_abline(
+    slope = mean(post_samplesM2_tbl$b_time_c),
+    intercept = mean(post_samplesM2_tbl$b_Intercept),
+    color = &amp;quot;blue&amp;quot;, size = 1
+  ) +
+  geom_ribbon(
+  data = predicts_m1_tbl, aes(x = predicts_m1_tbl$pred_time, ymin = predicts_m1_tbl$percentile_2.5, ymax = predicts_m1_tbl$percentile_97.5), alpha = 0.25, fill = &amp;quot;pink&amp;quot;, color = &amp;quot;black&amp;quot;, size = .3
+) +
+  geom_ribbon(
+  data = predicts_m2_tbl, aes(x = predicts_m2_tbl$pred_time_2, ymin = predicts_m2_tbl$percentile_2.5, ymax = predicts_m2_tbl$percentile_97.5), alpha = 0.4, fill = &amp;quot;pink&amp;quot;, color = &amp;quot;black&amp;quot;, size = .3
+) +
+  labs(
+    title = &amp;quot;Regression Line Representing Mean of Slope&amp;quot;,
+    subtitle = &amp;quot;Centered and Un-Centered Predictor Data&amp;quot;,
+    x = &amp;quot;Time (s)&amp;quot;,
+    y = &amp;quot;Temperature (C)&amp;quot;
+  ) +
+  scale_x_continuous(limits = c(-10, 37), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(40, 120), expand = c(0, 0))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/./img/big_enchilada.png&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class=&#34;footnotes&#34;&gt;
+&lt;hr /&gt;
+&lt;ol&gt;
+&lt;li id=&#34;fn1&#34;&gt;&lt;p&gt;Statistical Rethinking, &lt;a href=&#34;https://github.com/rmcelreath/statrethinking_winter2019&#34; class=&#34;uri&#34;&gt;https://github.com/rmcelreath/statrethinking_winter2019&lt;/a&gt;&lt;a href=&#34;#fnref1&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn2&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://www.sciencedirect.com/science/article/abs/pii/S1547527116001806&#34; class=&#34;uri&#34;&gt;https://www.sciencedirect.com/science/article/abs/pii/S1547527116001806&lt;/a&gt;&lt;a href=&#34;#fnref2&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn3&#34;&gt;&lt;p&gt;There’s a funky bug in ggExtra which makes you break this code into 2 chunks when working in Markdown, &lt;a href=&#34;https://cran.r-project.org/web/packages/ggExtra/vignettes/ggExtra.html&#34; class=&#34;uri&#34;&gt;https://cran.r-project.org/web/packages/ggExtra/vignettes/ggExtra.html&lt;/a&gt;&lt;a href=&#34;#fnref3&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
+</description>
+    </item>
     
     <item>
       <title>Confounders and Colliders - Modeling Spurious Correlations in R</title>

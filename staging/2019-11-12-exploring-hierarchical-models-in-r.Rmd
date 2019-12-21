@@ -1,0 +1,665 @@
+---
+title: Exploring Hierarchical Models in R
+author: Riley
+date: '2019-11-12'
+slug: exploring-hierarchical-models-in-r
+categories:
+  - R
+tags:
+  - Simulation
+  - R
+description: ''
+topics: []
+draft: TRUE
+
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    number_sections: yes
+    theme: none
+    toc: yes
+    toc_depth: 2
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  out.width = "100%",
+  out.height = "500px",
+  fig.pos = "center",
+  dpi = 300
+)
+```
+
+
+Exploring the Heirarchical Model.  Baseball analogy:  
+
+*  Level 1 - Observed Data - A single hitters's hits and misses (no-hits)
+These data distributed as a Bournoulli distribution controlled by (parameter) theta.  The theta is the batting average which is analogous to the probability of flipping heads from a single toss of a (potentially biased) coin.
+
+*  Level 2 - TEAM BATTING AVG - a distibution of different theta's representing the batting average across a certain team (or other group like league) - Each hitter has their own batting average based on their performance / data and we can look at the spread of the BA across the different players of the team.  This spread of different BA (theta) across the team can be described/controlled by a a Beta with governing parameters w, k. Could also use A, B like we sometimes do for Beta; they are both just ways to specify 2 shape factors. 
+
+*  Level 3 - LEAGUE BATTING AVG - a distribution of different w (and also k) across the teams of a certain league.  Each league will have a distribution based on each team's TEAM BATTING AVERAGE.  If the American League has a vastly different BA from the National League due to the DH then then we would expect w to be different at level 3.
+
+More random notes:
+
+How I'm thinking about the process of grid approximation (for binomial example):
+
+*  have a list of candidate theta values ready (typically 0 to 1 in small incrememnts)
+
+*  have the data ready (number of successes and total number of trial)
+
+*  select the first candidate theta (0) and build out the distribution based on theta, num trials.
+
+*  identify the probability density that the number of successes (data) maps to on this distribution.  This number respresents the relative number of ways to get the observed number of successes with theta = 0 and n=n.
+
+* repeat for all additional values of theta in the initial list (grid)
+ 
+ 
+```{r}
+library(tidyverse)
+library(ggridges)
+library(styler)
+library(knitr)
+library(brms)
+library(gridExtra)
+```
+
+
+#  Section 2.4 - Grid Approximations for Simple Binomial Models
+```{r}
+
+grid_length = 1e3
+
+d <- tibble(theta = seq(0, 1, length.out = grid_length)) %>%
+  #expand makes a new col, assigns all items in list to each item in col theta 
+  expand(theta, row = c("flat", "stepped", "Laplace")) %>%
+  arrange(row, theta) %>% 
+  mutate(prior = ifelse(row == "flat", 1,
+                        ifelse(row == "stepped", rep(0:1, each = grid_length / 2),
+                               exp(-abs(theta - .5) / .25) / ( 2 * .25))),
+         likelihood = dbinom(x = 6, size = 9, prob = theta)) %>%
+  group_by(row) %>%
+  mutate(posterior = prior * likelihood / sum(prior * likelihood)) %>%
+  gather(key, value, -theta, -row) %>%
+  ungroup() %>% 
+  mutate(key = factor(key, levels = c("prior", "likelihood", "posterior")),
+         row = factor(row, levels = c("flat", "stepped", "Laplace")))
+         
+
+```
+
+```{r}
+p1 <-
+  d %>%
+  filter(key == "prior") %>% 
+  ggplot(aes(x = theta, y = value)) +
+  geom_line() +
+  scale_x_continuous(NULL, breaks = c(0, .5, 1)) +
+  scale_y_continuous(NULL, breaks = NULL) +
+  labs(subtitle = "prior") +
+  theme(panel.grid       = element_blank(),
+        strip.background = element_blank(),
+        strip.text       = element_blank()) +
+  facet_wrap(row ~ ., scales = "free_y", ncol = 1)
+
+p1
+
+p2 <-
+  d %>%
+  filter(key == "likelihood") %>% 
+  ggplot(aes(x = theta, y = value)) +
+  geom_line() +
+  scale_x_continuous(NULL, breaks = c(0, .5, 1)) +
+  scale_y_continuous(NULL, breaks = NULL) +
+  labs(subtitle = "likelihood") +
+  theme(panel.grid       = element_blank(),
+        strip.background = element_blank(),
+        strip.text       = element_blank()) +
+  facet_wrap(row ~ ., scales = "free_y", ncol = 1)
+
+p2
+
+p3 <-
+  d %>%
+  filter(key == "posterior") %>% 
+  ggplot(aes(x = theta, y = value)) +
+  geom_line() +
+  scale_x_continuous(NULL, breaks = c(0, .5, 1)) +
+  scale_y_continuous(NULL, breaks = NULL) +
+  labs(subtitle = "posterior") +
+  theme(panel.grid       = element_blank(),
+        strip.background = element_blank(),
+        strip.text       = element_blank()) +
+  facet_wrap(row ~ ., scales = "free_y", ncol = 1)
+
+p3
+
+grid.arrange(p1, p2, p3, ncol = 3)
+```
+
+Super Simple Model
+```{r}
+simple_binom_grid_approximation <-
+  tibble(
+    p_grid = seq(from = 0, to = 1, length.out = 20), # define grid of parameter increments to eval
+    prior = 1 # define prior
+  ) %>% 
+  mutate(likelihood = dbinom(6, size = 9, prob = p_grid)) %>% # compute likelihood of 6 succeses at each param value in grid (for 9 tries)
+  mutate(unstd_posterior = likelihood * prior) %>% # compute product of likelihood and prior
+  mutate(posterior = unstd_posterior / sum(unstd_posterior)) # standardize the posterior, so it sums to 1
+
+simple_binom_grid_approximation
+
+```
+
+
+```{r}
+simple_binom_grid_approximation %>%
+  ggplot(aes(x = p_grid, y = posterior)) +
+  geom_point(aes(x = p_grid, y = prior)) +
+  
+  
+  geom_line(aes(x = p_grid, y = unstd_posterior)) +
+  geom_point(aes(x = p_grid, y = unstd_posterior)) +
+  
+  
+  geom_line(aes(x = p_grid, y = likelihood), alpha = 0.3) +
+  geom_point(aes(x = p_grid, y = likelihood), position = "jitter", color = "green") +
+  
+  geom_line(aes(x = p_grid, y = prior)) +
+  geom_point() +
+  geom_line()
+```
+
+```{r}
+n_grid <- 100
+
+tibble(p_grid                  = seq(from = 0, to = 1, length.out = n_grid) %>% rep(., times = 3),
+       prior                   = 1,
+       w                       = rep(c(6, 12, 24), each = n_grid),
+       n                       = rep(c(9, 18, 36), each = n_grid),
+       m                       = .67,
+       s                       = rep(c(.16, .11, .08), each = n_grid)) %>%
+  mutate(likelihood            = dbinom(w, size = n, prob = p_grid)) %>%
+  mutate(unstd_grid_posterior  = likelihood * prior,
+         unstd_quad_posterior  = dnorm(p_grid, m, s)) %>%
+  group_by(w) %>% 
+  mutate(grid_posterior        = unstd_grid_posterior / sum(unstd_grid_posterior),
+         quad_posterior        = unstd_quad_posterior / sum(unstd_quad_posterior),
+         n = str_c("n = ", n)) %>% 
+  mutate(n = factor(n, levels = c("n = 9", "n = 18", "n = 36"))) %>% 
+  
+  ggplot(aes(x = p_grid)) +
+  geom_line(aes(y = grid_posterior)) +
+  geom_line(aes(y = quad_posterior),
+            color = "grey50") +
+  labs(x = "proportion water",
+       y = "density") +
+  theme(panel.grid = element_blank()) +
+  facet_wrap(~n, scales = "free")
+```
+#2.4.3
+```{r}
+globa_q_brms <- brm(data = list(w = 24),
+                    family = binomial(link = "identity"),
+                    w | trials(36) ~ 1,
+                    prior(beta(1,1), class = Intercept),
+                    iter = 4000, warmup = 1000,
+                    control = list(adapt_delta = 0.9),
+                    seed = 4)
+                    
+```
+
+```{r}
+print(globa_q_brms)
+
+```
+
+
+```{r}
+p_samples_tbl <- posterior_samples(globa_q_brms)
+```
+
+```{r}
+p_samples_tbl %>% ggplot(aes(x = b_Intercept)) +
+  geom_density(fill = "black") +
+  xlim(c(0,1))
+```
+
+#3.1 Sampling from Grid-Like Posterior, Bernoulli
+
+```{r}
+n <- 1001
+n_successes <- 6
+n_trials <- 9
+
+d <- tibble(p_grid = seq(0, 1, length.out = n),
+       prior = 1) %>%
+  mutate(likelihood = dbinom(n_successes, n_trials, prob = p_grid)) %>%
+  mutate(posterior = prior * likelihood / sum(prior * likelihood))
+
+sum(d$posterior)
+
+```
+```{r}
+d
+```
+
+```{r}
+n_samples = 1e5
+set.seed(3)
+
+samples <- d %>% 
+  sample_n(size = n_samples, weight = posterior, replace = TRUE)
+
+samples %>% ggplot(aes(x = p_grid)) +
+  geom_density(fill = "black") +
+  xlim(c(0,1))
+
+```
+
+We can use the data to generate the posterior distribution of theta through likelihood and prior;  we can also sample from the posterior to make plausible values of theta!  Back and forth, it's a generative model.
+
+```{r}
+d %>% filter(p_grid < 0.5) %>%
+  summarize(sum = sum(posterior))
+
+
+```
+
+```{r}
+d %>% ggplot(aes(x = p_grid)) +
+  geom_line(aes(y = posterior)) +
+  geom_ribbon(data = d %>% filter(p_grid < .5), aes(ymin = 0, ymax = posterior))
+
+```
+
+```{r}
+q_80 <- quantile(samples$p_grid, 0.8)
+q_80
+
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+library(rethinking)
+```
+```{r}
+data(Howell1)
+d <- Howell1
+
+d
+```
+```{r}
+detachAllPackages <- function() {
+  basic.packages.blank <- c(    
+    "stats",    
+    "graphics",    
+    "grDevices",    
+    "utils",   
+    "datasets",  
+    "methods",    
+    "base"    
+  )    
+  basic.packages <- paste("package:", basic.packages.blank, sep = "")   
+  package.list <- search()[ifelse(unlist(gregexpr("package:", search())) == 1, TRUE, FALSE)]   
+  package.list <- setdiff(package.list, basic.packages)   
+  if (length(package.list) > 0) {   
+    for (package in package.list) {   
+      detach(package, character.only = TRUE)   
+    }   
+  }    
+}
+
+
+```
+
+```{r}
+library(rethinking)
+data(Howell1)
+d <- Howell1
+
+d %>%
+  select(height) %>%
+  head()
+
+rm(Howell1)
+detach(package:rethinking, unload = T)
+library(brms)
+```
+
+```{r}
+d2 <- d %>% filter(age >= 18)
+```
+
+Show the distribution of the height data using a density plot made on the fly
+```{r}
+t <- tibble(x = seq(0, 250, by = .1))
+t %>% ggplot(aes(x = x, y = dnorm(x = x, mean = 178, sd = 20))) +
+  geom_line()
+```
+
+Draw randomly from the priors to create a prior predictive distribution for height
+Priors are:
+*  mu = normal distribution with mean = 178, sd = 20
+*  standard dev sigma = uniform distribution with min = 0, max = 50
+
+Note: We only take 1 draw from each random combination of mean and sd in the prior
+So: mean is drawn randomly, sd is drawn randomly, then a random number from that distribution is taken and stored. n=1000 combos/draws in enough to make a nice distribution. 
+
+
+```{r}
+n = 1e4
+
+prior_tbl <- tibble(sample_mu = rnorm(n, mean = 178, sd = 20),
+                    sample_sd = runif(n, min = 0 , max = 50))
+
+prior_combo_tbl <- prior_tbl %>% 
+  mutate(random_draw_from_combo = rnorm(n, mean = sample_mu, sd = sample_sd))
+
+prior_combo_tbl %>% ggplot(aes(x = random_draw_from_combo)) +
+  geom_density(fill = "black")
+```
+
+Grid approximation of prosterior for height
+```{r}
+
+#Number of points in the grid ; grid resolution
+n <- 200
+
+#Set up the grid
+d_grid <- tibble(mu     =seq(140, 160, length.out = n),
+                 sigma = seq(4, 9, length.out = n))
+
+#n=200 to start, will expand to 200 x 200 = 40,000 ? --> Yes
+d_grid 
+
+d_grid <- d_grid %>% expand(mu, sigma)
+d_grid
+
+d_grid %>% ggplot(aes(x = mu, y = sigma)) +
+  geom_point(alpha = .1)
+
+```
+We want a function to take a single mu, single sigma, and pipe the data into to the likelihood function, returning the dnorm (density) for each value of height, then sum the densities across the whole vector of heights. The size of this sum will be a reflection of how well the data fits that particular distibution of mu, sigma
+
+Note: grid function uses log = TRUE with dnorm,
+prior_mu has to also be transformed to be on log scale
+prior_sigma must also be transformed to be on log scale
+
+If the dnorm density is log and both priors are log, then you create the product by ADDING them
+
+```{r}
+grid_function <- function(mu, sigma){
+  dnorm(d2$height, mean = mu, sd = sigma, log = T) %>% 
+    sum()
+}
+
+library(tidyr)
+#map2 is used to map over 2 variables. Always returns a list
+unnest <- unnest_legacy
+
+d_grid <-
+  d_grid %>% 
+  mutate(log_likelihood = map2(mu, sigma, grid_function)) %>% 
+  unnest() %>% 
+  mutate(prior_mu       = dnorm(mu,    mean = 178, sd  = 20, log = T),
+         prior_sigma    = dunif(sigma, min  = 0,   max = 50, log = T)) %>% 
+  mutate(product        = log_likelihood + prior_mu + prior_sigma) %>% 
+  mutate(probability    = exp(product - max(product)))
+  
+head(d_grid)
+
+
+
+
+```
+
+```{r}
+d_grid %>%
+  ggplot(aes(x = mu, y = sigma, z = probability)) +
+  geom_contour() +
+  coord_cartesian(xlim = range(d_grid$mu),
+                  ylim = range(d_grid$sigma))
+```
+```{r}
+d_grid %>%
+  ggplot(aes(x = mu, y = sigma)) +
+  geom_raster(aes(fill = probability), interpolate = TRUE) +
+  coord_cartesian(xlim = range(d_grid$mu),
+                  ylim = range(d_grid$sigma)) +
+  scale_fill_viridis_c(option = "A") +
+  theme(panel.grid = element_blank())
+```
+
+Can sample from the posterior by drawing rows randomly from d_grid tbl.  sample_n() can be used to draw rows randomly into a new df.  Setting the weight of the sampling equal to the probability col makes the sample reflect the credibility of the parameters in the grid that are compatible with the data.  The samples values of mu and sigma should also be credible in the same way as we determined the original data to be:
+```{r}
+d_grid_samples <- d_grid %>% sample_n(size = 1e4, replace = TRUE, weight = probability)
+d_grid_samples
+```
+
+```{r}
+d_grid_samples %>% ggplot(aes(x = mu, y = sigma)) +
+  geom_point(alpha = 0.05) +
+  coord_cartesian(xlim = range(d_grid$mu), ylim = range(d_grid$sigma)) +
+  labs(x = expression(mu[samples]),
+       y = expression(sigma[samples]))
+```
+If you wanted to just see the distributions of mu and sigma in the posterior simulated draws, you could gather() and display w/ facet wrap by key.  Could also do boxplots
+
+
+```{r}
+d_grid_samples %>% 
+  select(mu, sigma) %>%
+  gather() %>%
+  ggplot(aes(value)) +
+  geom_density(fill = "grey33") +
+  facet_wrap(~key, scales = "free") 
+```
+
+```{r}
+
+d_grid_samples %>% 
+  select(mu, sigma) %>%
+  gather() %>%
+  ggplot(aes(y = value)) +
+  geom_boxplot(fill = "#2c3e50", alpha = 0.6) +
+  facet_wrap(~key, scales = "free") +
+  scale_x_continuous(NULL, breaks = NULL)
+```
+
+```{r}
+library(tidybayes)
+
+d_grid_samples %>% 
+  select(mu, sigma) %>% 
+  gather() %>%
+  group_by(key) %>%
+  mode_hdi() %>%
+  ungroup()
+  
+
+```
+
+```{r}
+
+b4.1 <- brm(data = d2, 
+    family = gaussian, formula = height ~ 1, prior = c(prior(normal(178, 20), class = Intercept),
+                                                       prior(uniform(0, 50), class = sigma)),
+    iter = 31000, warmup = 30000, chains = 4, cores = 4,
+    seed = 4
+    )
+
+```
+```{r}
+plot(b4.1)
+summary(b4.1)
+```
+
+Kurz recommends using a half-cauchy as prior for sigma.  In this model we're still just modeling height (not even using a predictor.  This makes it the intercept in the model. )
+```{r}
+b4.1_half_cauchy <- 
+  brm(data = d2, family = gaussian,
+      height ~ 1, 
+      prior = c(prior(normal(178, 20), class = Intercept), 
+                prior(cauchy(0, 1), class = sigma)),
+      iter = 2000, warmup = 1000, chains = 4, cores = 4,
+      seed = 4)
+
+plot(b4.1_half_cauchy) 
+```
+
+```{r}
+summary(b4.1_half_cauchy)
+```
+```{r}
+posterior_samples_b4.1_half_cauchy_tbl <- posterior_samples(b4.1_half_cauchy)
+posterior_samples_b4.1_half_cauchy_tbl <-  posterior_samples_b4.1_half_cauchy_tbl %>% select(-lp__)
+
+```
+
+```{r}
+n <- 1e4
+b4.1_hc_sim_prior_tbl <- tibble(height_sim_prior_samples = rnorm(n, mean = 178, sd = 20),
+                                sigma_sim_prior_samples = rcauchy(n, 0, 1))
+     
+b4.1_hc_sim_prior_tbl %>% ggplot(aes(sigma_sim_prior_samples)) +
+  geom_density() +
+  coord_cartesian(xlim = range(b4.1_hc_sim_prior_tbl$sigma_sim_prior_samples))
+
+library(skimr)
+skim(b4.1_hc_sim_prior_tbl)
+
+```
+
+What happens if the prior for mu is very narrow?
+
+```{r}
+b4.2 <- 
+  brm(data = d2, formula = height ~ 1, family = gaussian,
+      prior = c(prior(normal(178, .1), class = Intercept),
+                prior(uniform(0, 50), class = sigma)),
+      iter = 3000, warmup = 2000, chains = 4, cores = 4,
+      seed = 4)
+```
+
+```{r}
+plot(b4.2)
+```
+```{r}
+summary(b4.2)
+```
+
+```{r}
+post_new <- posterior_samples(b4.1_half_cauchy)
+
+post_new
+```
+```{r}
+post_new %>% ggplot(aes(sigma)) +
+  geom_density(fill = "black") +
+  labs(
+    x = expression(sigma)
+  ) + 
+  scale_y_continuous(NULL, breaks = NULL)
+```
+```{r}
+d2 %>% ggplot(aes(x = weight, y = height)) +
+  geom_point()
+```
+Now we're moving into regression with a predictor variable: weight
+
+```{r}
+b4.3 <- 
+  brm(data = d2, family = gaussian,
+      formula = height ~ 1 + weight,
+      prior = c(prior(normal(156, 100), class = Intercept),
+                prior(normal(0, 10), class = b),
+                prior(cauchy(0, 1), class = sigma)),
+      iter = 4000, warmup = 3000, chains = 4, cores = 4,
+      seed = 4)
+
+
+```
+```{r}
+plot(b4.3)
+```
+```{r}
+summary(b4.3)
+```
+Workflow: fit the model, evaluate chains visually with plot(),
+check the outputs with summary(), extract posterior chains into a dataframe with tbl = posterior_samples(model_name), 
+evaluate correlations in posterior tbl with cor():
+
+```{r}
+b4.3_posterior_tbl <- posterior_samples(b4.3) %>%
+  select(-lp__) %>%
+  cor() %>%
+  round(digits = 2)
+
+b4.3_posterior_tbl
+```
+
+Highly_correlated. View again with pairs()
+
+```{r}
+pairs(b4.3)
+```
+
+
+We can reduce the correlation with centering:
+
+```{r}
+d2 <- d2 %>% mutate(weight_c = weight - mean(weight))
+```
+
+Now fit again, height predicted by centered weight weight_c:
+
+```{r}
+b4.3_c <- 
+  brm(data = d2, family = gaussian, 
+      formula = height ~ 1 + weight_c, 
+      prior = c(prior(normal(178, 100), class = Intercept),
+                prior(normal(0, 10), class = b),
+                prior(cauchy(0, 1), class = sigma)),
+      iter = 4000, warmup = 3000, chains = 4, cores = 4,
+      seed = 4)
+```
+
+
+```{r}
+plot(b4.3_c)
+summary(b4.3_c)
+b4.3_c_posterior_tbl <- posterior_samples(b4.3_c) 
+b4.3_c_posterior_tbl %>% select(-lp__) %>% cor()
+
+```
+```{r}
+pairs(b4.3_c)
+```
+
+```{r}
+pairs
+```
+ 
+```{r}
+write.csv(d, file = "d.csv")
+```
+
+
+
+
+
+
+
+
