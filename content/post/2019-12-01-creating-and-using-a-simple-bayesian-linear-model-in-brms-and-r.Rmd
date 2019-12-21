@@ -13,7 +13,7 @@ tags:
   - Stats
 description: ''
 topics: []
-draft: TRUE
+draft: FALSE
 
 output:
   pdf_document:
@@ -41,9 +41,9 @@ knitr::opts_chunk$set(
 )
 ```
 
-This post is my good-faith effort to create a simple linear model using the Bayesian framework and workflow described by Richard McElreath in his Statistical Rethinking book.^[Statistical Rethinking, https://github.com/rmcelreath/statrethinking_winter2019] As always - please view this post through the lens of the eager student and not the learned master - this stuff is hard.  I did my best to check my work, but it's entirely possible that something was missed.  Please let me know - I won't take it personally. As McElreath notes in his lectures - "if you're confused, it's because you're paying attention and I thank you for your attention". And sometimes I get confused.  Disclaimer over - let's get to it.
+This post is my good-faith effort to create a simple linear model using the Bayesian framework and workflow described by Richard McElreath in his Statistical Rethinking book.^[Statistical Rethinking, https://github.com/rmcelreath/statrethinking_winter2019] As always - please view this post through the lens of the eager student and not the learned master. I did my best to check my work, but it's entirely possible that something was missed.  Please let me know - I won't take it personally. As McElreath notes in his lectures - "if you're confused, it's because you're paying attention". And sometimes I get confused - this a lot harder than my old workflow which consisted of clicking "add a trendline" in Excel.  Thinking Bayesian is still relatively new to me.  Disclaimer over - let's get to it.
 
-I'm playing around with a bunch of fun libraries in the one. 
+I'm playing around with a bunch of fun libraries in this one. 
 ```{r}
 library(tidyverse)
 library(styler)
@@ -59,9 +59,9 @@ library(av)
 library(rgl)
 ```
 
-I made up this data set. It represents hypothetical values of ablation time and tissue impedance as measured by sensors embedded in a RF ablation catheter.  This type of device is designed to apply RF or thermal energy to the vessel wall.  The result is a lesion that can aid in improve arythmia, reduce hypertension, or provide some other desired outcome. 
+I made up this data set. It represents hypothetical values of ablation time and tissue impedance as measured by sensors embedded in a RF ablation catheter.  This type of device is designed to apply RF or thermal energy to the vessel wall.  The result is a lesion that can aid in improve arrhythmia, reduce hypertension, or provide some other desired outcome.  
 
-In RF ablations, the tissue heats up over the course of the RF cycle, resulting in a drop in impedance that varies over time. As described above, the goal will be to see how much of the variation in impedance is described by time (over some limited range) and then communicate the uncertainty in the predictions visually.  This is what an ablation catheter system looks like:^[https://www.sciencedirect.com/science/article/abs/pii/S1547527116001806]
+In RF ablations, the tissue heats up over the course of the RF cycle, resulting in a drop in impedance that varies over time. As described above, the goal will be to see how much of the variation in impedance is described by time (over some limited range) and then communicate the uncertainty in the predictions visually.  None of this detail is terribly important other than I like to frame my examples from within my industry and McElreath emphasizes grounding our modeling in real world science and domain knowledge. This is what an ablation catheter system looks like:^[https://www.sciencedirect.com/science/article/abs/pii/S1547527116001806]
 
 ```{r, out.width = '100%', out.height = "100%", echo=FALSE, fig.align="center"}
 knitr::include_graphics(path = "/./img/rf_cath.jpg")
@@ -75,7 +75,7 @@ ablation_dta_tbl <- ablation_dta_tbl %>% select(temp, time)
 ablation_dta_tbl %>% skim()
 ```
 
-Let's start with a simple visualization.  The code below builds out a scatterplot with marginal histograms which I think is a nice, clean way to evaluate scatter data.^[There's a funky bug in ggExtra which makes you break this code into 2 chunks when working in Markdown, https://cran.r-project.org/web/packages/ggExtra/vignettes/ggExtra.html] These data seem plausible since the impedance will typically drop as the tissue heats up during the procedure. In reality the impedence asymptotes we'll work over a limited range of time where the behavior might reasonably be linear.
+Let's start with a simple visualization.  The code below builds out a scatterplot with marginal histograms which I think is a nice, clean way to evaluate scatter data.^[There's a funky bug in ggExtra which makes you break this code into 2 chunks when working in Markdown, https://cran.r-project.org/web/packages/ggExtra/vignettes/ggExtra.html] These data seem plausible since the impedance will typically drop as the tissue heats up during the procedure. In reality the impedance goes asymptotic but we'll work over a limited range of time where the behavior might reasonably be linear.
 
 ```{r}
 
@@ -109,7 +109,7 @@ grid::grid.newpage()
 grid::grid.draw(scatter_hist_1_fig)
 ```
 
-It always helps to state clearly what the objective of this analysis even is. As best I can distill it...
+It helps to have a plan.  If I can create a posterior distribution that captures reasonable values for the model parameters and confirm that the model makes reasonable predictions then I will be happy.  Here's the workflow that hopefully will get me there.
 
 ```{r}
 
@@ -121,36 +121,36 @@ grViz("digraph flowchart {
       tab3 [label = 'Step 3: Set priors \n Simulate what the model knows before seeing the data.  Use domain knowledge as constraints.']
       tab4 [label = 'Step 4: Define the model \n Create the model using the observed data, the likelihood function, and the priors']
       tab5 [label = 'Step 5: Draw from the posterior \n Plot plausible lines using parameters visited by the Markov chains']
-      tab6 [label = 'Step 6: Push it back through the model \n Simulate real data from plausible combinations of mean and sigma']
+      tab6 [label = 'Step 6: Push the parameters back through the model \n Simulate real data from plausible combinations of mean and sigma']
       # edge definitions with the node IDs
       tab1 -> tab2 -> tab3 -> tab4 -> tab5 -> tab6;
       }
       ")
 ```
 
-# Step 1: Propose a distribution for the response variable
+## __Step 1: Propose a distribution for the response variable__
 
-A Gaussian model is reasonable for the outcome variable *temperature* as we know it is a measured from the thermocouples on the distal end of the catheter.  According to McElreath (pg 75): 
+A Gaussian model is reasonable for the outcome variable Temperature as we know it is a measured from the thermocouples on the distal end of the catheter.  According to McElreath (pg 75): 
 
 >__*Measurement errors, variations in growth, and the velocities of molecules all tend towards Gaussian distributions. These processes do this because at their heart, these processes add together fluctuations. And repeatedly adding finite fluctuations results in a distribution of sums that have shed all information about the underlying process, aside from mean and spread.*__
 
-Here's us formally asserting Temperature as a normal distritbution with mean \mu and standard deviation \sigma. These two parameters are all that is needed to completely describe the distribution and also pin down the likelihood function.
+Here's us formally asserting Temperature as a normal distribution with mean \mu and standard deviation \sigma. These two parameters are all that is needed to completely describe the distribution and also pin down the likelihood function.
 
 $T_i \sim \text{Normal}(\mu_i, \sigma)$  
 
-# Step 2: Parameterize the mean
+## __Step 2: Parameterize the mean__
 
-If we further parameterize \mu, we can do some neat things like move the mean around with the predictor variable.  This is a pretty key concept - *you move the mean of the outcome variable around by parameterizing it.  If we make it a line then it will move linearly with the predictor variable.*  The real data will still have a spread once the \sigma terms is folded back in, but we can thing of the whole distirbution shifting up and down based on the properties of the line.
+If we further parameterize \mu, we can do some neat things like move the mean around with the predictor variable.  This is a pretty key concept - *you move the mean of the outcome variable around by parameterizing it.  If we make it a line then it will move linearly with the predictor variable.*  The real data will still have a spread once the \sigma terms is folded back in, but we can think of the whole distribution shifting up and down based on the properties of the line.
 
-Here's us asserting we want mu to move linearly with changes in the predictor variable (time).
+Here's us asserting we want mu to move linearly with changes in the predictor variable (time).  Subtracting the mean from each value of the predictor variable "centers" the data which McElreath recommends in most cases. I will explore the differences between centered and un-centered later on.
 
 > $\mu_i = \alpha + \beta (x_i - \bar{x})$ 
 
-# Step 3: Set priors
+## __Step 3: Set priors__
 
 We know some things about these data.  Temperature is a continuous variable so we want a continuous distribution.  We also know from the nature of the treatment that there isn't really any physical mechanism within the device that would be expected to cool down the tissue below normal body temperature.  Since only heating is expected, the slope should be positive or zero.  
 
-McElreath emphasizes simulating from the priors to "see what the model knows before it sees the data". Here are some priors to consider.  Let's evaluate visually.
+McElreath emphasizes simulating from the priors to visualize "what the model knows before it sees the data". Here are some priors to consider.  Let's evaluate.
 
 ```{r}
 
@@ -161,8 +161,9 @@ set.seed(1999)
 n <- 150
 
 # random draws from the specified prior distributions
+# lognormal distribution is used to constrain slopes to positive values
 a <- rnorm(n, 75, 15)
-a_ <- rnorm(n, 0, 2)
+
 b <- rnorm(n, 0, 1)
 b_ <- rlnorm(n, 0, 0.8)
 
@@ -215,7 +216,7 @@ prior_fig_2 <- empty_tbl %>% ggplot() +
 plot_grid(prior_fig_1, prior_fig_2)
 ```
 
-The plots above show what the model thinks before seeing the data for two different sets of priors. In both cases, I have centered the data by subtracting the mean of the time from each individual value of time.  This means the intercept has the meaning of the expected temperature at the mean of time. The family of lines on the right seem a lot more realistic despite having some slopes that predict strange values out of sample (blood coagulates at ~90C). Choosing a lognormal distribution for time ensures positives slopes.  You could probably go even tighter on these priors but for this exercise I'm feeling good about proceeding. 
+The plots above show what the model thinks before seeing the data for two different sets of priors. In both cases, I have centered the data by subtracting the mean of the time from each individual value of time.  This means the intercept has the meaning of the expected temperature at the mean of time. The family of lines on the right seem a lot more realistic despite having some slopes that predict strange values out of sample (blood coagulates at ~90C). Choosing a log normal distribution for time ensures positives slopes.  You could probably go even tighter on these priors but for this exercise I'm feeling good about proceeding. 
 
 Looking only at the time window of the original observations and the Temp window bounded by body temperature (lower bound) and water boiling (upper bound).
 
@@ -240,15 +241,15 @@ empty_tbl %>% ggplot() +
 
 Here are the prior distributions selected to go forward.
 
-$\alpha \sim \text{Normal}(75, 15)$: `prior(normal(75, 15), class = Intercept`
+$\alpha \sim \text{Normal}(75, 15)$
 
-$\beta \sim \text{LogNormal}(0, .6)$: ` prior(lognormal(0, .6), class = b)`
+$\beta \sim \text{LogNormal}(0, .8)$
 
-$\sigma \sim \text{Uniform}(0, 1)$: `prior(uniform(0, 30), class = sigma)`
+$\sigma \sim \text{Uniform}(0, 30)$
 
-# Step 4: Define the model
+## __Step 4: Define the model__
 
-Here I model up what I'm creatively calling "model_1". This one uses the un-centered data for time. I'm using a lot of warmup cycles because I've heard chains for the uniform priors on sigma can take a long time to converge.  
+Here I use the brm() function in brms to build what I'm creatively calling: "model_1". This one uses the un-centered data for time. This function uses Markov Chain Monte Carlo to survey the parameter space.  After the warm up cycles, the relative amount of time the chains spend at each parameter value is a good approximation of the true posterior distribution. I'm using a lot of warm up cycles because I've heard chains for the uniform priors on sigma can take a long time to converge.  This model still takes a bit of time to chug through the parameter space on my modest laptop.
 
 ```{r, eval=FALSE, echo=TRUE}
 
@@ -266,12 +267,14 @@ Here I model up what I'm creatively calling "model_1". This one uses the un-cent
 #  )
 ```
 
+For presenting in a post, I found it easier to store the model and call it back when compiling the page rather than replicate the fitting each time.
+
 ```{r}
 #saveRDS(model_1, file = "blr_rethinking_model_1.rds")
 model_1 <- readRDS(file = "blr_rethinking_model_1.rds")
 ```
 
-# Step 5: Draw from the posterior
+## __Step 5: Draw from the posterior__
 
 The fruits of all my labor!  The posterior holds credible combinations for sigma and the slope and intercept (which together describe the mean of the outcome variable we care about).  Let's take a look.
 
@@ -286,7 +289,7 @@ post_samplesM1_tbl %>%
   kable(align = rep("c", 3))
 ```
 
-The plotting function in brms is pretty sweet.  I'm not expert in MCMC diagnostics but I do know the "fuzzy caterpillar"" look of the trace plots is desirable.
+The plotting function in brms is pretty sweet.  I'm not expert in MCMC diagnostics but I do know the "fuzzy caterpillar" look of the trace plots is desirable.
 
 ```{r}
 plot(model_1)
@@ -309,7 +312,7 @@ mod_1_summary_tbl %>%
   kable(align = rep("c", 5))
 ```
 
-Now let's see what changes if the time data is centered.  Everything is the same here in model_2 except the time_c data which is the normal time data minus the mean.
+Now let's see what changes if the time data is centered.  Everything is the same here in model_2 except the time_c data which is transformed by subtracting the mean from each value.
 
 ```{r}
 ablation_dta_tbl <- ablation_dta_tbl %>% mutate(time_c = time - mean(time))
@@ -329,7 +332,7 @@ ablation_dta_tbl <- ablation_dta_tbl %>% mutate(time_c = time - mean(time))
 #  )
 ```
 
-```{r}
+```{r echo=FALSE}
 #33saveRDS(model_2, file = "blr_rethinking_model_2.rds")
 model_2 <- readRDS(file = "blr_rethinking_model_2.rds")
 ```
@@ -341,7 +344,7 @@ plot_mod_2_fig <- plot(model_2)
 
 ```
 
-The slope B and sigma are very similar.  The intercept is the only difference with model_1 ranging from low to high 50's.  Model 2 is tight around 77.  We should visualize the lines proposed by the parameters in the poseriors of our models to understand the uncertainty associated with the mean and also understand why the intercepts are different between models. First, store the posterior samples as a tibble in anticipation for ggplot.
+The slope B and sigma are very similar.  The intercept is the only difference with model_1 ranging from low to high 50's.  Model 2 is tight around 77.  We should visualize the lines proposed by the parameters in the posteriors of our models to understand the uncertainty associated with the mean and also understand why the intercepts are different between models. First, store the posterior samples as a tibble in anticipation for ggplot.
 
 ```{r}
 post_samplesM2_tbl <-
@@ -467,11 +470,11 @@ combined_predicts_fig <- combined_mean_fig +
 knitr::include_graphics(path = "/./img/combined_predicts_fig.png")
 ```
 
-Now everything is clear.  The slopes are exactly the same (as we saw in the density plots between model_1 and model_2 in summary()). The intercepts are different because in the centered data (green) the intercept occurs when the predictor equals 0 (its new mean).  The outcome variable temp must therefore also be at its mean value in the "knot" of the bowtie.  
+Now everything is clear.  The slopes are exactly the same (as we saw in the density plots between model_1 and model_2 in summary()). The intercepts are different because in the centered data (green) the intercept occurs when the predictor equals 0 (its new mean).  The outcome variable temp must therefore also be at its mean value in the "knot" of the bow-tie.  
 
 For the un-centered data (purple), the intercept is the value of Temperature when the un-adjusted time is at 0.  The slope of the regression line for the mean is much more uncertain here.
 
-  Another way to look at the differences is as a map of the plausible parameter space.  We need a plot that can represent 3 parameters: intercept, slope, and sigma.  Each point will be a credible combination of the three parameters as observed in 1 row of the posterior distribution tibble(s).
+Another way to look at the differences is as a map of the plausible parameter space.  We need a plot that can represent 3 parameters: intercept, slope, and sigma.  Each point will be a credible combination of the three parameters as observed in 1 row of the posterior distribution tibble(s).
 
 First, the un-centered model.  
 
@@ -499,7 +502,6 @@ p_spaceM1_fig <-
 ```{r, out.width = '100%', out.height = "100%", echo=FALSE, fig.align="center"}
 knitr::include_graphics(path = "/./img/p_spaceM1_fig.png")
 ```
-
 
 Now the centered version:
 
@@ -554,9 +556,9 @@ knitr::include_graphics(path = "/./img/p_spaceC_tbl.png")
 ```
 
 
-Now we see they aren't as different as they first seemed. They cover very similar ranges for the slope and the uncentered model covers a wider range of plausible intercepts. 
+Now we see they aren't as different as they first seemed. They cover very similar ranges for the slope and the un-centered model covers a wider range of plausible intercepts. 
 
-I've been looking for a good time to fire up rayshader and I'm not throwing away my shot.  Plotting with rayshader feels like a superpower that I shouldn't be allowed to have. It's silly how easy it is to make these rediculous visuals. First, a fancy 3d plot providing some perspective on the relative "heights" of theta.
+I've been looking for a good time to fire up the rayshader package and I'm not throwing away my shot here.  Plotting with rayshader feels like a superpower that I shouldn't be allowed to have. It's silly how easy it is to make these ridiculous visuals. First, a fancy 3d plot providing some perspective on the relative "heights" of theta.
 
 ```{r eval=FALSE}
 #par(mfrow = c(1, 1))
@@ -571,7 +573,7 @@ I've been looking for a good time to fire up rayshader and I'm not throwing away
 knitr::include_graphics(path = "/./img/3d_params.png")
 ```
 
-If you want more, this code below renders a video guaranteed to impress small childen and executives.
+If you want more, this code below renders a video guaranteed to impress small children and executives.
 
 ```{r eval=FALSE}
 #install.packages("av")
@@ -593,18 +595,16 @@ If you want more, this code below renders a video guaranteed to impress small ch
 knitr::include_graphics(path = "/./img/hex_plot_fancy_2.gif")
 ```
 
+## __Step 6: Push the parameters back through the model__
+
+After a lot of work we have finally identified the credible values for our model parameters.  We now want to see what sort of predictions our posterior makes.  Again, I'll work with both the centered and un-centered data to try to understand the difference between the approaches.  The first step in both cases is to create a sequence of time data to predict off of.  For some reason I couldn't get the predict() function in brms to cooperate so I wrote my own function to predict values. You enter a time value and the function makes a temperature prediction for every combination of mean and standard deviation derived from the parameters in the posterior distribution.  Our goal will be to map this function over the sequence of predictor values we just set up.
 
 ```{r}
-
+#sequence of time data to predict off of.  Could use the same for both models but I created 2 for clarity
 time_seq_tbl   <- tibble(pred_time   = seq(from = -15, to = 60, by = 1))
 time_seq_tbl_2 <- tibble(pred_time_2 = seq(from = -15, to = 60, by = 1))
 
-#time_seq_tbl <- tibble(pred_time = seq(from = -15, to = 70, by = 1))
-#time_seq_tbl_2 <- 
-#  time_seq_tbl %>% 
-#  mutate(pred_time_2 = pred_time - mean(ablation_dta_tbl$time))
-  
-
+#function that takes a time value and makes a prediction using model_1 (un-centered) 
 rk_predict <- 
 function(time_to_sim){
   rnorm(n = nrow(post_samplesM1_tbl),
@@ -613,6 +613,7 @@ function(time_to_sim){
   )
 }
 
+#function that takes a time value and makes a prediction using model_2 (centered)
 rk_predict2 <- 
 function(time_to_sim){
   rnorm(n = nrow(post_samplesM2_tbl),
@@ -621,17 +622,20 @@ function(time_to_sim){
   )
 }
 
+#map the first prediction function over all values in the time sequence
+#then calculate the .025 and .975 quantiles in anticipation of 95% prediction intervals
 predicts_m1_tbl <- time_seq_tbl %>%
   mutate(preds_for_this_time = map(pred_time, rk_predict)) %>%
   mutate(percentile_2.5  = map_dbl(preds_for_this_time, ~quantile(., .025))) %>%
   mutate(percentile_97.5 = map_dbl(preds_for_this_time, ~quantile(., .975)))
     
+#same for the 2nd prediction function
 predicts_m2_tbl <- time_seq_tbl_2 %>%
   mutate(preds_for_this_time = map(pred_time_2, rk_predict2)) %>%
   mutate(percentile_2.5  = map_dbl(preds_for_this_time, ~quantile(., .025))) %>%
   mutate(percentile_97.5 = map_dbl(preds_for_this_time, ~quantile(., .975)))   
 
-
+#visualize what is stored in the nested prediction cells (sanity check)
 test_array <- predicts_m2_tbl[1, 2] %>% unnest(cols = c(preds_for_this_time))
 test_array %>% 
   round(digits = 2) %>%
@@ -640,7 +644,7 @@ test_array %>%
 
 
 ```
-
+And now the grand finale - overlay the 95% prediction intervals on the original data along with the credible values of mean.  We see there is no difference between the predictions made from centered data vs. un-centered.  
 
 ```{r eval=FALSE}
 
@@ -704,7 +708,9 @@ big_enchilada <-
 knitr::include_graphics(path = "/./img/big_enchilada.png")
 ```
 
+What a ride! This seemingly simple problem really stretched my brain. There are still a lot of question I want to go deeper on - diagnostics for the MCMC, impact of the regularizing priors, different between this workflow and frequentist at various sample sizes and priors, etc... but that will have to wait for another day. 
 
+Thank you for reading. 
 
 
 
