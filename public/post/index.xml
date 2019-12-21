@@ -49,7 +49,7 @@ ablation_dta_tbl %&amp;gt;% skim()&lt;/code&gt;&lt;/pre&gt;
 ##  n obs: 331 
 ##  n variables: 2 
 ## 
-## -- Variable type:numeric -------------------------------------------------------
+## -- Variable type:numeric ---------------------------------------------------------------------------------------------------------------
 ##  variable missing complete   n  mean   sd    p0   p25   p50   p75  p100
 ##      temp       0      331 331 77.37 3.9  68.26 74.61 77.15 80.33 89.53
 ##      time       0      331 331 22.57 3.22 15.83 20.22 22.54 24.69 31.5 
@@ -158,7 +158,7 @@ prior_fig_1 &amp;lt;- empty_tbl %&amp;gt;% ggplot() +
     x = &amp;quot;time (sec)&amp;quot;,
     y = &amp;quot;Temp (C)&amp;quot;,
     title = &amp;quot;Prior Predictive Simulations&amp;quot;,
-    subtitle = &amp;quot;Uninformed Informed&amp;quot;
+    subtitle = &amp;quot;Uninformed Prior&amp;quot;
   )
 
 # in this fig we confine the slopes to broad ranges informed by what we know about the domain
@@ -220,9 +220,6 @@ plot_grid(prior_fig_1, prior_fig_2)&lt;/code&gt;&lt;/pre&gt;
 #    iter = 41000, warmup = 40000, chains = 4, cores = 4,
 #    seed = 4
 #  )&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;For presenting in a post, I found it easier to store the model and call it back when compiling the page rather than replicate the fitting each time.&lt;/p&gt;
-&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#saveRDS(model_1, file = &amp;quot;blr_rethinking_model_1.rds&amp;quot;)
-model_1 &amp;lt;- readRDS(file = &amp;quot;blr_rethinking_model_1.rds&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 &lt;div id=&#34;step-5-draw-from-the-posterior&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;&lt;strong&gt;Step 5: Draw from the posterior&lt;/strong&gt;&lt;/h2&gt;
@@ -532,7 +529,7 @@ combined_mean_fig &amp;lt;-
        subtitle = &amp;quot;Regression Line Represents Rate of Change of Mean (Grey Bands are Uncertainty)&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;&lt;img src=&#34;/./img/combined_predicts_fig.png&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;Now everything is clear. The slopes are exactly the same (as we saw in the density plots between model_1 and model_2 in summary()). The intercepts are different because in the centered data (green) the intercept occurs when the predictor equals 0 (its new mean). The outcome variable temp must therefore also be at its mean value in the “knot” of the bow-tie.&lt;/p&gt;
-&lt;p&gt;For the un-centered data (purple), the intercept is the value of Temperature when the un-adjusted time is at 0. The slope of the regression line for the mean is much more uncertain here.&lt;/p&gt;
+&lt;p&gt;For the un-centered data (purple), the intercept is the value of Temperature when the un-adjusted time is at 0. The range of possible intercepts is much more uncertain here.&lt;/p&gt;
 &lt;p&gt;Another way to look at the differences is as a map of the plausible parameter space. We need a plot that can represent 3 parameters: intercept, slope, and sigma. Each point will be a credible combination of the three parameters as observed in 1 row of the posterior distribution tibble(s).&lt;/p&gt;
 &lt;p&gt;First, the un-centered model.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;p_spaceM1_fig &amp;lt;- 

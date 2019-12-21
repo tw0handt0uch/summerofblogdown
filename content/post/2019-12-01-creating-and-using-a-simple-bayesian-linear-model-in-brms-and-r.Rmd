@@ -192,7 +192,7 @@ prior_fig_1 <- empty_tbl %>% ggplot() +
     x = "time (sec)",
     y = "Temp (C)",
     title = "Prior Predictive Simulations",
-    subtitle = "Uninformed Informed"
+    subtitle = "Uninformed Prior"
   )
 
 # in this fig we confine the slopes to broad ranges informed by what we know about the domain
@@ -267,9 +267,7 @@ Here I use the brm() function in brms to build what I'm creatively calling: "mod
 #  )
 ```
 
-For presenting in a post, I found it easier to store the model and call it back when compiling the page rather than replicate the fitting each time.
-
-```{r}
+```{r echo=FALSE}
 #saveRDS(model_1, file = "blr_rethinking_model_1.rds")
 model_1 <- readRDS(file = "blr_rethinking_model_1.rds")
 ```
@@ -472,7 +470,7 @@ knitr::include_graphics(path = "/./img/combined_predicts_fig.png")
 
 Now everything is clear.  The slopes are exactly the same (as we saw in the density plots between model_1 and model_2 in summary()). The intercepts are different because in the centered data (green) the intercept occurs when the predictor equals 0 (its new mean).  The outcome variable temp must therefore also be at its mean value in the "knot" of the bow-tie.  
 
-For the un-centered data (purple), the intercept is the value of Temperature when the un-adjusted time is at 0.  The slope of the regression line for the mean is much more uncertain here.
+For the un-centered data (purple), the intercept is the value of Temperature when the un-adjusted time is at 0.  The range of possible intercepts is much more uncertain here.
 
 Another way to look at the differences is as a map of the plausible parameter space.  We need a plot that can represent 3 parameters: intercept, slope, and sigma.  Each point will be a credible combination of the three parameters as observed in 1 row of the posterior distribution tibble(s).
 
@@ -598,6 +596,7 @@ knitr::include_graphics(path = "/./img/hex_plot_fancy_2.gif")
 ## __Step 6: Push the parameters back through the model__
 
 After a lot of work we have finally identified the credible values for our model parameters.  We now want to see what sort of predictions our posterior makes.  Again, I'll work with both the centered and un-centered data to try to understand the difference between the approaches.  The first step in both cases is to create a sequence of time data to predict off of.  For some reason I couldn't get the predict() function in brms to cooperate so I wrote my own function to predict values. You enter a time value and the function makes a temperature prediction for every combination of mean and standard deviation derived from the parameters in the posterior distribution.  Our goal will be to map this function over the sequence of predictor values we just set up.
+
 
 ```{r}
 #sequence of time data to predict off of.  Could use the same for both models but I created 2 for clarity
