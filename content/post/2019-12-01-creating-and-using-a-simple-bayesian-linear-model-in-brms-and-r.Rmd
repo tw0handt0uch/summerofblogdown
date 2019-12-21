@@ -709,6 +709,8 @@ knitr::include_graphics(path = "/./img/big_enchilada.png")
 
 What a ride! This seemingly simple problem really stretched my brain. There are still a lot of question I want to go deeper on - diagnostics for the MCMC, impact of the regularizing priors, different between this workflow and frequentist at various sample sizes and priors, etc... but that will have to wait for another day. 
 
+For those looking for more interpretations of McElreath's workflows using Tidyverse tools, Solomon Kurz has a brilliant collection here.^[Statistical Rethinking with brms, ggplot2, and the tidyverse, https://bookdown.org/ajkurz/Statistical_Rethinking_recoded/]  
+
 Thank you for reading. 
 
 

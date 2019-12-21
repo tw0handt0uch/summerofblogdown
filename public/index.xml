@@ -715,6 +715,7 @@ test_array %&amp;gt;%
   scale_y_continuous(limits = c(40, 120), expand = c(0, 0))&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;&lt;img src=&#34;/./img/big_enchilada.png&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;What a ride! This seemingly simple problem really stretched my brain. There are still a lot of question I want to go deeper on - diagnostics for the MCMC, impact of the regularizing priors, different between this workflow and frequentist at various sample sizes and priors, etc… but that will have to wait for another day.&lt;/p&gt;
+&lt;p&gt;For those looking for more interpretations of McElreath’s workflows using Tidyverse tools, Solomon Kurz has a brilliant collection here.&lt;a href=&#34;#fn4&#34; class=&#34;footnoteRef&#34; id=&#34;fnref4&#34;&gt;&lt;sup&gt;4&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;Thank you for reading.&lt;/p&gt;
 &lt;/div&gt;
 &lt;div class=&#34;footnotes&#34;&gt;
@@ -723,6 +724,7 @@ test_array %&amp;gt;%
 &lt;li id=&#34;fn1&#34;&gt;&lt;p&gt;Statistical Rethinking, &lt;a href=&#34;https://github.com/rmcelreath/statrethinking_winter2019&#34; class=&#34;uri&#34;&gt;https://github.com/rmcelreath/statrethinking_winter2019&lt;/a&gt;&lt;a href=&#34;#fnref1&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
 &lt;li id=&#34;fn2&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://www.sciencedirect.com/science/article/abs/pii/S1547527116001806&#34; class=&#34;uri&#34;&gt;https://www.sciencedirect.com/science/article/abs/pii/S1547527116001806&lt;/a&gt;&lt;a href=&#34;#fnref2&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
 &lt;li id=&#34;fn3&#34;&gt;&lt;p&gt;There’s a funky bug in ggExtra which makes you break this code into 2 chunks when working in Markdown, &lt;a href=&#34;https://cran.r-project.org/web/packages/ggExtra/vignettes/ggExtra.html&#34; class=&#34;uri&#34;&gt;https://cran.r-project.org/web/packages/ggExtra/vignettes/ggExtra.html&lt;/a&gt;&lt;a href=&#34;#fnref3&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn4&#34;&gt;&lt;p&gt;Statistical Rethinking with brms, ggplot2, and the tidyverse, &lt;a href=&#34;https://bookdown.org/ajkurz/Statistical_Rethinking_recoded/&#34; class=&#34;uri&#34;&gt;https://bookdown.org/ajkurz/Statistical_Rethinking_recoded/&lt;/a&gt;&lt;a href=&#34;#fnref4&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
 &lt;/ol&gt;
 &lt;/div&gt;
 </description>
