@@ -134,13 +134,13 @@ A Gaussian model is reasonable for the outcome variable Temperature as we know i
 
 >__*Measurement errors, variations in growth, and the velocities of molecules all tend towards Gaussian distributions. These processes do this because at their heart, these processes add together fluctuations. And repeatedly adding finite fluctuations results in a distribution of sums that have shed all information about the underlying process, aside from mean and spread.*__
 
-Here's us formally asserting Temperature as a normal distribution with mean \mu and standard deviation \sigma. These two parameters are all that is needed to completely describe the distribution and also pin down the likelihood function.
+Here's us formally asserting Temperature as a normal distribution with mean mu and standard deviation sigma. These two parameters are all that is needed to completely describe the distribution and also pin down the likelihood function.
 
 $T_i \sim \text{Normal}(\mu_i, \sigma)$  
 
 ## __Step 2: Parameterize the mean__
 
-If we further parameterize \mu, we can do some neat things like move the mean around with the predictor variable.  This is a pretty key concept - *you move the mean of the outcome variable around by parameterizing it.  If we make it a line then it will move linearly with the predictor variable.*  The real data will still have a spread once the \sigma terms is folded back in, but we can think of the whole distribution shifting up and down based on the properties of the line.
+If we further parameterize the mean we can do some neat things like move it around with the predictor variable.  This is a pretty key concept - *you move the mean of the outcome variable around by parameterizing it.  If we make it a line then it will move linearly with the predictor variable.*  The real data will still have a spread once the sigma term is folded back in, but we can think of the whole distribution shifting up and down based on the properties of the line.
 
 Here's us asserting we want mu to move linearly with changes in the predictor variable (time).  Subtracting the mean from each value of the predictor variable "centers" the data which McElreath recommends in most cases. I will explore the differences between centered and un-centered later on.
 
