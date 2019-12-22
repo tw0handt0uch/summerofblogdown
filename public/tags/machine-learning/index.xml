@@ -105,12 +105,12 @@ grid::grid.draw(scatter_hist_1_fig)&lt;/code&gt;&lt;/pre&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;&lt;em&gt;Measurement errors, variations in growth, and the velocities of molecules all tend towards Gaussian distributions. These processes do this because at their heart, these processes add together fluctuations. And repeatedly adding finite fluctuations results in a distribution of sums that have shed all information about the underlying process, aside from mean and spread.&lt;/em&gt;&lt;/strong&gt;&lt;/p&gt;
 &lt;/blockquote&gt;
-&lt;p&gt;Here’s us formally asserting Temperature as a normal distribution with mean and standard deviation . These two parameters are all that is needed to completely describe the distribution and also pin down the likelihood function.&lt;/p&gt;
+&lt;p&gt;Here’s us formally asserting Temperature as a normal distribution with mean mu and standard deviation sigma. These two parameters are all that is needed to completely describe the distribution and also pin down the likelihood function.&lt;/p&gt;
 &lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(T_i \sim \text{Normal}(\mu_i, \sigma)\)&lt;/span&gt;&lt;/p&gt;
 &lt;/div&gt;
 &lt;div id=&#34;step-2-parameterize-the-mean&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;&lt;strong&gt;Step 2: Parameterize the mean&lt;/strong&gt;&lt;/h2&gt;
-&lt;p&gt;If we further parameterize , we can do some neat things like move the mean around with the predictor variable. This is a pretty key concept - &lt;em&gt;you move the mean of the outcome variable around by parameterizing it. If we make it a line then it will move linearly with the predictor variable.&lt;/em&gt; The real data will still have a spread once the terms is folded back in, but we can think of the whole distribution shifting up and down based on the properties of the line.&lt;/p&gt;
+&lt;p&gt;If we further parameterize the mean we can do some neat things like move it around with the predictor variable. This is a pretty key concept - &lt;em&gt;you move the mean of the outcome variable around by parameterizing it. If we make it a line then it will move linearly with the predictor variable.&lt;/em&gt; The real data will still have a spread once the sigma term is folded back in, but we can think of the whole distribution shifting up and down based on the properties of the line.&lt;/p&gt;
 &lt;p&gt;Here’s us asserting we want mu to move linearly with changes in the predictor variable (time). Subtracting the mean from each value of the predictor variable “centers” the data which McElreath recommends in most cases. I will explore the differences between centered and un-centered later on.&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\mu_i = \alpha + \beta (x_i - \bar{x})\)&lt;/span&gt;&lt;/p&gt;
@@ -118,7 +118,8 @@ grid::grid.draw(scatter_hist_1_fig)&lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 &lt;div id=&#34;step-3-set-priors&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;&lt;strong&gt;Step 3: Set priors&lt;/strong&gt;&lt;/h2&gt;
-&lt;p&gt;We know some things about these data. Temperature is a continuous variable so we want a continuous distribution. We also know from the nature of the treatment that there isn’t really any physical mechanism within the device that would be expected to cool down the tissue below normal body temperature. Since only heating is expected, the slope should be positive or zero.&lt;/p&gt;
+&lt;p&gt;We know some things about these data and we should use it to help regularize to model through the priors.&lt;/p&gt;
+&lt;p&gt;Temperature is a continuous variable so we want a continuous distribution. We also know from the nature of the treatment that there isn’t really any physical mechanism within the device that would be expected to cool down the tissue below normal body temperature. Since only heating is expected, the slope should be positive or zero.&lt;/p&gt;
 &lt;p&gt;McElreath emphasizes simulating from the priors to visualize “what the model knows before it sees the data”. Here are some priors to consider. Let’s evaluate.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# Set seed for repeatability
 set.seed(1999)

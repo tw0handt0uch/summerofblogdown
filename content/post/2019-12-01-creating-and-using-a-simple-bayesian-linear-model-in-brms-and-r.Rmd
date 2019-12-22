@@ -148,7 +148,9 @@ Here's us asserting we want mu to move linearly with changes in the predictor va
 
 ## __Step 3: Set priors__
 
-We know some things about these data.  Temperature is a continuous variable so we want a continuous distribution.  We also know from the nature of the treatment that there isn't really any physical mechanism within the device that would be expected to cool down the tissue below normal body temperature.  Since only heating is expected, the slope should be positive or zero.  
+We know some things about these data and we should use it to help regularize to model through the priors.  
+
+Temperature is a continuous variable so we want a continuous distribution.  We also know from the nature of the treatment that there isn't really any physical mechanism within the device that would be expected to cool down the tissue below normal body temperature.  Since only heating is expected, the slope should be positive or zero.  
 
 McElreath emphasizes simulating from the priors to visualize "what the model knows before it sees the data". Here are some priors to consider.  Let's evaluate.
 

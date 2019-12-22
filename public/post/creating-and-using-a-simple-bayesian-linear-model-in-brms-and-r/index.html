@@ -341,12 +341,12 @@ grid::grid.draw(scatter_hist_1_fig)</code></pre>
 <blockquote>
 <p><strong><em>Measurement errors, variations in growth, and the velocities of molecules all tend towards Gaussian distributions. These processes do this because at their heart, these processes add together fluctuations. And repeatedly adding finite fluctuations results in a distribution of sums that have shed all information about the underlying process, aside from mean and spread.</em></strong></p>
 </blockquote>
-<p>Here’s us formally asserting Temperature as a normal distribution with mean and standard deviation . These two parameters are all that is needed to completely describe the distribution and also pin down the likelihood function.</p>
+<p>Here’s us formally asserting Temperature as a normal distribution with mean mu and standard deviation sigma. These two parameters are all that is needed to completely describe the distribution and also pin down the likelihood function.</p>
 <p><span class="math inline">\(T_i \sim \text{Normal}(\mu_i, \sigma)\)</span></p>
 </div>
 <div id="step-2-parameterize-the-mean" class="section level2">
 <h2><strong>Step 2: Parameterize the mean</strong></h2>
-<p>If we further parameterize , we can do some neat things like move the mean around with the predictor variable. This is a pretty key concept - <em>you move the mean of the outcome variable around by parameterizing it. If we make it a line then it will move linearly with the predictor variable.</em> The real data will still have a spread once the terms is folded back in, but we can think of the whole distribution shifting up and down based on the properties of the line.</p>
+<p>If we further parameterize the mean we can do some neat things like move it around with the predictor variable. This is a pretty key concept - <em>you move the mean of the outcome variable around by parameterizing it. If we make it a line then it will move linearly with the predictor variable.</em> The real data will still have a spread once the sigma term is folded back in, but we can think of the whole distribution shifting up and down based on the properties of the line.</p>
 <p>Here’s us asserting we want mu to move linearly with changes in the predictor variable (time). Subtracting the mean from each value of the predictor variable “centers” the data which McElreath recommends in most cases. I will explore the differences between centered and un-centered later on.</p>
 <blockquote>
 <p><span class="math inline">\(\mu_i = \alpha + \beta (x_i - \bar{x})\)</span></p>
@@ -354,7 +354,8 @@ grid::grid.draw(scatter_hist_1_fig)</code></pre>
 </div>
 <div id="step-3-set-priors" class="section level2">
 <h2><strong>Step 3: Set priors</strong></h2>
-<p>We know some things about these data. Temperature is a continuous variable so we want a continuous distribution. We also know from the nature of the treatment that there isn’t really any physical mechanism within the device that would be expected to cool down the tissue below normal body temperature. Since only heating is expected, the slope should be positive or zero.</p>
+<p>We know some things about these data and we should use it to help regularize to model through the priors.</p>
+<p>Temperature is a continuous variable so we want a continuous distribution. We also know from the nature of the treatment that there isn’t really any physical mechanism within the device that would be expected to cool down the tissue below normal body temperature. Since only heating is expected, the slope should be positive or zero.</p>
 <p>McElreath emphasizes simulating from the priors to visualize “what the model knows before it sees the data”. Here are some priors to consider. Let’s evaluate.</p>
 <pre class="r"><code># Set seed for repeatability
 set.seed(1999)
