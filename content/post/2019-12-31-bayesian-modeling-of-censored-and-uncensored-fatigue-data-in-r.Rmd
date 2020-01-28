@@ -1585,7 +1585,9 @@ post_mwnp_samples <- posterior_samples(mtf_weib_new_priors_fit) %>%
 post_mwnp_samples %>%
   head(10) %>%
   kable(align = rep("c", 2), digits = 2)
+
 ```
+
 Evaluate the effect of the different priors (default vs. iterated) on the model fit for original n=30 censored data points.
 
 ```{r}
