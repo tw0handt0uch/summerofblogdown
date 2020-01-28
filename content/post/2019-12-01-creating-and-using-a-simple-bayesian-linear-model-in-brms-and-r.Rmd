@@ -333,7 +333,7 @@ ablation_dta_tbl <- ablation_dta_tbl %>% mutate(time_c = time - mean(time))
 ```
 
 ```{r echo=FALSE}
-#33saveRDS(model_2, file = "blr_rethinking_model_2.rds")
+#saveRDS(model_2, file = "blr_rethinking_model_2.rds")
 model_2 <- readRDS(file = "blr_rethinking_model_2.rds")
 ```
 

@@ -1,0 +1,2208 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.56.1" />
+
+  <title>Survival Analysis - Fitting Weibull Models for Improving Device Reliability in R &middot; [R]eliability</title>
+
+    
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.9.0/css/all.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+ 
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/img/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+  <a class="pure-menu-heading brand" href="/">Riley King</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/about/"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
+      
+        </li>
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/tw0handt0uch1" rel="me" target="_blank"><i class="fab fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/riley-king-9594247" rel="me" target="_blank"><i class="fab fa-linkedin"></i></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/tw0handt0uch" rel="me" target="_blank"><i class="fab fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+ <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://www.r-bloggers.com/"><i class="fa fa-rss fa-fw"></i>R-Bloggers</a>
+    </li>
+
+  </ul>
+</div>
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2019. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+
+<div class="header">
+  <h1>Survival Analysis - Fitting Weibull Models for Improving Device Reliability in R</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+    <i class="fa fa-calendar fa-fw"></i>
+    <time>27 Jan 2020</time>
+  </div>
+
+  
+
+  
+  
+  
+  
+
+  
+  
+  
+  <div>
+    <i class="fa fa-tags fa-fw"></i>
+    
+      <a class="post-taxonomy-tag" href="/tags/simulation">Simulation</a>&nbsp;&#47;
+    
+      <a class="post-taxonomy-tag" href="/tags/r">R</a>
+    
+  </div>
+  
+  
+
+</div>
+
+  
+
+
+<p>It’s time to get our hands dirty with some survival analysis! In this post, I’ll explore reliability modeling techniques that are applicable to Class III medical device testing. My goal is to expand on what I’ve been learning about GLM’s and get comfortable fitting data to Weibull distributions. I don’t have a ton of experience with Weibull analysis so I’ll be taking this opportunity to ask questions, probe assumptions, run simulations, explore different libraries, and develop some intuition about what to expect. I will look at the problem from both a frequentist and Bayesian perspective and explore censored and un-censored data types. Fair warning - expect the workflow to be less linear than normal to allow for these excursions.</p>
+<p>First - a bit of background. FDA expects data supporting the durability of implantable devices over a specified service life. Engineers develop and execute benchtop tests that accelerate the cyclic stresses and strains, typically by increasing the frequency. Such a test is shown here for a coronary stent:<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a></p>
+<p><img src="/./img/fracture.gif" width="100%" height="100%" style="display: block; margin: auto;" /></p>
+<p>The most common experimental design for this type of testing is to treat the data as attribute i.e. pass/fail by recording whether or not each test article fractured or not after some pre-determined duration <em>t</em>. By treating each tested device as a Bernoulli trial, a 1-sided confidence interval can be established on the reliability of the population based on the binomial distribution. This approach is not optimal however since it is generally only practical when all tested units pass the test and even then the sample size requirement are quite restricting. Additionally, designers cannot establish any sort of safety margin or understand the failure mode(s) of the design. We can do better by borrowing reliability techniques from other engineering domains where tests are run to failure and modeled as events vs. time. Such data often follows a Weibull distribution which is flexible enough to accommodate many different failure rates and patterns.</p>
+<ul>
+<li><a href="#part-1---fitting-models-to-weibull-data-without-censoring-%5Bfrequentist-perspective%5D">Part 1 - Fitting Models to Weibull Data Without Censoring [Frequentist Perspective]</a>
+<ul>
+<li><a href="#construct-weibull-model-from-un-censored-data-using-fitdistrplus">Construct Weibull model from un-censored data using fitdistrplus</a></li>
+<li><a href="#using-the-model-to-infer-device-reliability">Using the model to infer device reliability</a></li>
+</ul></li>
+<li><a href="#part-2---fitting-models-to-weibull-data-without-censoring-%5Bbayesian-perspective%5D">Part 2 - Fitting Models to Weibull Data Without Censoring [Bayesian Perspective]</a>
+<ul>
+<li><a href="#use-grid-approximation-to-estimate-posterior">Use grid approximation to estimate posterior</a></li>
+<li><a href="#visualize-draws-from-the-posterior">Visualize draws from the posterior</a></li>
+<li><a href="#uncertainty-in-the-implied-reliabilty-of-the-device">Uncertainty in the implied reliabilty of the device</a></li>
+</ul></li>
+<li><a href="#part-3---fitting-models-to-weibull-data-with-right-censoring-%5Bfrequentist-perspective%5D">Part 3 - Fitting Models to Weibull Data with Right-Censoring [Frequentist Perspective]</a>
+<ul>
+<li><a href="#point-estimate-with-right-censored-data">Point estimate with right-censored data</a></li>
+<li><a href="#simulation-to-understand-point-estimate-sensitivity-to-sample-size">Simulation to understand point estimate sensitivity to sample size</a></li>
+<li><a href="#simulation-of-95%-confidence-intervals-on-reliability">Simulation of 95% confidence intervals on reliability</a></li>
+</ul></li>
+<li><a href="#part-4---fitting-models-to-weibull-data-with-right-censoring-%5Bbayesian-perspective%5D">Part 4 - Fitting Models to Weibull Data with Right-Censoring [Bayesian Perspective]</a>
+<ul>
+<li><a href="#use-brm()-to-generate-a-posterior-distribution-for-shape-and-scale">Use brm() to generate a posterior distribution for shape and scale</a></li>
+<li><a href="#evaluation-of-priors">Evaluation of priors</a></li>
+<li><a href="#evaluate-sensitivity-of-posterior-to-sample-size">Evaluate sensitivity of posterior to sample size</a></li>
+<li><a href="#evaluate-sensitivity-of-reliability-estimate-to-sample-size.">Evaluate Sensitivity of Reliability Estimate to Sample Size.</a></li>
+</ul></li>
+<li><a href="#wrap-up">Wrap-up</a></li>
+<li><a href="#appendix---prior-predictive-simulation---beware-it&#39;s-ugly-in-here">APPENDIX - Prior Predictive Simulation - BEWARE it’s ugly in here</a></li>
+</ul>
+<pre class="r"><code>library(patchwork)
+library(skimr)
+library(ggrepel)
+library(tidyverse)
+library(knitr)
+library(rayshader)
+library(fitdistrplus)
+library(tidymodels)
+library(tidybayes)
+library(ggridges)
+library(ggExtra)
+library(brms)</code></pre>
+<div id="part-1---fitting-models-to-weibull-data-without-censoring-frequentist-perspective" class="section level2">
+<h2>Part 1 - Fitting Models to Weibull Data Without Censoring [Frequentist Perspective]</h2>
+<blockquote>
+<ul>
+<li><strong>Tools: fitdist() function form fitdistrplus package</strong></li>
+<li><strong>Goal: Obtain maximum likelihood point estimate of shape and scale parameters from best fitting Weibull distribution</strong></li>
+</ul>
+</blockquote>
+<p>In the following section I work with test data representing the number of days a set of devices were on test before failure.<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a> Each day on test represents 1 month in service. All devices were tested until failure (no censored data). To start, I’ll read in the data and take a look at it. There are 100 data points, which is more than typically tested for stents or implants but is reasonable for electronic components. We’ll assume that domain knowledge indicates these data come from a process that can be well described by a Weibull distribution.</p>
+<pre class="r"><code># Read data in and scan with skim()
+data &lt;- read.csv(file = &quot;Example3.1Data.txt&quot;, header = FALSE) %&gt;% as_tibble()
+data_tbl &lt;- data %&gt;% rename(fatigue_duration = V1)
+
+data_tbl %&gt;% skim()</code></pre>
+<pre><code>## Skim summary statistics
+##  n obs: 100 
+##  n variables: 1 
+## 
+## -- Variable type:integer --------------------------------------------------------------------------------------------------------------------
+##          variable missing complete   n  mean    sd p0   p25  p50   p75
+##  fatigue_duration       0      100 100 89.44 51.42  5 51.75 79.5 119.5
+##  p100     hist
+##   290 &lt;U+2583&gt;&lt;U+2587&gt;&lt;U+2586&gt;&lt;U+2583&gt;&lt;U+2582&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;</code></pre>
+<pre class="r"><code>data_tbl %&gt;%
+  head(10) %&gt;%
+  kable(align = rep(&quot;c&quot;, 1))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">fatigue_duration</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">75</td>
+</tr>
+<tr class="even">
+<td align="center">28</td>
+</tr>
+<tr class="odd">
+<td align="center">52</td>
+</tr>
+<tr class="even">
+<td align="center">67</td>
+</tr>
+<tr class="odd">
+<td align="center">78</td>
+</tr>
+<tr class="even">
+<td align="center">5</td>
+</tr>
+<tr class="odd">
+<td align="center">46</td>
+</tr>
+<tr class="even">
+<td align="center">132</td>
+</tr>
+<tr class="odd">
+<td align="center">169</td>
+</tr>
+<tr class="even">
+<td align="center">97</td>
+</tr>
+</tbody>
+</table>
+<div id="construct-weibull-model-from-un-censored-data-using-fitdistrplus" class="section level3">
+<h3>Construct Weibull model from un-censored data using fitdistrplus</h3>
+<p>To start out with, let’s take a frequentist approach and fit a 2-parameter Weibull distribution to these data. Once the parameters of the best fitting Weibull distribution of determined, they can be used to make useful inferences and predictions.</p>
+<p>I’ll use the fitdist() function from the fitdistrplus package to identify the best fit via maximum likelihood. The parameters we care about estimating are the shape and scale.</p>
+<pre class="r"><code># Fit model and extract parameters of interest
+mle_wieb_nocens_fit &lt;- fitdist(data_tbl$fatigue_duration, &quot;weibull&quot;)
+weib_shape &lt;- mle_wieb_nocens_fit$estimate[&quot;shape&quot;]
+weib_scale &lt;- mle_wieb_nocens_fit$estimate[&quot;scale&quot;]
+
+# Summarize and plot
+summary(mle_wieb_nocens_fit)</code></pre>
+<pre><code>## Fitting of the distribution &#39; weibull &#39; by maximum likelihood 
+## Parameters : 
+##         estimate Std. Error
+## shape   1.832201  0.1401198
+## scale 100.841802  5.8068570
+## Loglikelihood:  -526.2573   AIC:  1056.515   BIC:  1061.725 
+## Correlation matrix:
+##           shape     scale
+## shape 1.0000000 0.3186071
+## scale 0.3186071 1.0000000</code></pre>
+<pre class="r"><code>plot(mle_wieb_nocens_fit)</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-7-1.png" width="100%" height="500px" /> The Weibull isn’t the only possible distribution we could have fit. Lognormal and gamma are both known to model time-to-failure data well. They are shown below using the denscomp() function from fitdistrplus.</p>
+<pre class="r"><code># Fit gamma model, extract shape, rate
+mle_gamma_nocens_fit &lt;- fitdist(data_tbl$fatigue_duration, &quot;gamma&quot;)
+gamma_shape &lt;- mle_gamma_nocens_fit$estimate[&quot;shape&quot;]
+gamma_rate &lt;- mle_gamma_nocens_fit$estimate[&quot;rate&quot;]
+
+# Fit lognormal model, extract mean, sd
+mle_lognormal_nocens_fit &lt;- fitdist(data_tbl$fatigue_duration, &quot;lnorm&quot;)
+lnorm_meanlog &lt;- mle_lognormal_nocens_fit$estimate[&quot;meanlog&quot;]
+lnorm_sdlog &lt;- mle_lognormal_nocens_fit$estimate[&quot;sdlog&quot;]
+
+# visualize in fitdistrplus
+plot.legend &lt;- c(&quot;gamma&quot;, &quot;lognormal&quot;, &quot;Weibull&quot;)
+denscomp(list(mle_gamma_nocens_fit, mle_lognormal_nocens_fit, mle_wieb_nocens_fit), legendtext = plot.legend)</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-8-1.png" width="100%" height="500px" /></p>
+<p>I recreate the above in ggplot2, for fun and practice.</p>
+<pre class="r"><code>x_series &lt;- seq(0, 300, by = 1)
+x_tbl &lt;- tibble(x = x_series)
+
+
+wide_densities_tbl &lt;- x_tbl %&gt;%
+  mutate(
+    Weibull = dweibull(x, shape = weib_shape, scale = weib_scale),
+    gamma = dgamma(x, shape = gamma_shape, rate = gamma_rate),
+    lognormal = dlnorm(x, meanlog = lnorm_meanlog, sdlog = lnorm_sdlog)
+  ) %&gt;%
+  gather(&quot;distribution&quot;, &quot;value&quot;, -x)
+
+wide_densities_tbl %&gt;% ggplot(aes(x = x)) +
+  geom_line(aes(
+    x = x,
+    y = value,
+    color = distribution,
+    linetype = distribution
+  ),
+  size = .8
+  ) +
+  geom_histogram(
+    data = data_tbl,
+    aes(
+      x = fatigue_duration,
+      y = ..density..
+    ),
+    binwidth = 50,
+    boundary = 300,
+    color = &quot;white&quot;,
+    fill = &quot;#2c3e50&quot;,
+    alpha = .6
+  ) +
+  labs(
+    x = &quot;Time to Fatigue Failure Event (Days)&quot;,
+    y = &quot;Density&quot;,
+    title = &quot;Histogram and theoretical densities for Fatigue Data&quot;,
+    subtitle = &quot;Parametric fits using MLE via fitdist() function&quot;
+  ) +
+  theme(legend.title = element_blank())</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-9-1.png" width="100%" height="500px" /></p>
+<p>Goodness-of-fit statistics are available and shown below for reference. If available, we would prefer to use domain knowledge and experience to identify what the true distribution is instead of these statistics which are subject to sampling variation. It is not good practice to stare at the histogram and attempt to identify the distribution of the population from which it was drawn. Nevertheless, we might look at the statistics below if we had absolutely no idea the nature of the data generating process / test.</p>
+<pre class="r"><code># get goodness-of-fit
+gofstat(list(mle_wieb_nocens_fit, mle_gamma_nocens_fit, mle_lognormal_nocens_fit),
+  fitnames = c(&quot;weib&quot;, &quot;gamma&quot;, &quot;lnorm&quot;)
+)</code></pre>
+<pre><code>## Goodness-of-fit statistics
+##                                    weib      gamma      lnorm
+## Kolmogorov-Smirnov statistic 0.05066902 0.03643609 0.06948557
+## Cramer-von Mises statistic   0.03408173 0.02106615 0.12076742
+## Anderson-Darling statistic   0.21634543 0.17192106 0.81630880
+## 
+## Goodness-of-fit criteria
+##                                    weib    gamma    lnorm
+## Akaike&#39;s Information Criterion 1056.515 1056.408 1067.427
+## Bayesian Information Criterion 1061.725 1061.618 1072.637</code></pre>
+</div>
+<div id="using-the-model-to-infer-device-reliability" class="section level3">
+<h3>Using the model to infer device reliability</h3>
+<p>The model by itself isn’t what we are after. It is the vehicle from which we can infer some very important information about the reliability of the implant design. First and foremost - we would be very interested in understanding the reliability of the device at a time of interest. For instance, suppose our voice of customer research indicates that our new generation of device needs to last 10 months <em>in vivo</em> to be safe and competitive. Recall that each day on test represents 1 month in service. Once we fit a Weibull model to the test data for our device, we can use the reliability function to calculate the probability of survival beyond time <em>t</em>.<a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a></p>
+<p><span class="math display">\[\text{R} (t | \beta, \eta) =  e ^ {- \bigg (\frac{t}{\eta} \bigg ) ^ {\beta}}\]</span></p>
+<p>Note:</p>
+<blockquote>
+<p>t = the time of interest (for example, 10 years) <span class="math inline">\(\beta\)</span> = the Weibull scale parameter <span class="math inline">\(\eta\)</span> = the Weibull shape parameter</p>
+</blockquote>
+<p>This looks a little nasty but it reads something like “the probability of a device surviving beyond time <em>t</em> conditional on parameters <span class="math inline">\(\beta\)</span> and <span class="math inline">\(\eta\)</span> is [some mathy function of <em>t</em>, <span class="math inline">\(\beta\)</span> and <span class="math inline">\(\eta\)</span>]. For the model we fit above using MLE, a point estimate of the reliability at t=10 years (per the above VoC) can be calculated with a simple 1-liner:</p>
+<pre class="r"><code>reliability_at_10 &lt;- exp(-(10 / weib_scale)**(weib_shape))
+reliability_at_10 %&gt;%
+  scales::percent() %&gt;%
+  kable(align = &quot;c&quot;)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">x</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">98.6%</td>
+</tr>
+</tbody>
+</table>
+<p>In this way we infer something important about the quality of the product by fitting a model from benchtop data.</p>
+<p>It is common to report confidence intervals about the reliability estimate but this practice suffers many limitations. The intervals change with different stopping intentions and/or additional comparisons. They also do not represent true probabilistic distributions as our intuition expects them to and cannot be propagated through complex systems or simulations. What we’d really like is the posterior distribution for each of the parameters in the Weibull model, which provides all credible pairs of <span class="math inline">\(\beta\)</span> and <span class="math inline">\(\eta\)</span> that are supported by the data. For that, we need Bayesian methods which happen to also be more fun.</p>
+</div>
+</div>
+<div id="part-2---fitting-models-to-weibull-data-without-censoring-bayesian-perspective" class="section level2">
+<h2>Part 2 - Fitting Models to Weibull Data Without Censoring [Bayesian Perspective]</h2>
+<blockquote>
+<ul>
+<li><strong>Tools: Grid Approximation [manual calculations]</strong></li>
+<li><strong>Goal: Approximate true posterior distributions for shape and scale via discretization of priors</strong></li>
+</ul>
+</blockquote>
+<div id="use-grid-approximation-to-estimate-posterior" class="section level3">
+<h3>Use grid approximation to estimate posterior</h3>
+<p>This problem is simple enough that we can apply grid approximation to obtain the posterior. In this method we feed in a sequence of candidate combinations for <span class="math inline">\(\beta\)</span> and <span class="math inline">\(\eta\)</span> and determine which pairs were most likely to give rise to the data. The likelihood is multiplied by the prior and converted to a probability for each set of candidate <span class="math inline">\(\beta\)</span> and <span class="math inline">\(\eta\)</span>. Flat priors are used here for simplicity - I’ll put more effort into the priors later on in this post. Since the priors are flat, the posterior estimates should agree with the maximum likelihood point estimate.</p>
+<p>Calculate posterior via grid approximation:<a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a></p>
+<pre class="r"><code># function to get log-likelihood of the data for a given shape &amp; scale pair
+grid_function &lt;- function(shape, scale) {
+  dweibull(data_tbl$fatigue_duration, shape = shape, scale = scale, log = T) %&gt;%
+    sum()
+}
+
+# set up grid of possible shape, scale parameters
+n &lt;- 100
+shape_grid &lt;- seq(1, 3, length.out = n)
+scale_grid &lt;- seq(60, 130, length.out = n)
+two_param_grid &lt;- expand_grid(shape_grid, scale_grid)
+
+# map the grid_function over all candidate parameter pairs
+# multiply LL by prior and convert to probability
+full_tbl &lt;- two_param_grid %&gt;%
+  mutate(log_likelihood = map2(shape_grid, scale_grid, grid_function)) %&gt;%
+  unnest() %&gt;%
+  mutate(
+    shape_prior = 1,
+    scale_prior = 1
+  ) %&gt;%
+  mutate(product = log_likelihood + shape_prior + scale_prior) %&gt;%
+  mutate(probability = exp(product - max(product)))
+
+full_tbl %&gt;%
+  head(10) %&gt;%
+  kable(align = rep(&quot;c&quot;, 7))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">shape_grid</th>
+<th align="center">scale_grid</th>
+<th align="center">log_likelihood</th>
+<th align="center">shape_prior</th>
+<th align="center">scale_prior</th>
+<th align="center">product</th>
+<th align="center">probability</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">1</td>
+<td align="center">60.00000</td>
+<td align="center">-558.5011</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">-556.5011</td>
+<td align="center">0</td>
+</tr>
+<tr class="even">
+<td align="center">1</td>
+<td align="center">60.70707</td>
+<td align="center">-557.9365</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">-555.9365</td>
+<td align="center">0</td>
+</tr>
+<tr class="odd">
+<td align="center">1</td>
+<td align="center">61.41414</td>
+<td align="center">-557.3982</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">-555.3982</td>
+<td align="center">0</td>
+</tr>
+<tr class="even">
+<td align="center">1</td>
+<td align="center">62.12121</td>
+<td align="center">-556.8853</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">-554.8853</td>
+<td align="center">0</td>
+</tr>
+<tr class="odd">
+<td align="center">1</td>
+<td align="center">62.82828</td>
+<td align="center">-556.3968</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">-554.3968</td>
+<td align="center">0</td>
+</tr>
+<tr class="even">
+<td align="center">1</td>
+<td align="center">63.53535</td>
+<td align="center">-555.9317</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">-553.9317</td>
+<td align="center">0</td>
+</tr>
+<tr class="odd">
+<td align="center">1</td>
+<td align="center">64.24242</td>
+<td align="center">-555.4890</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">-553.4890</td>
+<td align="center">0</td>
+</tr>
+<tr class="even">
+<td align="center">1</td>
+<td align="center">64.94949</td>
+<td align="center">-555.0680</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">-553.0680</td>
+<td align="center">0</td>
+</tr>
+<tr class="odd">
+<td align="center">1</td>
+<td align="center">65.65657</td>
+<td align="center">-554.6678</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">-552.6678</td>
+<td align="center">0</td>
+</tr>
+<tr class="even">
+<td align="center">1</td>
+<td align="center">66.36364</td>
+<td align="center">-554.2875</td>
+<td align="center">1</td>
+<td align="center">1</td>
+<td align="center">-552.2875</td>
+<td align="center">0</td>
+</tr>
+</tbody>
+</table>
+<p>Plot the grid approximation of the posterior. If we super-impose our point estimate from Part 1, we see the maximum likelihood estimate agrees well with the mode of the joint posterior distributions for shape and scale.</p>
+<pre class="r"><code># need this data to feed to gg_label_repel to tell it where to attach label
+point_tbl &lt;- tibble(x = weib_shape, y = weib_scale)
+
+# visualize and compare to MLE
+plt_1 &lt;- full_tbl %&gt;%
+  ggplot(aes(x = shape_grid, y = scale_grid)) +
+  geom_raster(aes(fill = probability),
+    interpolate = T
+  ) +
+  geom_point(x = weib_shape, y = weib_scale, size = 1.3) +
+  geom_label_repel(
+    data = point_tbl, aes(x, y),
+    label = &quot;Maximum Likelihood\n Estimate&quot;,
+    fill = &quot;#8bd646ff&quot;,
+    color = &quot;black&quot;,
+    segment.color = &quot;black&quot;,
+    segment.size = 1,
+    #                   min.segment.length = unit(1, &quot;lines&quot;),
+    nudge_y = -16,
+    nudge_x = .5
+  ) +
+  scale_fill_viridis_c() +
+  labs(
+    x = expression(eta [&quot;shape&quot;]),
+    y = expression(beta [&quot;scale&quot;])
+  ) +
+  theme(panel.grid = element_blank())
+
+plt_1</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-14-1.png" width="100%" height="500px" /></p>
+<p>3d with rayshader just to flex :)</p>
+<pre class="r"><code># par(mfrow = c(1, 1))
+# plot_gg(plt_1, width = 5, height = 4, scale = 300, multicore = TRUE, windowsize = c(1200, 960),
+#        fov = 70, zoom = 0.45, theta = 330, phi = 40)</code></pre>
+<p><img src="/./img/3d_weib_2.png" width="100%" height="100%" style="display: block; margin: auto;" /></p>
+</div>
+<div id="visualize-draws-from-the-posterior" class="section level3">
+<h3>Visualize draws from the posterior</h3>
+<p>We can sample from the grid to get the same if we weight the draws by probability.</p>
+<pre class="r"><code>set.seed(2020)
+
+# take a weighted sample from the posterior
+grid_approx_posterior_samples &lt;- full_tbl %&gt;%
+  sample_n(size = 2000, replace = T, weight = probability)
+
+# visualize
+grid_approx_plot &lt;- grid_approx_posterior_samples %&gt;%
+  ggplot(aes(x = shape_grid, y = scale_grid)) +
+  geom_point(
+    colour = &quot;#e56a5dff&quot;,
+    size = 2,
+    alpha = 0.3
+  ) +
+  labs(
+    x = expression(eta [&quot;shape&quot;]),
+    y = expression(beta [&quot;scale&quot;])
+  ) +
+  geom_density_2d(color = &quot;black&quot;, size = 1.2, alpha = .4) +
+  labs(
+    title = &quot;Estimate of Joint Probabilities for Shape and Scale&quot;,
+    subtitle = &quot;Via Posterior Sampling&quot;
+  )
+
+grid_approx_marg_plot &lt;- ggMarginal(grid_approx_plot,
+  type = &quot;density&quot;,
+  color = &quot;white&quot;,
+  alpha = 0.7,
+  fill = &quot;#e56a5dff&quot;
+)</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-18-1.png" width="100%" height="500px" /></p>
+</div>
+<div id="uncertainty-in-the-implied-time-to-failure-curves" class="section level3">
+<h3>Uncertainty in the implied time-to-failure curves</h3>
+<p>Each of the credible parameter values implies a possible Weibull distribution of time-to-failure data from which a reliability estimate can be inferred. This is a good way to visualize the uncertainty in a way that makes intuitive sense.</p>
+<pre class="r"><code># sample from posterior; weighted as prob
+grid_approx_posterior_samples_4plot &lt;- full_tbl %&gt;%
+  sample_n(size = 1000, replace = T, weight = probability) %&gt;%
+  select(shape_grid, scale_grid)
+
+# plot 1000 Weibull curves from samples parameters
+weib_uncertainty_plt &lt;- grid_approx_posterior_samples_4plot %&gt;%
+  mutate(p_y_data = map2(
+    shape_grid, scale_grid,
+    ~ tibble(
+      x = seq(0, 200, length.out = 400),
+      y = dweibull(x, .x, .y)
+    )
+  )) %&gt;%
+  mutate(row_id = row_number()) %&gt;%
+  unnest(p_y_data) %&gt;%
+  ggplot(aes(x = x, y = y)) +
+  geom_line(aes(group = row_id), alpha = .05, color = &quot;#440154ff&quot;) +
+  labs(
+    x = &quot;Time&quot;,
+    y = &quot;Density&quot;,
+    title = &quot;Distribution of Time at Failure Event&quot;,
+    subtitle = &quot;Implied by Posterior Distribution [Sample of n=1000]&quot;
+  )</code></pre>
+<p><img src="/./img/weib_uncertainty_plt.png" width="100%" height="100%" style="display: block; margin: auto;" /></p>
+</div>
+<div id="uncertainty-in-the-implied-reliabilty-of-the-device" class="section level3">
+<h3>Uncertainty in the implied reliabilty of the device</h3>
+<p>Any row-wise operations performed will retain the uncertainty in the posterior distribution. This allows for a straightforward computation of the range of credible reliabilities at t=10 via the reliability function.</p>
+<pre class="r"><code># use params in posterior to calculate correstponding reliabilities at t=10
+grid_approx_posterior_samples_4relplot &lt;- full_tbl %&gt;%
+  sample_n(size = 4000, replace = T, weight = probability) %&gt;%
+  select(shape_grid, scale_grid) %&gt;%
+  mutate(reliability_at_10 = exp(-(10 / scale_grid)**(shape_grid)))
+
+# visualize reliability distribution
+grid_approx_posterior_samples_4relplot %&gt;%
+  ggplot(aes(reliability_at_10)) +
+  geom_histogram(aes(y = ..density..), fill = &quot;#2c3e50&quot;, color = &quot;white&quot;, alpha = .6) +
+  labs(
+    title = &quot;Reliability Distribution&quot;,
+    subtitle = &quot;Calculated from Grid Approximation with Flat Priors&quot;
+  )</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-22-1.png" width="100%" height="500px" /> This distribution gives much richer information than the MLE point estimate of reliability. The most credible estimate of reliability is ~ 98.8%, but it could plausibly also be as low as 96%. This delta can mean the difference between a successful and a failing product and should be considered as you move through project phase gates.</p>
+</div>
+</div>
+<div id="part-3---fitting-models-to-weibull-data-with-right-censoring-frequentist-perspective" class="section level2">
+<h2>Part 3 - Fitting Models to Weibull Data with Right-Censoring [Frequentist Perspective]</h2>
+<blockquote>
+<ul>
+<li><strong>Tools: survreg() function form survival package</strong></li>
+<li><strong>Goal: Obtain maximum likelihood point estimate of shape and scale parameters from best fitting Weibull distribution</strong></li>
+</ul>
+</blockquote>
+<p>In survival analysis we are waiting to observe the event of interest. For benchtop testing, we wait for fracture or some other failure. In a clinical study, we might be waiting for death, re-intervention, or endpoint. Sometimes the events don’t happen within the observation window but we still must draw the study to a close and crunch the data. Cases in which no events were observed are considered “right-censored” in that we know the start date (and therefore how long they were under observation) but don’t know if and when the event of interest would occur. They must inform the analysis in some way - generally within the likelihood.</p>
+<div id="point-estimate-with-right-censored-data" class="section level3">
+<h3>Point estimate with right-censored data</h3>
+<p>First, I’ll set up a function to generate simulated data from a Weibull distribution and censor any observations greater than 100. I set the function up in anticipation of using the survreg() function from the <strong>survival</strong> package in R. The syntax is a little funky so some additional detail is provided below.</p>
+<pre class="r"><code># function to generate random Weibull data and censor data &gt; 100
+rweibull_cens_mod_fcn &lt;- function(n, shape, scale) {
+  raw_times &lt;- rweibull(n, shape = shape, scale = scale)
+  tibble(failure_time_raw = raw_times) %&gt;%
+    mutate(time = case_when(
+      failure_time_raw &lt; 100 ~ failure_time_raw,
+      TRUE ~ 100
+    )) %&gt;%
+    mutate(censor = case_when(
+      time == 100 ~ 0,
+      TRUE ~ 1
+    )) %&gt;%
+    mutate(censor = censor == 1) %&gt;%
+    mutate(time = time %&gt;% round(digits = 2)) %&gt;%
+    select(-failure_time_raw)
+}
+
+# set seed for repeatability
+set.seed(54)
+first_test_fit_tbl &lt;- rweibull_cens_mod_fcn(30, 3, 100)
+first_test_fit_tbl %&gt;%
+  head(10) %&gt;%
+  kable(align = rep(&quot;c&quot;, 2))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">time</th>
+<th align="center">censor</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">31.16</td>
+<td align="center">TRUE</td>
+</tr>
+<tr class="even">
+<td align="center">73.94</td>
+<td align="center">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="center">71.90</td>
+<td align="center">TRUE</td>
+</tr>
+<tr class="even">
+<td align="center">100.00</td>
+<td align="center">FALSE</td>
+</tr>
+<tr class="odd">
+<td align="center">100.00</td>
+<td align="center">FALSE</td>
+</tr>
+<tr class="even">
+<td align="center">74.91</td>
+<td align="center">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="center">37.79</td>
+<td align="center">TRUE</td>
+</tr>
+<tr class="even">
+<td align="center">72.28</td>
+<td align="center">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="center">50.63</td>
+<td align="center">TRUE</td>
+</tr>
+<tr class="even">
+<td align="center">45.88</td>
+<td align="center">TRUE</td>
+</tr>
+</tbody>
+</table>
+<p>I admit this looks a little strange because the data that were just described as censored (duration greater than 100) show as “FALSE” in the censored column. This is due to the default syntax of the survreg() function in the survival package that we intend to fit the model with:<a href="#fn5" class="footnoteRef" id="fnref5"><sup>5</sup></a></p>
+<p><strong>survival package defaults for censoring:</strong></p>
+<blockquote>
+<ul>
+<li>0 or FALSE for censoring, 1 or TRUE for observed event</li>
+</ul>
+</blockquote>
+<p>To further throw us off the trail, the survreg() function returns “scale”&quot; and “intercept”&quot; that must be converted to recover the shape and scale parameters that align with the rweibull() function used to create the data. Don’t fall for these tricks - just extract the desired information as follows:</p>
+<p><strong>survival package defaults for parameterizing the Weibull distribution:</strong></p>
+<blockquote>
+<ul>
+<li>survreg’s scale parameter = 1/(rweibull shape parameter)</li>
+<li>survreg’s intercept = log(rweibull scale parameter)</li>
+</ul>
+</blockquote>
+<p>Ok let’s see if the model can recover the parameters when we providing survreg() the tibble with n=30 data points (some censored):</p>
+<pre class="r"><code># fit model to simulated data (n=30)
+test_fit &lt;- survival::survreg(Surv(time, censor) ~ 1,
+  data = first_test_fit_tbl,
+  dist = &quot;weibull&quot;
+)
+
+# evaluate the fit
+summary(test_fit)</code></pre>
+<pre><code>## 
+## Call:
+## survival::survreg(formula = Surv(time, censor) ~ 1, data = first_test_fit_tbl, 
+##     dist = &quot;weibull&quot;)
+##               Value Std. Error    z       p
+## (Intercept)  4.5469     0.0896 50.7 &lt; 2e-16
+## Log(scale)  -0.9266     0.1972 -4.7 2.6e-06
+## 
+## Scale= 0.396 
+## 
+## Weibull distribution
+## Loglik(model)= -106.7   Loglik(intercept only)= -106.7
+## Number of Newton-Raphson Iterations: 5 
+## n= 30</code></pre>
+<p>Extract and covert shape and scale with broom::tidy() and dplyr:</p>
+<pre class="r"><code># extract scale parameter
+scale &lt;- tidy(test_fit)[1, 2] %&gt;%
+  rename(scale = estimate) %&gt;%
+  exp() %&gt;%
+  round(2)
+
+# extract shape parameter
+shape &lt;- tidy(test_fit)[2, 2] %&gt;%
+  rename(shape = estimate) %&gt;%
+  exp() %&gt;%
+  .^-1 %&gt;%
+  round(2)
+
+# summarize
+point_estimates &lt;- bind_cols(shape, scale)
+point_estimates %&gt;% kable(align = rep(&quot;c&quot;, 2))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">shape</th>
+<th align="center">scale</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">2.53</td>
+<td align="center">94.34</td>
+</tr>
+</tbody>
+</table>
+<p>What has happened here? We know the true parameters are shape = 3, scale = 100 because that’s how the data were generated. These point estimates are pretty far off. Is the survreg() fitting function broken? Are there too few data and we are just seeing sampling variation? Is it confused by the censored data? I honestly don’t know. To answer these questions, we need a new function that fits a model using survreg() for any provided sample size. The data to make the fit are generated internal to the function. The function returns a tibble with estimates of shape and scale for that particular trial:</p>
+</div>
+<div id="simulation-to-understand-point-estimate-sensitivity-to-sample-size" class="section level3">
+<h3>Simulation to understand point estimate sensitivity to sample size</h3>
+<pre class="r"><code># seed for repeatability
+set.seed(2025)
+
+# fcn takes sample size n, simulates weibull(3, 100) data, fits model, estimates params
+test_map_fcn &lt;- function(n) {
+  holder &lt;- rweibull_cens_mod_fcn(n, 3, 100)
+
+  sr1_fit &lt;- survival::survreg(Surv(time, censor) ~ 1, data = holder, dist = &quot;weibull&quot;)
+
+  scale &lt;- tidy(sr1_fit)[1, 2] %&gt;%
+    rename(scale = estimate) %&gt;%
+    exp() %&gt;%
+    round(2)
+
+  shape &lt;- tidy(sr1_fit)[2, 2] %&gt;%
+    rename(shape = estimate) %&gt;%
+    exp() %&gt;%
+    .^-1 %&gt;%
+    round(2)
+
+  point_estimates &lt;- bind_cols(shape, scale)
+  point_estimates
+}</code></pre>
+<p>Now that we have a function that takes a sample size n and returns fitted shape and scale values, we want to apply the function across many values of n. Let’s look at what happens to our point estimates of shape and scale as the sample size n increases from 10 to 1000 by 1.</p>
+<pre class="r"><code># create sequence of n&#39;s
+n_sim_mle &lt;- seq(10, 1000, by = 1) %&gt;%
+  tibble() %&gt;%
+  rename(n = &quot;.&quot;)
+
+# map the fitting function across vector of n&#39;s.
+results_tbl &lt;- n_sim_mle %&gt;%
+  mutate(results = map(n, test_map_fcn)) %&gt;%
+  unnest()
+
+# peek at format of results
+results_tbl %&gt;%
+  head(5) %&gt;%
+  kable(align = rep(&quot;c&quot;, 3))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">n</th>
+<th align="center">shape</th>
+<th align="center">scale</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">10</td>
+<td align="center">5.99</td>
+<td align="center">85.94</td>
+</tr>
+<tr class="even">
+<td align="center">11</td>
+<td align="center">2.89</td>
+<td align="center">108.29</td>
+</tr>
+<tr class="odd">
+<td align="center">12</td>
+<td align="center">2.96</td>
+<td align="center">103.04</td>
+</tr>
+<tr class="even">
+<td align="center">13</td>
+<td align="center">1.88</td>
+<td align="center">82.20</td>
+</tr>
+<tr class="odd">
+<td align="center">14</td>
+<td align="center">4.98</td>
+<td align="center">101.62</td>
+</tr>
+</tbody>
+</table>
+<p>Visualize results of the simulation:</p>
+<pre class="r"><code>results_tbl %&gt;%
+  gather(key = key, value = value, -n) %&gt;%
+  ggplot(aes(x = n, y = value)) +
+  geom_point(color = &quot;#5C126EFF&quot;, alpha = 0.3) +
+  facet_wrap(~key, scales = &quot;free_y&quot;) +
+  geom_smooth(color = &quot;#F17020FF&quot;, alpha = 0.9) +
+  labs(
+    x = &quot;Sample Size&quot;,
+    y = &quot;&quot;,
+    title = &quot;Estimated Shape and Scale Parameters for Different Data Set Sizes&quot;,
+    subtitle = &quot;Weibull Regressions using survival package.  Data generated from Weibull(3, 100)&quot;
+  )</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-28-1.png" width="100%" height="500px" /></p>
+<p>This simulation is illuminating. It’s apparent that there is sampling variability effecting the estimates. On average, the true parameters of shape = 3 and scale = 100 are correctly estimated. But on any given experimental run, the estimate might be off by quite a bit. The precision increases with sample size as expected but the variation is still relevant even at large n.</p>
+<p>Based on this simulation we can conclude that our initial point estimate of 2.5, 94.3 fit from n=30 is within the range of what is to be expected and not a software bug or coding error.</p>
+<p>Estimates for product reliability at 15, 30, 45, and 60 months are shown below.</p>
+<pre class="r"><code>results_tbl %&gt;%
+  mutate(reliability_at_15 = exp(-(15 / scale)**(shape))) %&gt;%
+  mutate(reliability_at_30 = exp(-(30 / scale)**(shape))) %&gt;%
+  mutate(reliability_at_45 = exp(-(45 / scale)**(shape))) %&gt;%
+  mutate(reliability_at_60 = exp(-(60 / scale)**(shape))) %&gt;%
+  select(-c(shape, scale)) %&gt;%
+  gather(key = &quot;key&quot;, value = &quot;value&quot;, -n) %&gt;%
+  ggplot(aes(x = n, y = value)) +
+  geom_point(aes(color = key), alpha = .4) +
+  #  geom_smooth(aes(group = key), color = &quot;black&quot;, size = .4, alpha = .5) +
+  ylim(c(.73, 1)) +
+  scale_color_viridis_d(option = &quot;C&quot;, begin = 0, end = .8, direction = -1) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1))) +
+  labs(
+    title = &quot;Reliability Point Estimates&quot;,
+    subtitle = &quot;Effect of Sample Size and Sampling Variability&quot;,
+    x = &quot;Sample Size&quot;,
+    y = &quot;Reliability Estimate&quot;
+  ) +
+  theme(legend.title = element_blank())</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-29-1.png" width="100%" height="500px" /></p>
+<p>The above gives a nice sense of the uncertainty in the reliability estimate as sample size increases, but you can’t actually simulate a confidence interval from those data because there aren’t enough data points at any one sample size. To do that, we need many runs at the same sample size.</p>
+</div>
+<div id="simulation-of-95-confidence-intervals-on-reliability" class="section level3">
+<h3>Simulation of 95% confidence intervals on reliability</h3>
+<p>In the code below, I generate n=1000 simulations of n=30 samples drawn from a Weibull distribution with shape = 3 and scale = 100. For each set of 30 I fit a model and record the MLE for the parameters.</p>
+<pre class="r"><code># each simulation will be like a benchtop test of n=30 parts
+ci_reps_tbl &lt;- tibble(sample_size = rep(30, 1000))
+
+set.seed(98)
+
+# loop: draw 30 from rweibull(30, 100); fit model, estimate parameters
+ci_results_tbl &lt;- ci_reps_tbl %&gt;%
+  mutate(results = map(sample_size, test_map_fcn)) %&gt;%
+  unnest()
+
+# peek at results
+ci_results_tbl %&gt;%
+  head(10) %&gt;%
+  kable(align = rep(&quot;c&quot;, 3))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">sample_size</th>
+<th align="center">shape</th>
+<th align="center">scale</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">30</td>
+<td align="center">3.06</td>
+<td align="center">107.10</td>
+</tr>
+<tr class="even">
+<td align="center">30</td>
+<td align="center">3.80</td>
+<td align="center">98.42</td>
+</tr>
+<tr class="odd">
+<td align="center">30</td>
+<td align="center">2.99</td>
+<td align="center">111.44</td>
+</tr>
+<tr class="even">
+<td align="center">30</td>
+<td align="center">2.78</td>
+<td align="center">108.50</td>
+</tr>
+<tr class="odd">
+<td align="center">30</td>
+<td align="center">2.91</td>
+<td align="center">100.25</td>
+</tr>
+<tr class="even">
+<td align="center">30</td>
+<td align="center">2.84</td>
+<td align="center">102.01</td>
+</tr>
+<tr class="odd">
+<td align="center">30</td>
+<td align="center">2.84</td>
+<td align="center">95.47</td>
+</tr>
+<tr class="even">
+<td align="center">30</td>
+<td align="center">2.72</td>
+<td align="center">97.98</td>
+</tr>
+<tr class="odd">
+<td align="center">30</td>
+<td align="center">4.21</td>
+<td align="center">96.99</td>
+</tr>
+<tr class="even">
+<td align="center">30</td>
+<td align="center">3.74</td>
+<td align="center">98.30</td>
+</tr>
+</tbody>
+</table>
+<p>95% of the reliability estimates like above the .05 quantile. This means the .05 quantile is the analogous boundary for a simulated 95% confidence interval. In the code below, the .05 quantile of reliability is estimated for each time requirement of interest where we have 1000 simulation at each.</p>
+<pre class="r"><code># function will take a time of interest and calculate the implied reliability
+# only works with the params from the ci_results_tbl above
+reliability95_fcn &lt;- function(t_requirement) {
+  ci_results2tbl &lt;- ci_results_tbl %&gt;%
+    mutate(reliability_at_t = exp(-(t_requirement / scale)**(shape))) %&gt;%
+    mutate(q_05 = quantile(reliability_at_t, .05))
+  ci_results2tbl
+}
+
+# map the function across a sequence of candidate time requirements
+reliability_seq_tbl &lt;- tibble(time_requirement = seq(5, 100, by = 5)) %&gt;% mutate(rel_tbl = map(time_requirement, reliability95_fcn))
+
+# calculate the .05 quantile for reliability in each set of 1000 (each candidate time requirement)
+reliability_summary_tbl &lt;- reliability_seq_tbl %&gt;%
+  unnest(rel_tbl) %&gt;%
+  group_by(time_requirement) %&gt;%
+  summarize(rel_q05 = mean(q_05)) %&gt;%
+  ungroup()
+
+# Peek
+reliability_summary_tbl %&gt;% kable(align = rep(&quot;c&quot;, 2))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">time_requirement</th>
+<th align="center">rel_q05</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">5</td>
+<td align="center">0.9987176</td>
+</tr>
+<tr class="even">
+<td align="center">10</td>
+<td align="center">0.9942133</td>
+</tr>
+<tr class="odd">
+<td align="center">15</td>
+<td align="center">0.9858520</td>
+</tr>
+<tr class="even">
+<td align="center">20</td>
+<td align="center">0.9730873</td>
+</tr>
+<tr class="odd">
+<td align="center">25</td>
+<td align="center">0.9558373</td>
+</tr>
+<tr class="even">
+<td align="center">30</td>
+<td align="center">0.9344743</td>
+</tr>
+<tr class="odd">
+<td align="center">35</td>
+<td align="center">0.9076116</td>
+</tr>
+<tr class="even">
+<td align="center">40</td>
+<td align="center">0.8775053</td>
+</tr>
+<tr class="odd">
+<td align="center">45</td>
+<td align="center">0.8429503</td>
+</tr>
+<tr class="even">
+<td align="center">50</td>
+<td align="center">0.8015775</td>
+</tr>
+<tr class="odd">
+<td align="center">55</td>
+<td align="center">0.7562483</td>
+</tr>
+<tr class="even">
+<td align="center">60</td>
+<td align="center">0.7054836</td>
+</tr>
+<tr class="odd">
+<td align="center">65</td>
+<td align="center">0.6544688</td>
+</tr>
+<tr class="even">
+<td align="center">70</td>
+<td align="center">0.5948305</td>
+</tr>
+<tr class="odd">
+<td align="center">75</td>
+<td align="center">0.5358066</td>
+</tr>
+<tr class="even">
+<td align="center">80</td>
+<td align="center">0.4756331</td>
+</tr>
+<tr class="odd">
+<td align="center">85</td>
+<td align="center">0.4150847</td>
+</tr>
+<tr class="even">
+<td align="center">90</td>
+<td align="center">0.3500516</td>
+</tr>
+<tr class="odd">
+<td align="center">95</td>
+<td align="center">0.2880577</td>
+</tr>
+<tr class="even">
+<td align="center">100</td>
+<td align="center">0.2288761</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code># reference tibbles for labeling w/ gg_label_repel
+label_ci_tbl &lt;- tibble(x = 45, y = 0.8429503)
+label_95rel_tbl &lt;- tibble(x = 10, y = 0.95)
+
+# visualize
+reliability_seq_tbl %&gt;%
+  unnest(rel_tbl) %&gt;%
+  ggplot(aes(x = time_requirement, y = reliability_at_t)) +
+  geom_jitter(alpha = 0.03) +
+  #  geom_point(data = reliability_summary_tbl, aes(x = time_requirement, y = rel_q05), color = &quot;#c44c74ff&quot;, size = 1) +
+  geom_smooth(data = reliability_summary_tbl, aes(x = time_requirement, y = rel_q05), color = &quot;#c44c74ff&quot;, size = 1, alpha = .2) +
+  geom_hline(aes(yintercept = .95), color = &quot;#240691ff&quot;, size = 1) +
+  geom_label_repel(
+    data = label_ci_tbl, aes(x, y),
+    label = &quot;1-sided 95% Confidence\n bound on Reliability&quot;,
+    fill = &quot;#c44c74ff&quot;,
+    color = &quot;#f0f921ff&quot;,
+    segment.color = &quot;#c44c74ff&quot;,
+    segment.size = 1,
+    #                   min.segment.length = unit(1, &quot;lines&quot;),
+    nudge_y = -.5,
+    nudge_x = -5
+  ) +
+  geom_label_repel(
+    data = label_95rel_tbl, aes(x, y),
+    label = &quot;Product Reliability\n Requirement: 95%&quot;,
+    fill = &quot;#240691ff&quot;,
+    color = &quot;#f0f921ff&quot;,
+    segment.color = &quot;#240691ff&quot;,
+    segment.size = 1,
+    #                   min.segment.length = unit(1, &quot;lines&quot;),
+    nudge_y = -.25,
+    nudge_x = 5
+  ) +
+  labs(
+    title = &quot;Approximate 95% Confidence Interval for Various Durability Requirements&quot;,
+    subtitle = &quot;Each Sim: 1000 models fit from 1000 draws of n=30 from Weibull(3, 100)&quot;,
+    x = &quot;Device Requirement (Service Life without Failure)&quot;,
+    y = &quot;Reliability&quot;
+  )</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-32-1.png" width="100%" height="500px" /> There’s a lot going on here so it’s worth it to pause for a minute. If I was to try to communicate this in words, I would say:</p>
+<ul>
+<li>Assume we have designed a medical device that fails according to a Weibull distribution with shape = 3 and scale = 100.</li>
+<li>Assume the service life requirement for the device is known and specified within the product’s requirements</li>
+<li>Assume we can only test n=30 units in 1 test run and that testing is expensive and resource intensive</li>
+<li>The n=30 failure/censor times will be subject to sampling variability and the model fit from the data will likely not be Weibull(3, 100)</li>
+<li>The variability in the parameter estimates is propagated to the reliability estimates - a distribution of reliability is generated for each potential service life requirement (in practice we would only have 1 requirement)</li>
+<li>The .05 quantile of the reliability distribution at each requirement approximates the 1-sided lower bound of the 95% confidence interval. This threshold changes for each candidate service life requirement.</li>
+</ul>
+<p>Why does any of this even matter? Here’s the TLDR of this whole section:</p>
+<blockquote>
+<p>Suppose the service life requirement for our device is 24 months (2 years). Our boss asks us to set up an experiment to verify with 95% confidence that 95% of our product will meet the 24 month service requirement without failing. The industry standard way to do this is to test n=59 parts for 24 days (each day on test representing 1 month in service). If all n=59 pass then we can claim 95% reliability with 95% confidence. However, if we are willing to test a bit longer then the above figure indicates we can run the test to failure with only n=30 parts instead of n=59. If it cost a lot to obtain and prep test articles (which it often does), then <strong>we just saved a ton of money and test resources by treating the data as variable instead of attribute.</strong> <a href="#fn6" class="footnoteRef" id="fnref6"><sup>6</sup></a> We also get information about the failure mode for free.</p>
+</blockquote>
+</div>
+</div>
+<div id="part-4---fitting-models-to-weibull-data-with-right-censoring-bayesian-perspective" class="section level2">
+<h2>Part 4 - Fitting Models to Weibull Data with Right-Censoring [Bayesian Perspective]</h2>
+<blockquote>
+<ul>
+<li><strong>Tools: brm() function in brms; stan under the hood</strong></li>
+<li><strong>Goal: Obtain posterior distributions of shape and scale parameters via Hamiltonian Markov Chain Monte Carlo –&gt; calculate reliability distributions</strong></li>
+</ul>
+</blockquote>
+<p>These data are just like those used before - a set of n=30 generated from a Weibull with shape = 3 and scale = 100. They represent months to failure as determined by accelerated testing. In the brms framework, censored data are designated by a 1 (not a 0 as with the survival package).</p>
+<pre class="r"><code># test data
+ttf &lt;- c(100, 84.8, 87.8, 61.5, 99.3, 100, 100, 60.3, 80.3, 100, 51.7, 68.5, 99.6, 100, 53.2, 46.6, 26.4, 72.3, 62.9, 70.5, 22.2, 100, 100, 75.2, 87.2, 47.4, 100, 47.1, 98.2, 67.3)
+
+# indicator of run-out / censoring
+censored &lt;- c(1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0)
+
+# combine
+months_to_failure_tbl_4.3.3 &lt;- tibble(
+  time = ttf,
+  censored = censored
+)</code></pre>
+<div id="use-brm-to-generate-a-posterior-distribution-for-shape-and-scale" class="section level3">
+<h3>Use brm() to generate a posterior distribution for shape and scale</h3>
+<p>The formula for asking brms to fit a model looks relatively the same as with survival. To start, we fit a simple model with default priors.</p>
+<pre class="r"><code># fit model with brm() [use default priors]
+# mtf_weib_fit &lt;- brm(time | cens(censored) ~ 1,
+# data = months_to_failure_tbl_4.3.3, family = weibull())</code></pre>
+<p>Just like with the survival package, the default parameterization in brms can easily trip you up. We are fitting an intercept-only model meaning there are no predictor variables. The parameters that get estimated by brm() are the Intercept and shape. We can use the shape estimate as-is, but it’s a bit tricky to recover the scale. The key is that brm() uses a log-link function on the mean <span class="math inline">\(\mu\)</span>. There is no doubt that this is a rambling post - even so, it is not within scope to try to explain link functions and GLM’s (I’m not expert enough to do it anyways, refer to Statistical Rethinking by McElreath). In short, to convert to scale we need to both undo the link function by taking the exponent and then refer to the brms documentation to understand how the mean <span class="math inline">\(\mu\)</span> relates to the scale <span class="math inline">\(\beta\)</span>. The operation looks like this:<a href="#fn7" class="footnoteRef" id="fnref7"><sup>7</sup></a></p>
+<pre class="r"><code>#scale = exp(Intercept)/(gamma(1 + 1/shape))</code></pre>
+<p>Examine the results:</p>
+<pre class="r"><code># saveRDS(mtf_weib_fit, file = &quot;censored_data_mtf_weib_fit.rds&quot;)
+mtf_weib_fit &lt;- readRDS(file = &quot;censored_data_mtf_weib_fit.rds&quot;)
+
+summary(mtf_weib_fit)</code></pre>
+<pre><code>##  Family: weibull 
+##   Links: mu = log; shape = identity 
+## Formula: time | cens(censored) ~ 1 
+##    Data: months_to_failure_tbl_4.3.3 (Number of observations: 30) 
+## Samples: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;
+##          total post-warmup samples = 4000
+## 
+## Population-Level Effects: 
+##           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+## Intercept     4.41      0.08     4.25     4.58 1.00     2349     1782
+## 
+## Family Specific Parameters: 
+##       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+## shape     2.74      0.52     1.82     3.84 1.00     2530     2281
+## 
+## Samples were drawn using sampling(NUTS). For each parameter, Eff.Sample 
+## is a crude measure of effective sample size, and Rhat is the potential 
+## scale reduction factor on split chains (at convergence, Rhat = 1).</code></pre>
+<p>Gut-check on convergence of chains. Things look good visually and Rhat = 1 (also good).</p>
+<pre class="r"><code>plot(mtf_weib_fit)</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-37-1.png" width="100%" height="500px" /></p>
+<p>Within the tibble of posterior draws we convert the intercept to scale using the formula previously stated.</p>
+<pre class="r"><code># extract scale and shape
+post_mtf_weib_samples &lt;- posterior_samples(mtf_weib_fit) %&gt;%
+  mutate(scale = exp(b_Intercept) / (gamma(1 + 1 / shape))) %&gt;%
+  select(shape, scale)
+
+# peek
+post_mtf_weib_samples %&gt;%
+  head(10) %&gt;%
+  kable(align = rep(&quot;c&quot;, 2), digits = 2)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">shape</th>
+<th align="center">scale</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">3.44</td>
+<td align="center">87.78</td>
+</tr>
+<tr class="even">
+<td align="center">3.07</td>
+<td align="center">91.80</td>
+</tr>
+<tr class="odd">
+<td align="center">2.49</td>
+<td align="center">93.35</td>
+</tr>
+<tr class="even">
+<td align="center">2.28</td>
+<td align="center">93.43</td>
+</tr>
+<tr class="odd">
+<td align="center">2.10</td>
+<td align="center">86.42</td>
+</tr>
+<tr class="even">
+<td align="center">3.23</td>
+<td align="center">103.19</td>
+</tr>
+<tr class="odd">
+<td align="center">2.33</td>
+<td align="center">107.53</td>
+</tr>
+<tr class="even">
+<td align="center">2.37</td>
+<td align="center">93.37</td>
+</tr>
+<tr class="odd">
+<td align="center">3.13</td>
+<td align="center">91.18</td>
+</tr>
+<tr class="even">
+<td align="center">3.39</td>
+<td align="center">90.43</td>
+</tr>
+</tbody>
+</table>
+<p>Here is our first look at the posterior drawn from a model fit with censored data. We know the data were simulated by drawing randomly from a Weibull(3, 100) so the true data generating process is marked with lines.</p>
+<pre class="r"><code>mtf_plot &lt;- post_mtf_weib_samples %&gt;%
+  ggplot(aes(x = shape, y = scale)) +
+  geom_point(
+    colour = &quot;#453781FF&quot;,
+    size = 2,
+    alpha = 0.1
+  ) +
+  geom_hline(aes(yintercept = 100), size = .5, alpha = .3) +
+  geom_vline(aes(xintercept = 3), size = .5, alpha = .3) +
+  labs(
+    title = &quot;Credible Parameters for Shape and Scale&quot;,
+    subtitle = &quot;Run-Out Data Treated as Right-Censored&quot;,
+    x = expression(eta [&quot;shape&quot;]),
+    y = expression(beta [&quot;scale&quot;])
+  )
+
+
+mtf_marg_plot &lt;- ggMarginal(mtf_plot,
+  type = &quot;density&quot;,
+  color = &quot;white&quot;,
+  alpha = 0.7,
+  fill = &quot;#453781FF&quot;
+)</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-40-1.png" width="100%" height="500px" /> It looks like we did catch the true parameters of the data generating process within the credible range of our posterior. However, it is certainly not centered. Once again we should question: is the software working properly? Is the sample size a problem? Are the priors appropriate? Was the censoring specified and treated appropriately?</p>
+</div>
+<div id="investigation-of-how-to-treat-censored-data-points" class="section level3">
+<h3>Investigation of how to treat censored data points</h3>
+<p>Let’s start with the question about the censoring. One question that I’d like to know is: What would happen if we omitted the censored data completely or treated it like the device failed at the last observed time point? This hypothetical should be straightforward to simulate. Let’s fit a model to the same data set, but we’ll just treat the last time point as if the device failed there (i.e. we’ll have lots of failures at t=100).</p>
+<pre class="r"><code># This model treats the data as though the devices failed at the last observed timepoint
+# mtf_weib_nocens_fit &lt;- brm(time ~ 1,
+# data = months_to_failure_tbl_4.3.3, family = weibull())</code></pre>
+<pre class="r"><code># saveRDS(mtf_weib_nocens_fit, file = &quot;mtf_weib_nocens_fit.rds&quot;)
+mtf_weib_nocens_fit &lt;- readRDS(file = &quot;mtf_weib_nocens_fit.rds&quot;)</code></pre>
+<p>Now another model where we just omit the censored data completely (i.e. remove any units that don’t fail from the data set completely and fit a model to the rest).</p>
+<pre class="r"><code># This model just omits the censored data completely
+# mtf_weib_omit_fit &lt;- brm(time ~ 1,
+# data = months_to_failure_tbl_4.3.3 %&gt;% filter(censored == 0), family = weibull())</code></pre>
+<pre class="r"><code> plot(mtf_weib_nocens_fit)</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-45-1.png" width="100%" height="500px" /></p>
+<pre class="r"><code> plot(mtf_weib_omit_fit)</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-45-2.png" width="100%" height="500px" /></p>
+<p>Create tibble of posterior draws from partially censored, un-censored, and censor-omitted models with identifier column.</p>
+<pre class="r"><code>cens_model_post_draws &lt;- posterior_samples(mtf_weib_fit) %&gt;%
+  mutate(scale = exp(b_Intercept) / (gamma(1 + 1 / shape))) %&gt;%
+  select(shape, scale) %&gt;%
+  mutate(model = &quot;Weibull with Censoring&quot;)
+
+uncens_model_post_draws &lt;- posterior_samples(mtf_weib_nocens_fit) %&gt;%
+  mutate(scale = exp(b_Intercept) / (gamma(1 + 1 / shape))) %&gt;%
+  select(shape, scale) %&gt;%
+  mutate(model = &quot;Weibull (Treat Last Timepoint as Failure)&quot;)
+
+omit_model_post_draws &lt;- posterior_samples(mtf_weib_omit_fit) %&gt;%
+  mutate(scale = exp(b_Intercept) / (gamma(1 + 1 / shape))) %&gt;%
+  select(shape, scale) %&gt;%
+  mutate(model = &quot;Weibull Omitting Censored Data&quot;)
+
+combined_weib_tbl &lt;- cens_model_post_draws %&gt;%
+  bind_rows(uncens_model_post_draws) %&gt;%
+  bind_rows(omit_model_post_draws) %&gt;%
+  mutate(model = as_factor(model))
+
+combined_weib_tbl %&gt;%
+  head(5) %&gt;%
+  kable(align = rep(&quot;c&quot;, 3), digits = 2)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">shape</th>
+<th align="center">scale</th>
+<th align="center">model</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">3.44</td>
+<td align="center">87.78</td>
+<td align="center">Weibull with Censoring</td>
+</tr>
+<tr class="even">
+<td align="center">3.07</td>
+<td align="center">91.80</td>
+<td align="center">Weibull with Censoring</td>
+</tr>
+<tr class="odd">
+<td align="center">2.49</td>
+<td align="center">93.35</td>
+<td align="center">Weibull with Censoring</td>
+</tr>
+<tr class="even">
+<td align="center">2.28</td>
+<td align="center">93.43</td>
+<td align="center">Weibull with Censoring</td>
+</tr>
+<tr class="odd">
+<td align="center">2.10</td>
+<td align="center">86.42</td>
+<td align="center">Weibull with Censoring</td>
+</tr>
+</tbody>
+</table>
+<p>Here we compare the effect of the different treatments of censored data on the parameter estimates. Intervals are 95% HDI.</p>
+<pre class="r"><code>d_shp_1 &lt;- combined_weib_tbl %&gt;% ggplot(aes(x = shape)) +
+  geom_density(aes(fill = model), size = 0, alpha = 0.4) +
+  scale_y_continuous(NULL, breaks = NULL) +
+  labs(x = expression(eta[&quot;shape&quot;])) +
+  stat_pointintervalh(aes(y = 0),
+    point_interval = mode_hdi, .width = .95, show.legend = FALSE
+  ) +
+  facet_wrap(~model) +
+  theme_classic() +
+  theme(
+    legend.position = &quot;none&quot;,
+    axis.line.y = element_blank(),
+    strip.background = element_blank(),
+    strip.text.x = element_blank(),
+    legend.title = element_blank()
+  )
+
+
+d_shp_2 &lt;- combined_weib_tbl %&gt;% ggplot(aes(x = shape)) +
+  geom_density(aes(fill = model), size = 0, alpha = 0.4) +
+  scale_y_continuous(NULL, breaks = NULL) +
+  labs(
+    x = expression(eta[&quot;shape&quot;]),
+    title = &quot;Parameter Estimates&quot;,
+    subtitle = &quot;Effect of Including Censored Data in Model&quot;
+  ) +
+  theme_classic() +
+  theme(
+    axis.line.y = element_blank(),
+    strip.background = element_blank(),
+    strip.text.x = element_blank(),
+    legend.title = element_blank()
+  )
+
+d_scale_1 &lt;- combined_weib_tbl %&gt;% ggplot(aes(x = scale, fill = model)) +
+  geom_density(size = 0, alpha = 0.4) +
+  scale_y_continuous(NULL, breaks = NULL) +
+  labs(x = expression(beta[&quot;scale&quot;])) +
+  stat_pointintervalh(aes(y = 0),
+    point_interval = mode_hdi, .width = .95, show.legend = FALSE
+  ) +
+  facet_wrap(~model) +
+  theme_classic() +
+  theme(
+    legend.position = &quot;none&quot;,
+    axis.line.y = element_blank(),
+    strip.background = element_blank(),
+    strip.text.x = element_blank(),
+    legend.title = element_blank()
+  )
+
+d_scale_2 &lt;- combined_weib_tbl %&gt;% ggplot(aes(x = scale)) +
+  geom_density(aes(fill = model), size = 0, alpha = 0.4) +
+  scale_y_continuous(NULL, breaks = NULL) +
+  labs(
+    x = expression(beta[&quot;scale&quot;]),
+    title = &quot;Parameter Estimates&quot;,
+    subtitle = &quot;Effect of Including Censored Data in Model&quot;
+  ) +
+  theme_classic() +
+  theme(
+    axis.line.y = element_blank(),
+    strip.background = element_blank(),
+    strip.text.x = element_blank(),
+    legend.title = element_blank()
+  )
+
+d_shp_2 + d_shp_1 + plot_layout(
+  ncol = 1,
+  guides = &quot;collect&quot;
+)</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-47-1.png" width="100%" height="500px" /></p>
+<pre class="r"><code>d_scale_2 + d_scale_1 + plot_layout(
+  ncol = 1,
+  guides = &quot;collect&quot;
+)</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-47-2.png" width="100%" height="500px" /> When we omit the censored data or treat it as a failure, the shape parameter shifts up and the scale parameter shifts down. In both cases, it moves farther away from true. This should give is confidence that we are treating the censored points appropriately and have specified them correctly in the brm() syntax.</p>
+<p>Plotting the joint distributions for the three groups:</p>
+<pre class="r"><code>combined_weib_plt &lt;- combined_weib_tbl %&gt;%
+  ggplot(aes(x = shape, y = scale)) +
+  geom_point(aes(color = model, fill = model), size = 2, alpha = 0.08) +
+  geom_hline(aes(yintercept = 100), size = .5, alpha = .3) +
+  geom_vline(aes(xintercept = 3), size = .5, alpha = .3) +
+  scale_color_manual(values = c(&quot;#453781FF&quot;, &quot;#EA4F88&quot;, &quot;#FDE725FF&quot;)) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1))) + # force legend icons to be alpha = 1 instead of .08
+  labs(
+    title = &quot;Credible Parameters for Shape and Scale&quot;,
+    subtitle = &quot;Effect of Treating Censored Data Points in Different Ways&quot;,
+    x = expression(eta [&quot;shape&quot;]),
+    y = expression(beta [&quot;scale&quot;])
+  ) +
+  theme(
+    legend.position = &quot;bottom&quot;,
+    legend.title = element_blank()
+  )
+
+cens_marg_plot &lt;- ggMarginal(combined_weib_plt,
+  groupColour = TRUE,
+  groupFill = TRUE,
+  type = &quot;density&quot;,
+  alpha = 0.7
+)</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-49-1.png" width="100%" height="500px" /> Our censored data set (purple) is closest to true. But we still don’t know why the highest density region of our posterior isn’t centered on the true value.</p>
+</div>
+<div id="evaluation-of-priors" class="section level3">
+<h3>Evaluation of priors</h3>
+<p>We haven’t looked closely at our priors yet (shame on me) so let’s do that now. The default priors are viewed with prior_summary().</p>
+<pre class="r"><code># get default priors
+prior_summary(mtf_weib_fit) %&gt;%
+  select(prior, class) %&gt;%
+  kable(align = rep(&quot;c&quot;, 2))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">prior</th>
+<th align="center">class</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">student_t(3, 4, 10)</td>
+<td align="center">Intercept</td>
+</tr>
+<tr class="even">
+<td align="center">gamma(0.01, 0.01)</td>
+<td align="center">shape</td>
+</tr>
+</tbody>
+</table>
+<p>I was taught to visualize what the model thinks before seeing the data via prior predictive simulation. I made a good-faith effort to do that, but the results are funky for brms default priors. I an not an expert here, but I believe this is because very vague default Gamma priors aren’t good for prior predictive simulations but quickly adapt to the first few data points they see.<a href="#fn8" class="footnoteRef" id="fnref8"><sup>8</sup></a>. The prior must be placed on the intercept when must be then propagated to the scale which further muddies things. All in all there isn’t much to see. A lot of the weight is at zero but there are long tails for the defaults. I have all the code for this simulation for the defaults in the Appendix.</p>
+<p><img src="/./img/def.png" width="100%" height="100%" style="display: block; margin: auto;" /></p>
+<p>If you take this at face value, the model thinks the reliability is always zero before seeing the model. Again, I think this is a special case for vague gamma priors but it doesn’t give us much confidence that we are setting things up correctly.</p>
+<p>After viewing the default predictions, I did my best to iterate on the priors to generate something more realisti. I was able to spread some credibility up across the middle reliability values but ended up a lot of mass on either end, which wasn’t to goal.</p>
+<p><img src="/./img/imp_priors.png" width="100%" height="100%" style="display: block; margin: auto;" /></p>
+<p>Regardless, I refit the model with the (potentially) improved more realistic (but still not great) priors and found minimal difference in the model fit as shown below.</p>
+<p><img src="/./img/prior_compare.png" width="100%" height="100%" style="display: block; margin: auto;" /></p>
+<p>Note: all models throughout the remainder of this post use the “better” priors (even though there is minimal difference in the model fits relative to brms default).</p>
+<p>The above analysis, while not comprehensive, was enough to convince me that the default brms priors are not the problem with initial model fit (recall above where the mode of the posterior was not centered at the true data generating process and we wondered why). I do need to get better at doing these prior predictive simulations but it’s a deep, dark rabbit hole to go down on an already long post. Given the low model sensitivity across the range of priors I tried, I’m comfortable moving on to investigate sample size.</p>
+<p>The original model was fit from n=30. We need a simulation that lets us adjust n.</p>
+</div>
+<div id="evaluate-sensitivity-of-posterior-to-sample-size" class="section level3">
+<h3>Evaluate sensitivity of posterior to sample size</h3>
+<p>Here we write a function to generate censored data of different shape, scale, and sample size. The syntax of the censoring column is brms (1 = censored).</p>
+<pre class="r"><code>rweibull_cens_gen_fcn &lt;- function(n, shape, scale) {
+  raw_times &lt;- rweibull(n, shape = shape, scale = scale)
+  tibble(failure_time_raw = raw_times) %&gt;%
+    mutate(time = case_when(
+      failure_time_raw &lt; 100 ~ failure_time_raw,
+      TRUE ~ 100
+    )) %&gt;%
+    mutate(censor = case_when(
+      time == 100 ~ 1,
+      TRUE ~ 0
+    )) %&gt;%
+    select(-failure_time_raw)
+}</code></pre>
+<p>Now the function above is used to create simulated data sets for different sample sizes (all have shape 3, scale = 100)</p>
+<pre class="r"><code>set.seed(3980)
+
+fit_weib_45_tbl &lt;- rweibull_cens_gen_fcn(45, 3, 100)
+fit_weib_60_tbl &lt;- rweibull_cens_gen_fcn(60, 3, 100)
+fit_weib_100_tbl &lt;- rweibull_cens_gen_fcn(100, 3, 100)
+fit_weib_200_tbl &lt;- rweibull_cens_gen_fcn(200, 3, 100)
+fit_weib_300_tbl &lt;- rweibull_cens_gen_fcn(300, 3, 100)
+fit_weib_400_tbl &lt;- rweibull_cens_gen_fcn(400, 3, 100)
+fit_weib_500_tbl &lt;- rweibull_cens_gen_fcn(500, 3, 100)
+fit_weib_600_tbl &lt;- rweibull_cens_gen_fcn(600, 3, 100)
+fit_weib_700_tbl &lt;- rweibull_cens_gen_fcn(700, 3, 100)
+fit_weib_800_tbl &lt;- rweibull_cens_gen_fcn(800, 3, 100)</code></pre>
+<p>Fit and save a model to each of the above data sets.</p>
+<pre class="r"><code># mtf_700_weib_fit &lt;- brm(time | cens(censor) ~ 1,
+# data = fit_weib_700_tbl, family = weibull(),
+#    prior = c(
+#     prior(student_t(3, 5, 5), class = Intercept),
+#     prior(uniform(0, 10), class = shape)
+#    ),
+#    iter = 41000, warmup = 40000, chains = 4, cores = 4,
+#    seed = 4
+#  )</code></pre>
+<p>Draw from the posterior of each model and combine into one tibble along with the original fit from n=30.</p>
+<pre class="r"><code>mtf_30_weib_fit_post_draws &lt;- post_mwnp_samples # this is original data fit to milely informed priors, see Appendix
+mtf_60_weib_fit_post_draws &lt;- posterior_samples(mtf_60_weib_fit)
+mtf_100_weib_fit_post_draws &lt;- posterior_samples(mtf_100_weib_fit)
+mtf_200_weib_fit_post_draws &lt;- posterior_samples(mtf_200_weib_fit)
+mtf_300_weib_fit_post_draws &lt;- posterior_samples(mtf_300_weib_fit)
+mtf_400_weib_fit_post_draws &lt;- posterior_samples(mtf_400_weib_fit)
+mtf_500_weib_fit_post_draws &lt;- posterior_samples(mtf_500_weib_fit)
+mtf_600_weib_fit_post_draws &lt;- posterior_samples(mtf_600_weib_fit)
+mtf_700_weib_fit_post_draws &lt;- posterior_samples(mtf_700_weib_fit)
+mtf_800_weib_fit_post_draws &lt;- posterior_samples(mtf_800_weib_fit)
+
+
+combined_n_tbl &lt;- bind_rows(
+  &quot;60&quot;  = mtf_60_weib_fit_post_draws,
+  &quot;100&quot; = mtf_100_weib_fit_post_draws,
+  &quot;200&quot; = mtf_200_weib_fit_post_draws,
+  &quot;300&quot; = mtf_300_weib_fit_post_draws,
+  &quot;400&quot; = mtf_400_weib_fit_post_draws,
+  &quot;500&quot; = mtf_500_weib_fit_post_draws,
+  &quot;600&quot; = mtf_600_weib_fit_post_draws,
+  &quot;700&quot; = mtf_700_weib_fit_post_draws,
+  &quot;800&quot; = mtf_800_weib_fit_post_draws,
+  .id = &quot;model&quot;
+) %&gt;%
+  mutate(model = as_factor(model)) %&gt;%
+  mutate(scale = exp(b_Intercept) / (gamma(1 + 1 / shape))) %&gt;%
+  select(shape, scale, model)
+
+# have to add in the n=30 set seperately since it is already converted from Intercept to shape
+combined_n_tbl &lt;- mtf_30_weib_fit_post_draws %&gt;%
+  mutate(model = &quot;30&quot;) %&gt;%
+  bind_rows(combined_n_tbl) %&gt;%
+  mutate(model = as_factor(model))</code></pre>
+<p>Finally we can visualize the effect of sample size on precision of posterior estimates.</p>
+<pre class="r"><code>combined_n_plt &lt;- combined_n_tbl %&gt;%
+  ggplot(aes(x = shape, y = scale)) +
+  geom_point(aes(color = model, fill = model), size = 2, alpha = 0.01) +
+  scale_color_viridis_d() +
+  guides(colour = guide_legend(override.aes = list(alpha = 1))) + # force legend icons to be alpha = 1 instead of .05
+  geom_hline(yintercept = 100, colour = &quot;black&quot;, alpha = 0.3, size = .5) +
+  geom_vline(xintercept = 3, colour = &quot;black&quot;, alpha = 0.3, size = .5) +
+  labs(
+    title = &quot;Effect of Sample Size on Parameter Estimation&quot;,
+    subtitle = &quot;Model: Weibull with Censoring; True ~ Weibull(shape = 3, scale = 100)&quot;,
+    x = expression(eta [&quot;shape&quot;]),
+    y = expression(beta [&quot;scale&quot;])
+  ) +
+  theme(
+    legend.position = &quot;bottom&quot;,
+    legend.title = element_blank()
+  )
+
+cens_marg_2_plot &lt;- ggMarginal(combined_n_plt,
+  groupColour = TRUE,
+  groupFill = TRUE,
+  type = &quot;density&quot;,
+  alpha = 0.7
+)</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-62-1.png" width="100%" height="500px" /> This figure tells a lot. We simply needed more data points to zero in on the true data generating process. At n=30, there’s just a lot of uncertainty due to the randomness of sampling.</p>
+<p>This plot looks really cool, but the marginal distributions are bit cluttered. This is a perfect use case for ggridges which will let us see the same type of figure but without overlap.</p>
+<pre class="r"><code>cn1 &lt;- combined_n_tbl %&gt;%
+  gather(key = &quot;key&quot;, value = &quot;value&quot;, -model) %&gt;%
+  mutate(true_p = case_when(
+    key == &quot;scale&quot; ~ 100,
+    TRUE ~ 3
+  )) %&gt;%
+  ggplot(aes(x = value, y = model, group = model, fill = model)) +
+  geom_density_ridges(size = 1 / 3, rel_min_height = .005, alpha = .65) +
+  geom_vline(aes(xintercept = true_p), color = &quot;#711a6eff&quot;) +
+  stat_pointintervalh(
+    point_interval = mode_hdi,
+    .width = .95,
+    show.legend = FALSE
+  ) +
+  coord_flip() +
+  scale_fill_viridis_d() +
+  facet_wrap(~key, scales = &quot;free_y&quot;) +
+  labs(
+    x = &quot;Parameter Value&quot;,
+    y = &quot;Number of Data Points Used to Fit Model&quot;,
+    title = &quot;Model Fitting Variability due to Random Sampling [New Draw Each Fit]&quot;,
+    subtitle = &quot;True Distribution ~ Weibull(3, 100)&quot;
+  ) +
+  theme(legend.position = &quot;&quot;)
+
+cn1</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-63-1.png" width="100%" height="500px" /></p>
+<p>Set of 800 to demonstrate Bayesian updating.</p>
+<pre class="r"><code>set.seed(125)
+fit_weib_800_bu_tbl &lt;- rweibull_cens_gen_fcn(800, 3, 100)
+
+fit_weib_30_bu_tbl &lt;- fit_weib_800_bu_tbl[1:30, ]
+fit_weib_60_bu_tbl &lt;- fit_weib_800_bu_tbl[1:60, ]
+fit_weib_100_bu_tbl &lt;- fit_weib_800_bu_tbl[1:100, ]
+fit_weib_200_bu_tbl &lt;- fit_weib_800_bu_tbl[1:200, ]
+fit_weib_300_bu_tbl &lt;- fit_weib_800_bu_tbl[1:300, ]
+fit_weib_400_bu_tbl &lt;- fit_weib_800_bu_tbl[1:400, ]
+fit_weib_500_bu_tbl &lt;- fit_weib_800_bu_tbl[1:500, ]
+fit_weib_600_bu_tbl &lt;- fit_weib_800_bu_tbl[1:600, ]
+fit_weib_700_bu_tbl &lt;- fit_weib_800_bu_tbl[1:700, ]
+fit_weib_800_bu_tbl &lt;- fit_weib_800_bu_tbl[1:800, ]</code></pre>
+<p>Fit a model the first set of n=30</p>
+<pre class="r"><code># mtf_30_bu_weib_fit &lt;- brm(time | cens(censor) ~ 1,
+# data = fit_weib_30_bu_tbl, family = weibull(),
+#    prior = c(
+#     prior(student_t(3, 5, 5), class = Intercept),
+#     prior(uniform(0, 10), class = shape)
+#    ),
+#    iter = 41000, warmup = 40000, chains = 4, cores = 4,
+#    seed = 4
+#  )</code></pre>
+<p>We use the update() function in brms to update and save each model with additional data.</p>
+<pre class="r"><code># mtf_60_bu_weib_fit &lt;- update(mtf_30_bu_weib_fit, newdata = fit_weib_60_bu_tbl)
+# mtf_100_bu_weib_fit &lt;- update(mtf_60_bu_weib_fit, newdata = fit_weib_100_bu_tbl)
+# mtf_200_bu_weib_fit &lt;- update(mtf_100_bu_weib_fit, newdata = fit_weib_200_bu_tbl)
+# mtf_300_bu_weib_fit &lt;- update(mtf_200_bu_weib_fit, newdata = fit_weib_300_bu_tbl)
+# mtf_400_bu_weib_fit &lt;- update(mtf_300_bu_weib_fit, newdata = fit_weib_400_bu_tbl)
+# mtf_500_bu_weib_fit &lt;- update(mtf_400_bu_weib_fit, newdata = fit_weib_500_bu_tbl)
+# mtf_600_bu_weib_fit &lt;- update(mtf_500_bu_weib_fit, newdata = fit_weib_600_bu_tbl)
+# mtf_700_bu_weib_fit &lt;- update(mtf_600_bu_weib_fit, newdata = fit_weib_700_bu_tbl)
+# mtf_800_bu_weib_fit &lt;- update(mtf_700_bu_weib_fit, newdata = fit_weib_800_bu_tbl)
+
+# save each one
+# saveRDS(mtf_800_bu_weib_fit, file = &quot;mtf_800_bu_weib_fit.rds&quot;)
+
+mtf_800_bu_weib_fit &lt;- readRDS(file = &quot;mtf_800_bu_weib_fit.rds&quot;)
+mtf_700_bu_weib_fit &lt;- readRDS(file = &quot;mtf_700_bu_weib_fit.rds&quot;)
+mtf_600_bu_weib_fit &lt;- readRDS(file = &quot;mtf_600_bu_weib_fit.rds&quot;)
+mtf_500_bu_weib_fit &lt;- readRDS(file = &quot;mtf_500_bu_weib_fit.rds&quot;)
+mtf_400_bu_weib_fit &lt;- readRDS(file = &quot;mtf_400_bu_weib_fit.rds&quot;)
+mtf_300_bu_weib_fit &lt;- readRDS(file = &quot;mtf_300_bu_weib_fit.rds&quot;)
+mtf_200_bu_weib_fit &lt;- readRDS(file = &quot;mtf_200_bu_weib_fit.rds&quot;)
+mtf_100_bu_weib_fit &lt;- readRDS(file = &quot;mtf_100_bu_weib_fit.rds&quot;)
+mtf_60_bu_weib_fit &lt;- readRDS(file = &quot;mtf_60_bu_weib_fit.rds&quot;)
+mtf_30_bu_weib_fit &lt;- readRDS(file = &quot;mtf_30_bu_weib_fit.rds&quot;)</code></pre>
+<p>Extract posterior draws for each one.</p>
+<pre class="r"><code>mtf_30_bu_weib_fit_post_draws &lt;- posterior_samples(mtf_30_bu_weib_fit)
+mtf_60_bu_weib_fit_post_draws &lt;- posterior_samples(mtf_60_bu_weib_fit)
+mtf_100_bu_weib_fit_post_draws &lt;- posterior_samples(mtf_100_bu_weib_fit)
+mtf_200_bu_weib_fit_post_draws &lt;- posterior_samples(mtf_200_bu_weib_fit)
+mtf_300_bu_weib_fit_post_draws &lt;- posterior_samples(mtf_300_bu_weib_fit)
+mtf_400_bu_weib_fit_post_draws &lt;- posterior_samples(mtf_400_bu_weib_fit)
+mtf_500_bu_weib_fit_post_draws &lt;- posterior_samples(mtf_500_bu_weib_fit)
+mtf_600_bu_weib_fit_post_draws &lt;- posterior_samples(mtf_600_bu_weib_fit)
+mtf_700_bu_weib_fit_post_draws &lt;- posterior_samples(mtf_700_bu_weib_fit)
+mtf_800_bu_weib_fit_post_draws &lt;- posterior_samples(mtf_800_bu_weib_fit)</code></pre>
+<p>Combine into single tibble and convert intercept to scale. Some data wrangling is in anticipation for ggplot().</p>
+<pre class="r"><code>combined_nbu_tbl &lt;- bind_rows(
+  &quot;30&quot;  = mtf_30_bu_weib_fit_post_draws, # note: this one is the original dataset
+  &quot;60&quot;  = mtf_60_bu_weib_fit_post_draws,
+  &quot;100&quot; = mtf_100_bu_weib_fit_post_draws,
+  &quot;200&quot; = mtf_200_bu_weib_fit_post_draws,
+  &quot;300&quot; = mtf_300_bu_weib_fit_post_draws,
+  &quot;400&quot; = mtf_400_bu_weib_fit_post_draws,
+  &quot;500&quot; = mtf_500_bu_weib_fit_post_draws,
+  &quot;600&quot; = mtf_600_bu_weib_fit_post_draws,
+  &quot;700&quot; = mtf_700_bu_weib_fit_post_draws,
+  &quot;800&quot; = mtf_800_bu_weib_fit_post_draws,
+  .id = &quot;model&quot;
+) %&gt;%
+  mutate(model = as_factor(model)) %&gt;%
+  mutate(scale = exp(b_Intercept) / (gamma(1 + 1 / shape))) %&gt;%
+  select(shape, scale, model)
+
+cn2 &lt;- combined_nbu_tbl %&gt;%
+  gather(key = &quot;key&quot;, value = &quot;value&quot;, -model) %&gt;%
+  mutate(true_p = case_when(
+    key == &quot;scale&quot; ~ 100,
+    TRUE ~ 3
+  )) %&gt;%
+  ggplot(aes(x = value, y = model, group = model, fill = model)) +
+  geom_density_ridges(size = 1 / 3, rel_min_height = .005, alpha = .65) +
+  geom_vline(aes(xintercept = true_p), color = &quot;#711a6eff&quot;) +
+  stat_pointintervalh(
+    point_interval = mode_hdi,
+    .width = .95,
+    show.legend = FALSE
+  ) +
+  coord_flip() +
+  scale_fill_viridis_d() +
+  facet_wrap(~key, scales = &quot;free_y&quot;) +
+  labs(
+    x = &quot;Parameter Value&quot;,
+    y = &quot;Number of Data Points Used to Fit Model&quot;,
+    title = &quot;Model Fitting Variability due to Random Sampling [Updated Model Each Fit]&quot;,
+    subtitle = &quot;True Distribution ~ Weibull(3, 100)&quot;
+  ) +
+  theme(legend.position = &quot;&quot;)
+
+cn1</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-69-1.png" width="100%" height="500px" /></p>
+<pre class="r"><code>#cn2</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-70-1.png" width="100%" height="500px" /></p>
+<p>The precision increase here is more smooth since supplemental data is added to the original set instead of just drawing completely randomly for each sample size. This is Bayesian updating.</p>
+</div>
+<div id="evaluate-sensitivity-of-reliability-estimate-to-sample-size." class="section level3">
+<h3>Evaluate Sensitivity of Reliability Estimate to Sample Size.</h3>
+<p>To wrap things up, we should should translate the above figures into a reliability metric because that is the prediction we care about at the end of the day. I chose an arbitrary time point of t=40 to evaluate the reliability.</p>
+<pre class="r"><code>combined_nbu_rr_tbl &lt;- combined_nbu_tbl %&gt;% mutate(reliability_at_t40 = exp(-(40 / scale)**(shape)))
+
+rq05_tbl &lt;- combined_nbu_rr_tbl %&gt;% group_by(model) %&gt;%
+  summarize(rel_q05 = quantile(reliability_at_t40, .05)) %&gt;%
+  mutate(model = as.numeric(model)) %&gt;%
+  ungroup()
+
+reliability_ridge_plt &lt;- combined_nbu_rr_tbl %&gt;%
+  gather(key = &quot;key&quot;, value = &quot;value&quot;, -c(model, reliability_at_t40)) %&gt;%
+  ggplot(aes(x = reliability_at_t40, y = model, group = model, fill = model)) +
+  geom_density_ridges(size = 1 / 3, rel_min_height = .005, alpha = .8) +
+  stat_pointintervalh(
+    point_interval = mode_hdi,
+    .width = .95,
+    show.legend = FALSE
+  ) +
+  coord_flip() +
+  scale_fill_viridis_d() +
+  labs(
+    x = &quot;Reliability at t=40&quot;,
+    y = &quot;Number of Data Points Used to Fit Model&quot;,
+    title = &quot;Uncertainty in Reliability Posterior&quot;,
+    subtitle = &quot;Reliability Assessed at t = 40&quot;
+  ) +
+  theme(legend.position = &quot;&quot;) +
+  xlim(c(.85, 1))
+
+
+
+reliability_ridge_plt</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-71-1.png" width="100%" height="500px" /></p>
+</div>
+</div>
+<div id="wrap-up" class="section level2">
+<h2>Wrap-up</h2>
+<p>Here is a summary of where we ended up going in the post: * Fit some models using fitdistr plus using data that was not censored. Calculated reliability at time of interest. * Fit the same models using a Bayesian approach with grid approximation. Visualized what happens if we incorrectly omit the censored data or treat it as if it failed at the last observed time point. * Explored fitting censored data using the survival package. Evaluated sensitivity to sample size. * Used brms to fit Bayesian models with censored data. Assessed sensitivity of priors and tried to improve our priors over the default. Evaluated effect of sample size and explored the different between updating an existing data set vs. drawing new samples.</p>
+<p>If you made it this far - I appreciate your patience with this long and rambling post. Thank you for reading!</p>
+</div>
+<div id="appendix---prior-predictive-simulation---beware-its-ugly-in-here" class="section level2">
+<h2>APPENDIX - Prior Predictive Simulation - BEWARE it’s ugly in here</h2>
+<pre class="r"><code># evaluate default priors
+default_shape_prior &lt;- rgamma(10000, .01, .01)
+default_shape_prior_tbl &lt;- default_shape_prior %&gt;% as_tibble()
+default_shape_prior_tbl %&gt;% ggplot(aes(x = default_shape_prior)) +
+  geom_histogram(aes(y = ..density..), binwidth = 3, boundary = 0, fill = &quot;#2c3e50&quot;, color = &quot;white&quot;, alpha = .6) + geom_density(color = &quot;#cf4c74ff&quot;) +
+  labs(title = &quot;Default Prior for Shape Parameter&quot;)</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-72-1.png" width="100%" height="500px" /></p>
+<pre class="r"><code>#   ylim(c(0, 1e-3))
+
+default_intercept_prior &lt;- rstudent_t(10000, 3, 4, 10)
+
+default_priors_tbl &lt;- default_intercept_prior %&gt;%
+  as_tibble() %&gt;%
+  bind_cols(default_shape_prior_tbl) %&gt;%
+  rename(intercept = value, shape = value1) %&gt;%
+  mutate(scale_prior = exp(intercept) / (gamma(1 + 1 / shape))) %&gt;%
+  filter(scale_prior &lt; 1000) %&gt;%
+  select(-intercept)
+
+default_priors_tbl %&gt;% ggplot(aes(x = scale_prior)) +
+  geom_histogram(aes(y = ..density..), binwidth = 5, boundary = 100, fill = &quot;#2c3e50&quot;, color = &quot;white&quot;, alpha = .8) +
+  geom_density(color = &quot;#cf4c74ff&quot;) +
+  labs(title = &quot;Default Prior for Scale Parameter&quot;)</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-72-2.png" width="100%" height="500px" /></p>
+<pre class="r"><code>#  ylim(c(0, .001))</code></pre>
+<p>Prior Predictive Simulation - Default Priors</p>
+<pre class="r"><code>d1 &lt;- default_priors_tbl[1:350, ] %&gt;%
+  mutate(plotted_y_data = map2(
+    shape, scale_prior,
+    ~ tibble(
+      x = seq(0, 200, length.out = 400),
+      y = dweibull(x, .x, .y)
+    )
+  )) %&gt;%
+  unnest(plotted_y_data) %&gt;%
+  ggplot(aes(x, y)) +
+  geom_line(aes(group = shape), alpha = .2) +
+  labs(
+    x = &quot;Time to Event&quot;,
+    y = &quot;Density&quot;
+  )
+
+d2 &lt;- d1 +
+  xlim(c(0, 25)) +
+  ylim(c(0, .1))
+
+d1 + d2 + plot_layout(
+  nrow = 1,
+  guides = &quot;collect&quot;
+) +
+  plot_annotation(title = &quot;Implied Time-to-Failure Weibull Distributions (from default priors)&quot;)</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-73-1.png" width="100%" height="500px" /> Here are the reliabilities at t=15 implied by the default priors.</p>
+<pre class="r"><code>r15_pp_default_tbl &lt;- default_priors_tbl %&gt;% mutate(reliability_at_t15 = exp(-(15 / scale_prior)**(shape)))
+
+r1 &lt;- r15_pp_default_tbl %&gt;% ggplot(aes(x = reliability_at_t15)) +
+  geom_histogram(aes(y = ..density..), binwidth = .01, boundary = 1, fill = &quot;#de6065ff&quot;, color = &quot;white&quot;, alpha = .6) +
+  labs(title = &quot;Reliability at t=15 implied by default priors&quot;)
+
+def_plt &lt;- (d1 + d2) / r1 + plot_layout(guides = &quot;collect&quot;) +
+  plot_annotation(title = &quot;Implied Time-to-Failure Weibull Distributions (from default priors)&quot;)</code></pre>
+<p>Not too useful. In the following section I try to tweak the priors such that the simulations indicate some spread of reliability from 0 to 1 before seeing the data. Again, it’s tough because we have to work through the Intercept and the annoying gamma function.</p>
+<pre class="r"><code># Evaluate Mildly Informed Priors
+shape_prior &lt;- runif(100000, 0, 10)
+shape_prior_tbl &lt;- shape_prior %&gt;% as_tibble()
+shaaaape &lt;- shape_prior_tbl %&gt;% ggplot(aes(x = shape_prior)) +
+  geom_histogram(aes(y = ..density..), binwidth = 1, boundary = 10, fill = &quot;#2c3e50&quot;, color = &quot;white&quot;, alpha = .6)
+
+intercept_prior &lt;- rstudent_t(100000, 3, 5, 5)
+
+priors_tbl &lt;- intercept_prior %&gt;%
+  as_tibble() %&gt;%
+  bind_cols(shape_prior_tbl) %&gt;%
+  rename(intercept = value, shape = value1) %&gt;%
+  mutate(scale_prior = exp(intercept) / (gamma(1 + 1 / shape))) %&gt;%
+  filter(scale_prior &lt; 1000) %&gt;%
+  select(-intercept)
+
+scaaaale &lt;- priors_tbl %&gt;% ggplot(aes(x = scale_prior)) +
+  geom_histogram(aes(y = ..density..), binwidth = 10, boundary = 100, fill = &quot;#2c3e50&quot;, color = &quot;white&quot;, alpha = .8) +
+  ylim(c(0, .005))
+
+shaaaape + scaaaale + plot_annotation(title = &quot;Prior Predicitve Simulations for Shape and Scale&quot;)</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-75-1.png" width="100%" height="500px" /> Implied time-to-event curves:</p>
+<pre class="r"><code>p1 &lt;- priors_tbl[1:500, ] %&gt;%
+  mutate(plotted_y_data = map2(
+    shape, scale_prior,
+    ~ tibble(
+      x = seq(0, 200, length.out = 400),
+      y = dweibull(x, .x, .y)
+    )
+  )) %&gt;%
+  unnest(plotted_y_data) %&gt;%
+  ggplot(aes(x, y)) +
+  geom_line(aes(group = shape), alpha = .2) +
+  xlim(c(0, 50)) +
+  ylim(c(0, .5)) +
+  labs(
+    x = &quot;Time to Event&quot;,
+    y = &quot;Density&quot;,
+    title = &quot;Implied Time-to-Event Curves from Iterated Priors&quot;
+  )
+
+p1</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-76-1.png" width="100%" height="500px" /> And the implied prior predictive reliability at t=15:</p>
+<pre class="r"><code>r15_pp_mi_tbl &lt;- priors_tbl %&gt;% mutate(reliability_at_t15 = exp(-(15 / scale_prior)**(shape)))
+
+pz &lt;- r15_pp_mi_tbl %&gt;% ggplot(aes(x = reliability_at_t15)) +
+  geom_histogram(aes(y = ..density..), binwidth = .1, boundary = 1, fill = &quot;#7b0288ff&quot;, color = &quot;white&quot;, alpha = .6) +
+  labs(
+    title = &quot;Prior Predictive Estimate at t=15&quot;,
+    subtitle = &quot;Iterated Priors&quot;
+  )
+
+p1 + pz</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-77-1.png" width="100%" height="500px" /> This still isn’t great - now I’ve stacked most of the weight at 0 and 1 always fail or never fail. This is hard and I do know I need to get better at it. But since I’m already down a rabbit hole let’s just check to see how the different priors impact the estimates.</p>
+<p>Fit the model with iterated priors: student_t(3, 5, 5) for Intercept and uniform(0, 10) for shape.</p>
+<pre class="r"><code># fit model with better priors (original n=30 data point)
+# mtf_weib_new_priors_fit &lt;-
+#  brm(
+#    data = months_to_failure_tbl_4.3.3, family = weibull(),
+#    time | cens(censored) ~ 1,
+#    prior = c(
+#      prior(student_t(3, 5, 5), class = Intercept),
+#     prior(uniform(0, 10), class = shape)
+#    ),
+#    iter = 41000, warmup = 40000, chains = 4, cores = 4,
+#   seed = 4
+#  )</code></pre>
+<p>Evaluate chains and convert to shape and scale</p>
+<pre class="r"><code>plot(mtf_weib_new_priors_fit)</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-80-1.png" width="100%" height="500px" /></p>
+<pre class="r"><code>post_mwnp_samples &lt;- posterior_samples(mtf_weib_new_priors_fit) %&gt;%
+  mutate(scale = exp(b_Intercept) / (gamma(1 + 1 / shape))) %&gt;%
+  select(shape, scale)
+
+post_mwnp_samples %&gt;%
+  head(10) %&gt;%
+  kable(align = rep(&quot;c&quot;, 2), digits = 2)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">shape</th>
+<th align="center">scale</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">3.66</td>
+<td align="center">98.52</td>
+</tr>
+<tr class="even">
+<td align="center">3.66</td>
+<td align="center">98.52</td>
+</tr>
+<tr class="odd">
+<td align="center">2.39</td>
+<td align="center">98.48</td>
+</tr>
+<tr class="even">
+<td align="center">2.82</td>
+<td align="center">95.86</td>
+</tr>
+<tr class="odd">
+<td align="center">3.02</td>
+<td align="center">92.85</td>
+</tr>
+<tr class="even">
+<td align="center">3.05</td>
+<td align="center">90.54</td>
+</tr>
+<tr class="odd">
+<td align="center">2.38</td>
+<td align="center">97.18</td>
+</tr>
+<tr class="even">
+<td align="center">2.50</td>
+<td align="center">97.05</td>
+</tr>
+<tr class="odd">
+<td align="center">2.48</td>
+<td align="center">92.92</td>
+</tr>
+<tr class="even">
+<td align="center">3.25</td>
+<td align="center">87.81</td>
+</tr>
+<tr class="odd">
+<td align="center">Evaluate</td>
+<td align="center">the effect of the different priors (default vs. iterated) on the model fit for original n=30 censored data points.</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>baseline_30_default_prior_tbl &lt;- post_mtf_weib_samples %&gt;% mutate(priors = &quot;shape: gamma(.01, .01) \nIntercept: student_t(3, 4, 10)&quot;)
+
+baseline_30_mi_prior_tbl &lt;- post_mwnp_samples %&gt;% mutate(priors = &quot;shape: uniform(0, 10) \nIntercept: student_t(3, 5, 5)&quot;)
+
+baseline_30_prior_compare_tbl &lt;- bind_rows(
+  baseline_30_default_prior_tbl,
+  baseline_30_mi_prior_tbl
+)
+
+b_30_prior_plt &lt;- baseline_30_prior_compare_tbl %&gt;% ggplot(aes(x = shape, y = scale)) +
+  geom_point(aes(color = priors), alpha = .1) +
+  geom_hline(aes(yintercept = 100), size = .5, alpha = .3) +
+  geom_vline(aes(xintercept = 3), size = .5, alpha = .3) +
+  scale_color_viridis_d() +
+  guides(colour = guide_legend(override.aes = list(alpha = 1))) + # force legend icons to be alpha = 1 instead of .05
+  labs(
+    title = &quot;Credible Parameters for Shape and Scale; Effect of Priors&quot;,
+    subtitle = &quot;Model: Weibull with Censoring; True ~ Weibull(shape = 3, scale = 100)&quot;,
+    x = expression(eta [&quot;shape&quot;]),
+    y = expression(beta [&quot;scale&quot;])
+  ) +
+  theme(legend.position = &quot;bottom&quot;)
+
+
+b_30_prior_marg_plot &lt;- ggMarginal(b_30_prior_plt,
+  groupColour = TRUE,
+  groupFill = TRUE,
+  type = &quot;density&quot;,
+  alpha = 0.5
+)</code></pre>
+<p><img src="/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-82-1.png" width="100%" height="500px" /></p>
+<p>At the end of the day, both the default and the iterated priors result in similar model fits and parameter estimates after seeing just n=30 data points. This is sort of cheating but I’m still new to this so I’m cutting myself some slack.</p>
+</div>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Stent fatigue testing <a href="https://www.youtube.com/watch?v=YhUluh5V8uM" class="uri">https://www.youtube.com/watch?v=YhUluh5V8uM</a><a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>Data taken from <strong>Practical Applications of Bayesian Reliability</strong> by Abeyratne and Liu, 2019<a href="#fnref2">↩</a></p></li>
+<li id="fn3"><p>Note: the reliability function is sometimes called the survival function in reference to patient outcomes and survival analysis<a href="#fnref3">↩</a></p></li>
+<li id="fn4"><p>grid_function borrowed from Kurz, <a href="https://bookdown.org/ajkurz/Statistical_Rethinking_recoded/" class="uri">https://bookdown.org/ajkurz/Statistical_Rethinking_recoded/</a><a href="#fnref4">↩</a></p></li>
+<li id="fn5"><p>Survival package documentation, <a href="https://stat.ethz.ch/R-manual/R-devel/library/survival/html/survreg.html" class="uri">https://stat.ethz.ch/R-manual/R-devel/library/survival/html/survreg.html</a><a href="#fnref5">↩</a></p></li>
+<li id="fn6"><p>We would want to de-risk this appoach by makng sure we have a bit of historical data on file indicating our device fails at times that follow a Weibull(3, 100) or similar<a href="#fnref6">↩</a></p></li>
+<li id="fn7"><p>See the “Survival Model” section of this document: <a href="https://cran.r-project.org/web/packages/brms/vignettes/brms_families.html#survival-models" class="uri">https://cran.r-project.org/web/packages/brms/vignettes/brms_families.html#survival-models</a><a href="#fnref7">↩</a></p></li>
+<li id="fn8"><p>Thread about vague gamma priors <a href="https://math.stackexchange.com/questions/449234/vague-gamma-prior" class="uri">https://math.stackexchange.com/questions/449234/vague-gamma-prior</a><a href="#fnref8">↩</a></p></li>
+</ol>
+</div>
+
+  
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/post/creating-and-using-a-simple-bayesian-linear-model-in-brms-and-r/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/post/creating-and-using-a-simple-bayesian-linear-model-in-brms-and-r/"> Creating and Using a Simple, Bayesian Linear Model (in brms and R)</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+  </div>
+</div>
+
+
+
+
+</div>
+
+</div>
+</div>
+<script src="/js/ui.js"></script>
+<script src="/js/menus.js"></script>
+
+
+<script>
+  
+  if (window.location.hostname != "localhost") {
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+    ga('create', 'Your Google Analytics tracking ID', 'auto');
+    ga('send', 'pageview');
+  }
+</script>
+
+
+
+
+
+<script src="/js/math-code.js"></script>
+  <script async src="//cdn.bootcss.com/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+  
+
+
+</body>
+</html>
+
