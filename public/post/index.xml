@@ -230,7 +230,13 @@ gofstat(list(mle_wieb_nocens_fit, mle_gamma_nocens_fit, mle_lognormal_nocens_fit
 &lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[\text{R} (t | \beta, \eta) =  e ^ {- \bigg (\frac{t}{\eta} \bigg ) ^ {\beta}}\]&lt;/span&gt;&lt;/p&gt;
 &lt;p&gt;Note:&lt;/p&gt;
 &lt;blockquote&gt;
-&lt;p&gt;t = the time of interest (for example, 10 years) &lt;span class=&#34;math inline&#34;&gt;\(\beta\)&lt;/span&gt; = the Weibull scale parameter &lt;span class=&#34;math inline&#34;&gt;\(\eta\)&lt;/span&gt; = the Weibull shape parameter&lt;/p&gt;
+&lt;p&gt;t = the time of interest (for example, 10 years)&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\beta\)&lt;/span&gt; = the Weibull scale parameter&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\eta\)&lt;/span&gt; = the Weibull shape parameter&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;This looks a little nasty but it reads something like “the probability of a device surviving beyond time &lt;em&gt;t&lt;/em&gt; conditional on parameters &lt;span class=&#34;math inline&#34;&gt;\(\beta\)&lt;/span&gt; and &lt;span class=&#34;math inline&#34;&gt;\(\eta\)&lt;/span&gt; is [some mathy function of &lt;em&gt;t&lt;/em&gt;, &lt;span class=&#34;math inline&#34;&gt;\(\beta\)&lt;/span&gt; and &lt;span class=&#34;math inline&#34;&gt;\(\eta\)&lt;/span&gt;]. For the model we fit above using MLE, a point estimate of the reliability at t=10 years (per the above VoC) can be calculated with a simple 1-liner:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;reliability_at_10 &amp;lt;- exp(-(10 / weib_scale)**(weib_shape))
