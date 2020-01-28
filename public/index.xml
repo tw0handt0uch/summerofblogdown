@@ -1862,12 +1862,9 @@ post_mwnp_samples %&amp;gt;%
 &lt;td align=&#34;center&#34;&gt;3.25&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;87.81&lt;/td&gt;
 &lt;/tr&gt;
-&lt;tr class=&#34;odd&#34;&gt;
-&lt;td align=&#34;center&#34;&gt;Evaluate&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;the effect of the different priors (default vs. iterated) on the model fit for original n=30 censored data points.&lt;/td&gt;
-&lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
+&lt;p&gt;Evaluate the effect of the different priors (default vs. iterated) on the model fit for original n=30 censored data points.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;baseline_30_default_prior_tbl &amp;lt;- post_mtf_weib_samples %&amp;gt;% mutate(priors = &amp;quot;shape: gamma(.01, .01) \nIntercept: student_t(3, 4, 10)&amp;quot;)
 
 baseline_30_mi_prior_tbl &amp;lt;- post_mwnp_samples %&amp;gt;% mutate(priors = &amp;quot;shape: uniform(0, 10) \nIntercept: student_t(3, 5, 5)&amp;quot;)
@@ -1898,7 +1895,7 @@ b_30_prior_marg_plot &amp;lt;- ggMarginal(b_30_prior_plt,
   type = &amp;quot;density&amp;quot;,
   alpha = 0.5
 )&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-82-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-83-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;At the end of the day, both the default and the iterated priors result in similar model fits and parameter estimates after seeing just n=30 data points. This is sort of cheating but I’m still new to this so I’m cutting myself some slack.&lt;/p&gt;
 &lt;/div&gt;
 &lt;div class=&#34;footnotes&#34;&gt;
