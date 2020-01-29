@@ -23,5 +23,5 @@ Devices that are near and dear to my heart:
 
 Tiny humans that are near and dear to my heart:
 
-<img src="/./img/lil_1.jpg" width="830">
+<img src="/./img/king-72.jpg" width="830">
 
