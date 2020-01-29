@@ -416,7 +416,7 @@ plt_1 &amp;lt;- full_tbl %&amp;gt;%
   geom_point(x = weib_shape, y = weib_scale, size = 1.3) +
   geom_label_repel(
     data = point_tbl, aes(x, y),
-    label = &amp;quot;Maximum Likelihood\n Estimate&amp;quot;,
+    label = &amp;quot;Maximum Likelihood Estimate \n[from Part 1]&amp;quot;,
     fill = &amp;quot;#8bd646ff&amp;quot;,
     color = &amp;quot;black&amp;quot;,
     segment.color = &amp;quot;black&amp;quot;,
@@ -427,6 +427,8 @@ plt_1 &amp;lt;- full_tbl %&amp;gt;%
   ) +
   scale_fill_viridis_c() +
   labs(
+    title = &amp;quot;Posterior for Weibull Shape and Scale Parameters&amp;quot;,
+    subtitle = &amp;quot;Calculated with Grid Approximation&amp;quot;,
     x = expression(eta [&amp;quot;shape&amp;quot;]),
     y = expression(beta [&amp;quot;scale&amp;quot;])
   ) +
@@ -874,7 +876,7 @@ ci_results_tbl %&amp;gt;%
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;95% of the reliability estimates like above the .05 quantile. This means the .05 quantile is the analogous boundary for a simulated 95% confidence interval. In the code below, the .05 quantile of reliability is estimated for each time requirement of interest where we have 1000 simulation at each.&lt;/p&gt;
+&lt;p&gt;95% of the reliability estimates lik above the .05 quantile. This means the .05 quantile is the analogous boundary for a simulated 95% confidence interval. In the code below, the .05 quantile of reliability is estimated for each time requirement of interest where we have 1000 simulation at each.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# function will take a time of interest and calculate the implied reliability
 # only works with the params from the ci_results_tbl above
 reliability95_fcn &amp;lt;- function(t_requirement) {
@@ -1390,7 +1392,28 @@ prior_summary(mtf_weib_fit) %&amp;gt;%
 &lt;p&gt;I was taught to visualize what the model thinks before seeing the data via prior predictive simulation. I made a good-faith effort to do that, but the results are funky for brms default priors. I an not an expert here, but I believe this is because very vague default Gamma priors aren’t good for prior predictive simulations but quickly adapt to the first few data points they see.&lt;a href=&#34;#fn8&#34; class=&#34;footnoteRef&#34; id=&#34;fnref8&#34;&gt;&lt;sup&gt;8&lt;/sup&gt;&lt;/a&gt;. The prior must be placed on the intercept when must be then propagated to the scale which further muddies things. All in all there isn’t much to see. A lot of the weight is at zero but there are long tails for the defaults. I have all the code for this simulation for the defaults in the Appendix.&lt;/p&gt;
 &lt;p&gt;&lt;img src=&#34;/./img/def.png&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;If you take this at face value, the model thinks the reliability is always zero before seeing the model. Again, I think this is a special case for vague gamma priors but it doesn’t give us much confidence that we are setting things up correctly.&lt;/p&gt;
-&lt;p&gt;After viewing the default predictions, I did my best to iterate on the priors to generate something more realisti. I was able to spread some credibility up across the middle reliability values but ended up a lot of mass on either end, which wasn’t to goal.&lt;/p&gt;
+&lt;p&gt;After viewing the default predictions, I did my best to iterate on the priors to generate something more realistic. My process was manual and my general plan was to force some crdibility over higher values of shape using a uniform distribution. The intercept values were more diffcult to iterate. Here are the revised priors I tried:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;tibble(prior = c(&amp;quot;student_t(3, 5, 5)&amp;quot;, &amp;quot;uniform(0, 10)&amp;quot;),
+       class = c(&amp;quot;Intercept&amp;quot;, &amp;quot;shape&amp;quot;)) %&amp;gt;% kable(align = rep(&amp;quot;c&amp;quot;, 2))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;prior&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;class&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;student_t(3, 5, 5)&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;Intercept&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;uniform(0, 10)&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;shape&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;As can be seen, the revised priors were able to spread some credibility up across the middle reliability values but ended up a lot of mass on either end, which wasn’t to goal.&lt;/p&gt;
 &lt;p&gt;&lt;img src=&#34;/./img/imp_priors.png&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;Regardless, I refit the model with the (potentially) improved more realistic (but still not great) priors and found minimal difference in the model fit as shown below.&lt;/p&gt;
 &lt;p&gt;&lt;img src=&#34;/./img/prior_compare.png&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
@@ -1496,7 +1519,7 @@ cens_marg_2_plot &amp;lt;- ggMarginal(combined_n_plt,
   type = &amp;quot;density&amp;quot;,
   alpha = 0.7
 )&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-62-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt; This figure tells a lot. We simply needed more data points to zero in on the true data generating process. At n=30, there’s just a lot of uncertainty due to the randomness of sampling.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-63-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt; This figure tells a lot. We simply needed more data points to zero in on the true data generating process. At n=30, there’s just a lot of uncertainty due to the randomness of sampling.&lt;/p&gt;
 &lt;p&gt;This plot looks really cool, but the marginal distributions are bit cluttered. This is a perfect use case for ggridges which will let us see the same type of figure but without overlap.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;cn1 &amp;lt;- combined_n_tbl %&amp;gt;%
   gather(key = &amp;quot;key&amp;quot;, value = &amp;quot;value&amp;quot;, -model) %&amp;gt;%
@@ -1524,7 +1547,7 @@ cens_marg_2_plot &amp;lt;- ggMarginal(combined_n_plt,
   theme(legend.position = &amp;quot;&amp;quot;)
 
 cn1&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-63-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-64-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;Set of 800 to demonstrate Bayesian updating.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(125)
 fit_weib_800_bu_tbl &amp;lt;- rweibull_cens_gen_fcn(800, 3, 100)
@@ -1628,9 +1651,9 @@ cn2 &amp;lt;- combined_nbu_tbl %&amp;gt;%
   theme(legend.position = &amp;quot;&amp;quot;)
 
 cn1&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-69-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
-&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#cn2&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-70-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#cn2&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-71-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;The precision increase here is more smooth since supplemental data is added to the original set instead of just drawing completely randomly for each sample size. This is Bayesian updating.&lt;/p&gt;
 &lt;/div&gt;
 &lt;div id=&#34;evaluate-sensitivity-of-reliability-estimate-to-sample-size.&#34; class=&#34;section level3&#34;&gt;
@@ -1666,12 +1689,32 @@ reliability_ridge_plt &amp;lt;- combined_nbu_rr_tbl %&amp;gt;%
 
 
 reliability_ridge_plt&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-71-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-72-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
 &lt;/div&gt;
 &lt;/div&gt;
 &lt;div id=&#34;wrap-up&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;Wrap-up&lt;/h2&gt;
-&lt;p&gt;Here is a summary of where we ended up going in the post: * Fit some models using fitdistr plus using data that was not censored. Calculated reliability at time of interest. * Fit the same models using a Bayesian approach with grid approximation. Visualized what happens if we incorrectly omit the censored data or treat it as if it failed at the last observed time point. * Explored fitting censored data using the survival package. Evaluated sensitivity to sample size. * Used brms to fit Bayesian models with censored data. Assessed sensitivity of priors and tried to improve our priors over the default. Evaluated effect of sample size and explored the different between updating an existing data set vs. drawing new samples.&lt;/p&gt;
+&lt;p&gt;Here is a summary of where we ended up going in the post:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;Fit some models using fitdistr plus using data that was not censored. Calculated reliability at time of interest.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+&lt;blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;Fit the same models using a Bayesian approach with grid approximation. Visualized what happens if we incorrectly omit the censored data or treat it as if it failed at the last observed time point.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+&lt;blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;Explored fitting censored data using the survival package. Evaluated sensitivity to sample size.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+&lt;blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;Used brms to fit Bayesian models with censored data. Assessed sensitivity of priors and tried to improve our priors over the default. Evaluated effect of sample size and explored the different between updating an existing data set vs. drawing new samples.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
 &lt;p&gt;If you made it this far - I appreciate your patience with this long and rambling post. Thank you for reading!&lt;/p&gt;
 &lt;/div&gt;
 &lt;div id=&#34;appendix---prior-predictive-simulation---beware-its-ugly-in-here&#34; class=&#34;section level2&#34;&gt;
@@ -1682,7 +1725,7 @@ default_shape_prior_tbl &amp;lt;- default_shape_prior %&amp;gt;% as_tibble()
 default_shape_prior_tbl %&amp;gt;% ggplot(aes(x = default_shape_prior)) +
   geom_histogram(aes(y = ..density..), binwidth = 3, boundary = 0, fill = &amp;quot;#2c3e50&amp;quot;, color = &amp;quot;white&amp;quot;, alpha = .6) + geom_density(color = &amp;quot;#cf4c74ff&amp;quot;) +
   labs(title = &amp;quot;Default Prior for Shape Parameter&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-72-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-73-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#   ylim(c(0, 1e-3))
 
 default_intercept_prior &amp;lt;- rstudent_t(10000, 3, 4, 10)
@@ -1699,7 +1742,7 @@ default_priors_tbl %&amp;gt;% ggplot(aes(x = scale_prior)) +
   geom_histogram(aes(y = ..density..), binwidth = 5, boundary = 100, fill = &amp;quot;#2c3e50&amp;quot;, color = &amp;quot;white&amp;quot;, alpha = .8) +
   geom_density(color = &amp;quot;#cf4c74ff&amp;quot;) +
   labs(title = &amp;quot;Default Prior for Scale Parameter&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-72-2.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-73-2.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;#  ylim(c(0, .001))&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Prior Predictive Simulation - Default Priors&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;d1 &amp;lt;- default_priors_tbl[1:350, ] %&amp;gt;%
@@ -1727,7 +1770,7 @@ d1 + d2 + plot_layout(
   guides = &amp;quot;collect&amp;quot;
 ) +
   plot_annotation(title = &amp;quot;Implied Time-to-Failure Weibull Distributions (from default priors)&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-73-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt; Here are the reliabilities at t=15 implied by the default priors.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-74-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt; Here are the reliabilities at t=15 implied by the default priors.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;r15_pp_default_tbl &amp;lt;- default_priors_tbl %&amp;gt;% mutate(reliability_at_t15 = exp(-(15 / scale_prior)**(shape)))
 
 r1 &amp;lt;- r15_pp_default_tbl %&amp;gt;% ggplot(aes(x = reliability_at_t15)) +
@@ -1758,7 +1801,7 @@ scaaaale &amp;lt;- priors_tbl %&amp;gt;% ggplot(aes(x = scale_prior)) +
   ylim(c(0, .005))
 
 shaaaape + scaaaale + plot_annotation(title = &amp;quot;Prior Predicitve Simulations for Shape and Scale&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-75-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt; Implied time-to-event curves:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-76-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt; Implied time-to-event curves:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;p1 &amp;lt;- priors_tbl[1:500, ] %&amp;gt;%
   mutate(plotted_y_data = map2(
     shape, scale_prior,
@@ -1779,7 +1822,7 @@ shaaaape + scaaaale + plot_annotation(title = &amp;quot;Prior Predicitve Simulat
   )
 
 p1&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-76-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt; And the implied prior predictive reliability at t=15:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-77-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt; And the implied prior predictive reliability at t=15:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;r15_pp_mi_tbl &amp;lt;- priors_tbl %&amp;gt;% mutate(reliability_at_t15 = exp(-(15 / scale_prior)**(shape)))
 
 pz &amp;lt;- r15_pp_mi_tbl %&amp;gt;% ggplot(aes(x = reliability_at_t15)) +
@@ -1790,7 +1833,7 @@ pz &amp;lt;- r15_pp_mi_tbl %&amp;gt;% ggplot(aes(x = reliability_at_t15)) +
   )
 
 p1 + pz&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-77-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt; This still isn’t great - now I’ve stacked most of the weight at 0 and 1 always fail or never fail. This is hard and I do know I need to get better at it. But since I’m already down a rabbit hole let’s just check to see how the different priors impact the estimates.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-78-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt; This still isn’t great - now I’ve stacked most of the weight at 0 and 1 always fail or never fail. This is hard and I do know I need to get better at it. But since I’m already down a rabbit hole let’s just check to see how the different priors impact the estimates.&lt;/p&gt;
 &lt;p&gt;Fit the model with iterated priors: student_t(3, 5, 5) for Intercept and uniform(0, 10) for shape.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# fit model with better priors (original n=30 data point)
 # mtf_weib_new_priors_fit &amp;lt;-
@@ -1806,7 +1849,7 @@ p1 + pz&lt;/code&gt;&lt;/pre&gt;
 #  )&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Evaluate chains and convert to shape and scale&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;plot(mtf_weib_new_priors_fit)&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-80-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-81-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;post_mwnp_samples &amp;lt;- posterior_samples(mtf_weib_new_priors_fit) %&amp;gt;%
   mutate(scale = exp(b_Intercept) / (gamma(1 + 1 / shape))) %&amp;gt;%
   select(shape, scale)
@@ -1895,7 +1938,7 @@ b_30_prior_marg_plot &amp;lt;- ggMarginal(b_30_prior_plt,
   type = &amp;quot;density&amp;quot;,
   alpha = 0.5
 )&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-83-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-12-31-bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r_files/figure-html/unnamed-chunk-84-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;At the end of the day, both the default and the iterated priors result in similar model fits and parameter estimates after seeing just n=30 data points. This is sort of cheating but I’m still new to this so I’m cutting myself some slack.&lt;/p&gt;
 &lt;/div&gt;
 &lt;div class=&#34;footnotes&#34;&gt;
