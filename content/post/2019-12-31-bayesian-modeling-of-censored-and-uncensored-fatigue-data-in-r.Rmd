@@ -323,7 +323,7 @@ plt_1 <- full_tbl %>%
   geom_point(x = weib_shape, y = weib_scale, size = 1.3) +
   geom_label_repel(
     data = point_tbl, aes(x, y),
-    label = "Maximum Likelihood\n Estimate",
+    label = "Maximum Likelihood Estimate \n[from Part 1]",
     fill = "#8bd646ff",
     color = "black",
     segment.color = "black",
@@ -334,6 +334,8 @@ plt_1 <- full_tbl %>%
   ) +
   scale_fill_viridis_c() +
   labs(
+    title = "Posterior for Weibull Shape and Scale Parameters",
+    subtitle = "Calculated with Grid Approximation",
     x = expression(eta ["shape"]),
     y = expression(beta ["scale"])
   ) +
@@ -656,7 +658,7 @@ ci_results_tbl %>%
   kable(align = rep("c", 3))
 ```
 
-95% of the reliability estimates like above the .05 quantile.  This means the .05 quantile is the analogous boundary for a simulated 95% confidence interval.  In the code below, the .05 quantile of reliability is estimated for each time requirement of interest where we have 1000 simulation at each.  
+95% of the reliability estimates lik above the .05 quantile.  This means the .05 quantile is the analogous boundary for a simulated 95% confidence interval.  In the code below, the .05 quantile of reliability is estimated for each time requirement of interest where we have 1000 simulation at each.  
 
 ```{r}
 
@@ -1037,7 +1039,15 @@ knitr::include_graphics(path = "/./img/def.png")
 
 If you take this at face value, the model thinks the reliability is always zero before seeing the model.  Again, I think this is a special case for vague gamma priors but it doesn't give us much confidence that we are setting things up correctly.
 
-After viewing the default predictions, I did my best to iterate on the priors to generate something more realisti. I was able to spread some credibility up across the middle reliability values but ended up a lot of mass on either end, which wasn't to goal.  
+After viewing the default predictions, I did my best to iterate on the priors to generate something more realistic. My process was manual and my general plan was to force some crdibility over higher values of shape using a uniform distribution. The intercept values were more diffcult to iterate.  Here are the revised priors I tried:
+
+```{r}
+tibble(prior = c("student_t(3, 5, 5)", "uniform(0, 10)"),
+       class = c("Intercept", "shape")) %>% kable(align = rep("c", 2))
+```
+
+
+As can be seen, the revised priors were able to spread some credibility up across the middle reliability values but ended up a lot of mass on either end, which wasn't to goal.  
 
 ```{r, out.width = '100%', out.height = "100%", echo=FALSE, fig.align="center"}
 knitr::include_graphics(path = "/./img/imp_priors.png")
@@ -1414,10 +1424,14 @@ reliability_ridge_plt
 ## Wrap-up
 
 Here is a summary of where we ended up going in the post:
-* Fit some models using fitdistr plus using data that was not censored.  Calculated reliability at time of interest.
-* Fit the same models using a Bayesian approach with grid approximation.  Visualized what happens if we incorrectly omit the censored data or treat it as if it failed at the last observed time point.
-* Explored fitting censored data using the survival package. Evaluated sensitivity to sample size.
-* Used brms to fit Bayesian models with censored data. Assessed sensitivity of priors and tried to improve our priors over the default.  Evaluated effect of sample size and explored the different between updating an existing data set vs. drawing new samples.
+
+>* Fit some models using fitdistr plus using data that was not censored.  Calculated reliability at time of interest.
+
+>* Fit the same models using a Bayesian approach with grid approximation.  Visualized what happens if we incorrectly omit the censored data or treat it as if it failed at the last observed time point.
+
+>* Explored fitting censored data using the survival package. Evaluated sensitivity to sample size.
+
+>* Used brms to fit Bayesian models with censored data. Assessed sensitivity of priors and tried to improve our priors over the default.  Evaluated effect of sample size and explored the different between updating an existing data set vs. drawing new samples.
 
 If you made it this far - I appreciate your patience with this long and rambling post.  Thank you for reading!
 
