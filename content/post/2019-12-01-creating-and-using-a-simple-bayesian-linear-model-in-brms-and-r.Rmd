@@ -194,7 +194,7 @@ prior_fig_1 <- empty_tbl %>% ggplot() +
     x = "time (sec)",
     y = "Temp (C)",
     title = "Prior Predictive Simulations",
-    subtitle = "Uninformed Prior"
+    subtitle = "Uninform Prior"
   )
 
 # in this fig we confine the slopes to broad ranges informed by what we know about the domain
