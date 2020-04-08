@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.56.1" />
+
+  <title>Bayesian Stress-Strength Analysis for Product Design (in R and brms) &middot; [R]eliability</title>
+
+    
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.9.0/css/all.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+ 
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/img/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+  <a class="pure-menu-heading brand" href="/">Riley King</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/about/"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
+      
+        </li>
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/tw0handt0uch1" rel="me" target="_blank"><i class="fab fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/riley-king-9594247" rel="me" target="_blank"><i class="fab fa-linkedin"></i></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/tw0handt0uch" rel="me" target="_blank"><i class="fab fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+ <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://www.r-bloggers.com/"><i class="fa fa-rss fa-fw"></i>R-Bloggers</a>
+    </li>
+
+  </ul>
+</div>
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2019. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+
+<div class="header">
+  <h1>Bayesian Stress-Strength Analysis for Product Design (in R and brms)</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+    <i class="fa fa-calendar fa-fw"></i>
+    <time>07 Apr 2020</time>
+  </div>
+
+  
+
+  
+  
+  
+  
+
+  
+  
+  
+  <div>
+    <i class="fa fa-tags fa-fw"></i>
+    
+      <a class="post-taxonomy-tag" href="/tags/r">R</a>
+    
+  </div>
+  
+  
+
+</div>
+
+  
+
+
+<p>Whether you are building bridges, baseball bats, or medical devices, one of the most basic rules of engineering is that the thing you build must be strong enough to survive its service environment. Although a simple concept in principle, variation in use conditions, material properties, and geometric tolerances all introduce uncertainty that can doom a product. Stress-Strength analysis attempts to formalize a more rigorous approach to evaluating overlap between the stress and strength distributions. Graphically, a smaller area of overlap represents a smaller probability of failure and greater expected reliability (although it doesn’t exactly equal the probability of failure).<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> <a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a></p>
+<p><img src="/./img/stress_strength.png" width="100%" height="100%" style="display: block; margin: auto;" /></p>
+<p>However, even formal stress-strength analysis usually infers device reliability from point estimates of material strength and/or use conditions. Monte Carlo simulations intending to respect the full spread of stress and strength distributions generally ignore the uncertainty inherent in the distributional parameters themselves. Fortunately there is a Bayesian extension of Stress-Strength analysis that naturally incorporates the uncertainty of the parameters to provide a true probability distribution of device reliability. In this post I will first walk through the frequentist approach to obtaining a point estimate of reliability and then the Bayesian extension that yields a full posterior for reliability.</p>
+<p>First, load the libraries.</p>
+<pre class="r"><code>library(tidyverse)
+library(broom)
+library(survival)
+library(brms)
+library(knitr)
+library(patchwork)
+library(tidybayes)
+library(gganimate)
+library(transformr)</code></pre>
+<p>I’ll be using a dataset from Liu and Abeyratne that contains stress and strength data for an electrode connector component in an electronic medical device.<a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a> The stress-in-service data are compiled from characterization tests and customer usage data. The strength data (here called “failure_stress” to emphasize that they can be directly evaluated against stress-in-service) are obtained from benchtop testing and are right censored at 15. Assume the units of each are the same.</p>
+<p>The stress-in-service data are known from historical testing to follow a lognormal distribution. Likewise, the failure stress data are known to follow a Weibull distribution.</p>
+<pre class="r"><code># Manually enter data
+stress_in_service_tbl &lt;- tibble(stress_in_service = c(2.53, 2.76, 1.89, 3.85, 3.62, 3.89, 3.06, 2.16, 2.20, 1.90, 1.96, 2.09, 1.70, 5.77, 4.35, 5.30, 3.61, 2.63, 4.53, 4.77, 1.68, 1.85, 2.32, 2.11, 1.94, 1.81, 1.53, 1.60, 0.47, 1.06, 1.30, 2.84, 3.84, 3.32))
+
+# Peek at data
+stress_in_service_tbl %&gt;%
+  head(7) %&gt;%
+  kable(align = &quot;c&quot;)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">stress_in_service</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">2.53</td>
+</tr>
+<tr class="even">
+<td align="center">2.76</td>
+</tr>
+<tr class="odd">
+<td align="center">1.89</td>
+</tr>
+<tr class="even">
+<td align="center">3.85</td>
+</tr>
+<tr class="odd">
+<td align="center">3.62</td>
+</tr>
+<tr class="even">
+<td align="center">3.89</td>
+</tr>
+<tr class="odd">
+<td align="center">3.06</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code># manually enter failure stress data
+failure_stress_tbl &lt;- tibble(failure_stress = c(7.52, 15, 8.44, 6.67, 11.48, 11.09, 15, 5.85, 13.27, 13.09, 12.73, 11.08, 15, 8.41, 12.34, 8.77, 6.47, 10.51, 7.05, 10.90, 12.38, 7.78, 14.61, 15, 10.99, 11.35, 4.72, 6.72, 11.74, 8.45, 13.26, 13.89, 12.83, 6.49))
+
+# add column to indicate run-out / censoring.  brms convention is 1 = censored, 0 = failure event
+failure_stress_tbl &lt;- failure_stress_tbl %&gt;% 
+  mutate(censored_brms = case_when(failure_stress == 15 ~ 1, TRUE ~ 0)) %&gt;%
+  mutate(censored_surv = case_when(failure_stress == 15 ~ 0,TRUE ~ 1))
+
+# peek at data
+failure_stress_tbl %&gt;%
+  head(7) %&gt;%
+  kable(align = rep(&quot;c&quot;, 3))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">failure_stress</th>
+<th align="center">censored_brms</th>
+<th align="center">censored_surv</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">7.52</td>
+<td align="center">0</td>
+<td align="center">1</td>
+</tr>
+<tr class="even">
+<td align="center">15.00</td>
+<td align="center">1</td>
+<td align="center">0</td>
+</tr>
+<tr class="odd">
+<td align="center">8.44</td>
+<td align="center">0</td>
+<td align="center">1</td>
+</tr>
+<tr class="even">
+<td align="center">6.67</td>
+<td align="center">0</td>
+<td align="center">1</td>
+</tr>
+<tr class="odd">
+<td align="center">11.48</td>
+<td align="center">0</td>
+<td align="center">1</td>
+</tr>
+<tr class="even">
+<td align="center">11.09</td>
+<td align="center">0</td>
+<td align="center">1</td>
+</tr>
+<tr class="odd">
+<td align="center">15.00</td>
+<td align="center">1</td>
+<td align="center">0</td>
+</tr>
+</tbody>
+</table>
+<p>After verifying the data has been imported correctly, the two distributions can be visualized on the same plot and the degree of overlap evaluated qualitatively.</p>
+<pre class="r"><code># set up a combined stress/strength tibble
+a &lt;- tibble(val = stress_in_service_tbl$stress_in_service, label = &quot;stress_in_service&quot;)
+b &lt;- tibble(val = failure_stress_tbl$failure_stress, label = &quot;failure_stress&quot;)
+overlap_tbl &lt;- bind_rows(a, b) %&gt;%
+  mutate(label = as_factor(label))
+
+# view combined tbl
+overlap_tbl %&gt;%
+  head(5) %&gt;%
+  kable(align = rep(&quot;c&quot;, 2))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">val</th>
+<th align="center">label</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">2.53</td>
+<td align="center">stress_in_service</td>
+</tr>
+<tr class="even">
+<td align="center">2.76</td>
+<td align="center">stress_in_service</td>
+</tr>
+<tr class="odd">
+<td align="center">1.89</td>
+<td align="center">stress_in_service</td>
+</tr>
+<tr class="even">
+<td align="center">3.85</td>
+<td align="center">stress_in_service</td>
+</tr>
+<tr class="odd">
+<td align="center">3.62</td>
+<td align="center">stress_in_service</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>overlap_tbl %&gt;%
+  tail(5) %&gt;%
+  kable(align = rep(&quot;c&quot;, 2))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">val</th>
+<th align="center">label</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">8.45</td>
+<td align="center">failure_stress</td>
+</tr>
+<tr class="even">
+<td align="center">13.26</td>
+<td align="center">failure_stress</td>
+</tr>
+<tr class="odd">
+<td align="center">13.89</td>
+<td align="center">failure_stress</td>
+</tr>
+<tr class="even">
+<td align="center">12.83</td>
+<td align="center">failure_stress</td>
+</tr>
+<tr class="odd">
+<td align="center">6.49</td>
+<td align="center">failure_stress</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code># plot empirical distributions
+overlap_tbl %&gt;% ggplot() +
+  geom_density(aes(x = val, fill = label), alpha = .5) +
+  labs(
+    x = &quot;Stress&quot;,
+    y = &quot;Density of Observations&quot;,
+    title = &quot;Empirical Distributions for Stress-In-Service and Failure Stress&quot;,
+    subtitle = &quot;Overlap Region Represents Posssible Device Failure, Failrue Stress Censored at 15&quot;
+  ) +
+  scale_fill_manual(values = c(&quot;#20A486FF&quot;, &quot;#FDE725FF&quot;)) +
+  theme(legend.title = element_blank()) +
+  theme(legend.position = &quot;bottom&quot;)</code></pre>
+<p><img src="/post/2020-03-05-bayesian-stress-strength-inference-in-r-and-brms_files/figure-html/unnamed-chunk-6-1.png" width="100%" height="500px" /></p>
+<div id="obtain-the-frequentist-point-estimates" class="section level2">
+<h2>Obtain the Frequentist Point Estimates</h2>
+<p>We can get the best parameter estimates for both data sets using the survreg function from the survival package.</p>
+<pre class="r"><code>#fit stress-in-service data using survreg from survival package
+stress_in_service_fit &lt;- survreg(Surv(stress_in_service) ~ 1,
+  data = stress_in_service_tbl,
+  dist = &quot;lognormal&quot;
+)
+
+#extract point estimates of parameters from sis-fit
+sis_point_est_tbl &lt;- tidy(stress_in_service_fit)[1, 2] %&gt;%
+  rename(meanlog = estimate) %&gt;%
+  mutate(sdlog = stress_in_service_fit$scale) %&gt;%
+  round(2) %&gt;%
+  kable(align = rep(&quot;c&quot;, 2))
+
+sis_point_est_tbl </code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">meanlog</th>
+<th align="center">sdlog</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">0.88</td>
+<td align="center">0.5</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>#fit failure stress data using survreg from survival package
+failure_stress_fit &lt;- survreg(Surv(failure_stress, censored_surv) ~ 1,
+  data = failure_stress_tbl,
+  dist = &quot;weibull&quot;
+)
+
+# extract scale parameter
+scale &lt;- tidy(failure_stress_fit)[1, 2] %&gt;%
+  rename(scale = estimate) %&gt;%
+  exp() %&gt;%
+  round(2)
+
+# extract shape parameter
+shape &lt;- tidy(failure_stress_fit)[2, 2] %&gt;%
+  rename(shape = estimate) %&gt;%
+  exp() %&gt;%
+  .^-1 %&gt;%
+  round(2)
+
+# summarize
+fs_point_est_tbl &lt;- bind_cols(shape, scale) %&gt;%
+  kable(align = rep(&quot;c&quot;, 2))
+
+fs_point_est_tbl</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">shape</th>
+<th align="center">scale</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">3.57</td>
+<td align="center">12</td>
+</tr>
+</tbody>
+</table>
+<p>The reliability point estimate is obtained by drawing randomly from the two fitted distributions and seeing the percentage of occasions where the stress_in_service is greater than the failure_stress:</p>
+<pre class="r"><code># Monte Carlo to see how often s-i-s &gt; fs
+set.seed(10)
+
+#random draws
+sis_draws &lt;- rlnorm(n = 100000, meanlog = .88, sdlog = .50)
+fs_draws &lt;- rweibull(n = 100000, shape = 3.57, scale = 12)
+
+#assign 1 to cases where sis_draws &gt;= fs_draws
+point_sim &lt;- tibble(
+  sis_draws = sis_draws,
+  fs_draws = fs_draws
+) %&gt;%
+  mutate(freq = case_when(
+    sis_draws &gt;= fs_draws ~ 1,
+    TRUE ~ 0
+  ))
+
+#take freqency of 0&#39;s
+reliability_pt_est &lt;- (1 - mean(point_sim$freq))
+
+#show as tibble
+tibble(reliability = 1 - mean(point_sim$freq)) %&gt;%
+  round(3) %&gt;% 
+  kable(align = &quot;c&quot;)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">reliability</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">0.986</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="model-the-stress-in-service-with-brms" class="section level2">
+<h2>Model the Stress-in-Service with brms</h2>
+<p>For the Bayesian approach we fit the models with brms instead of survreg. The result is a posterior of plausible values for each parameter.</p>
+<p>Before running to model, reasonable priors were established through simulation. Code and details are included in the Appendix at the end of this post so as to not derail the flow.</p>
+<pre class="r"><code>#Fit model to stress-in-service data. Data is known to be of lognormal form.  
+
+# stress_in_service_model_1 &lt;-
+#  brm(
+#    data = stress_in_service_tbl, family = lognormal,
+#    stress_in_service ~ 1,
+#   prior = c(
+#     prior(normal(.5, 1), class = Intercept),
+#     prior(uniform(.01, 8), class = sigma)),
+#   iter = 41000, warmup = 40000, chains = 4, cores = 4,
+#   seed = 4
+# )</code></pre>
+<p>Clean up the posterior tibble and plot.</p>
+<pre class="r"><code># extract posterior draws 
+post_samples_stress_in_service_model_1_tbl &lt;-
+  posterior_samples(stress_in_service_model_1) %&gt;%
+  select(-lp__) %&gt;%
+  rename(&quot;mu&quot; = b_Intercept)
+
+#examine as tibble
+post_samples_stress_in_service_model_1_tbl %&gt;%
+  head(7) %&gt;%
+  kable(align = rep(&quot;c&quot;, 2), digits = 3)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">mu</th>
+<th align="center">sigma</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">0.932</td>
+<td align="center">0.537</td>
+</tr>
+<tr class="even">
+<td align="center">0.922</td>
+<td align="center">0.601</td>
+</tr>
+<tr class="odd">
+<td align="center">0.801</td>
+<td align="center">0.535</td>
+</tr>
+<tr class="even">
+<td align="center">0.836</td>
+<td align="center">0.526</td>
+</tr>
+<tr class="odd">
+<td align="center">0.977</td>
+<td align="center">0.540</td>
+</tr>
+<tr class="even">
+<td align="center">0.732</td>
+<td align="center">0.535</td>
+</tr>
+<tr class="odd">
+<td align="center">0.757</td>
+<td align="center">0.535</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code># get visual of posterior with rough idea of chain convergence
+plot(stress_in_service_model_1)</code></pre>
+<p><img src="/post/2020-03-05-bayesian-stress-strength-inference-in-r-and-brms_files/figure-html/unnamed-chunk-13-1.png" width="100%" height="500px" /></p>
+<p>Here is the summary of the stress-in-service model:</p>
+<pre class="r"><code># evaluate posterior distribution with 95% CI and rhat diagnostic
+summary(stress_in_service_model_1)</code></pre>
+<pre><code>##  Family: lognormal 
+##   Links: mu = identity; sigma = identity 
+## Formula: stress_in_service ~ 1 
+##    Data: stress_in_service_tbl (Number of observations: 34) 
+## Samples: 4 chains, each with iter = 41000; warmup = 40000; thin = 1;
+##          total post-warmup samples = 4000
+## 
+## Population-Level Effects: 
+##           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+## Intercept     0.88      0.09     0.71     1.06 1.00     1976     2298
+## 
+## Family Specific Parameters: 
+##       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+## sigma     0.53      0.07     0.42     0.69 1.00     2399     2016
+## 
+## Samples were drawn using sampling(NUTS). For each parameter, Eff.Sample 
+## is a crude measure of effective sample size, and Rhat is the potential 
+## scale reduction factor on split chains (at convergence, Rhat = 1).</code></pre>
+</div>
+<div id="model-the-failure-stress-data-with-brms" class="section level2">
+<h2>Model the Failure Stress Data with brms</h2>
+<p>The failure stress data is fit in a similar way as before. Again, prior predictive simulations are shown in the Appendix.</p>
+<pre class="r"><code># failure_stress_model_1 &lt;- brm(failure_stress | cens(censored_brms) ~ 1,
+# data = failure_stress_tbl, family = weibull(),
+# prior = c(
+#   prior(student_t(3, 5, 5), class = Intercept),
+#   prior(uniform(0, 10), class = shape)),
+# iter = 41000, warmup = 40000, chains = 4, cores = 4, seed = 4
+# )</code></pre>
+<p>The following code extracts and converts the parameters from the brms default into the shape and scale that are used in the rweibull() function before displaying the summaries.</p>
+<pre class="r"><code># extract posterior draws and examine as tibble
+failure_stress_model_1_tbl &lt;-
+  posterior_samples(failure_stress_model_1) %&gt;%
+  select(-lp__) %&gt;%
+  rename(&quot;mu&quot; = b_Intercept)
+
+#compute shape and scale
+post_samples_failure_stress_model_1_tbl &lt;- posterior_samples(failure_stress_model_1) %&gt;%
+  mutate(scale = exp(b_Intercept) / (gamma(1 + 1 / shape))) %&gt;%
+  select(shape, scale)
+
+#display as tibble
+post_samples_failure_stress_model_1_tbl %&gt;%
+  head(7) %&gt;%
+  kable(align = rep(&quot;c&quot;, 2), digits = 3)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">shape</th>
+<th align="center">scale</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">3.590</td>
+<td align="center">10.972</td>
+</tr>
+<tr class="even">
+<td align="center">3.502</td>
+<td align="center">11.126</td>
+</tr>
+<tr class="odd">
+<td align="center">3.363</td>
+<td align="center">10.961</td>
+</tr>
+<tr class="even">
+<td align="center">3.570</td>
+<td align="center">10.310</td>
+</tr>
+<tr class="odd">
+<td align="center">3.040</td>
+<td align="center">13.621</td>
+</tr>
+<tr class="even">
+<td align="center">3.067</td>
+<td align="center">13.753</td>
+</tr>
+<tr class="odd">
+<td align="center">4.245</td>
+<td align="center">11.035</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>plot(failure_stress_model_1)</code></pre>
+<p><img src="/post/2020-03-05-bayesian-stress-strength-inference-in-r-and-brms_files/figure-html/unnamed-chunk-19-1.png" width="100%" height="500px" /></p>
+<pre class="r"><code>summary(failure_stress_model_1)</code></pre>
+<pre><code>##  Family: weibull 
+##   Links: mu = log; shape = identity 
+## Formula: failure_stress | cens(censored_brms) ~ 1 
+##    Data: failure_stress_tbl (Number of observations: 34) 
+## Samples: 4 chains, each with iter = 41000; warmup = 40000; thin = 1;
+##          total post-warmup samples = 4000
+## 
+## Population-Level Effects: 
+##           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+## Intercept     2.38      0.06     2.28     2.49 1.00     2257     2279
+## 
+## Family Specific Parameters: 
+##       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+## shape     3.56      0.55     2.56     4.67 1.00     1963     2169
+## 
+## Samples were drawn using sampling(NUTS). For each parameter, Eff.Sample 
+## is a crude measure of effective sample size, and Rhat is the potential 
+## scale reduction factor on split chains (at convergence, Rhat = 1).</code></pre>
+</div>
+<div id="visualization-of-uncertainty---credible-curves-for-stress-in-service-and-failure-stress" class="section level2">
+<h2>Visualization of Uncertainty - Credible Curves for Stress-in-Service and Failure Stress</h2>
+<p>I haven’t ever used the gganimate package and this seems like a nice opportunity. The code below draws a small handful of parameters from the posterior and plots them to visualize the uncertainty in both distributions.</p>
+<pre class="r"><code>#take 25 sets of parameters, convert to lnorm curves
+lnorm_stress_curve_tbl &lt;- post_samples_stress_in_service_model_1_tbl[1:25, ] %&gt;%
+  mutate(plotted_y_data = map2(
+    mu, sigma,
+    ~ tibble(
+      x = seq(0, 20, length.out = 100),
+      y = dlnorm(x, .x, .y)
+    )
+  )) %&gt;%
+  unnest(plotted_y_data) %&gt;%
+  mutate(model = &quot;Stress in Service [lnorm]&quot;) %&gt;%
+  rename(
+    param_1 = mu,
+    param_2 = sigma
+  )
+
+#take 25 sets of parameters, convert to Weib curves
+weib_stress_curve_tbl &lt;- post_samples_failure_stress_model_1_tbl[1:25, ] %&gt;%
+  mutate(plotted_y_data = map2(
+    shape, scale,
+    ~ tibble(
+      x = seq(0, 20, length.out = 100),
+      y = dweibull(x, .x, .y)
+    )
+  )) %&gt;%
+  unnest(plotted_y_data) %&gt;%
+  mutate(model = &quot;Failure Stress [weib]&quot;) %&gt;%
+  rename(
+    param_1 = shape,
+    param_2 = scale
+  )
+
+#combine
+a &lt;- bind_rows(lnorm_stress_curve_tbl, weib_stress_curve_tbl) %&gt;% mutate(param_1_fct = as_factor(param_1))
+
+#visualize
+p &lt;- a %&gt;%
+  ggplot(aes(x, y)) +
+  geom_line(aes(x, y, group = param_1_fct, color = model), alpha = 1, size = 1) +
+  labs(
+    x = &quot;Stress&quot;,
+    y = &quot;Density&quot;,
+    title = &quot;Credible Failure Stress and Service Stress Distributions&quot;,
+    subtitle = &quot;n=25 curves sampled from the posterior&quot;
+  ) +
+  scale_color_viridis_d(end = .8) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1))) +
+  theme(legend.title = element_blank()) +
+  theme(legend.position = &quot;bottom&quot;) +
+  transition_states(param_1_fct, 0, 1) +
+  shadow_mark(past = TRUE, future = TRUE, alpha = .3, color = &quot;gray50&quot;, size = .4)
+
+#gganimate 
+animate(p, nframes = 50, fps = 2.5, width = 900, height = 600, res = 120, dev = &quot;png&quot;, type = &quot;cairo&quot;)</code></pre>
+<p><img src="/post/2020-03-05-bayesian-stress-strength-inference-in-r-and-brms_files/figure-html/unnamed-chunk-20-1.gif" width="100%" height="500px" /></p>
+</div>
+<div id="building-the-credible-reliability-distribution" class="section level2">
+<h2>Building the Credible Reliability Distribution</h2>
+<p>Having now obtained the posterior distributions for both stress-in-service and failure stress, we can select random sets of parameters and compare a random (but credible) pair of distributions. By simulating from each random pair of distributions and calculating a single value of reliability as before, we can build out a credible reliability distribution. The blue vertical line indicates the frequentist point estimate we obtained at the beginning of the analysis.</p>
+<pre class="r"><code>#set number of simulations
+n_sims &lt;- 10000
+set.seed(1001)
+
+#stress-in-service (lognormal) simulations
+labeled_post_ln_tbl &lt;- post_samples_stress_in_service_model_1_tbl %&gt;%
+  mutate(
+    model = &quot;lognormal&quot;
+  ) %&gt;%
+  rename(
+    param1 = mu,
+    param2 = sigma
+  ) %&gt;%
+  mutate(nested_data_ln = map2(param1, param2, ~ rlnorm(n_sims, .x, .y)))
+
+#failure stress (Weibull) simulations
+labeled_post_wb_tbl &lt;- post_samples_failure_stress_model_1_tbl %&gt;%
+  mutate(
+    model = &quot;weibull&quot;
+  ) %&gt;%
+  rename(
+    param1 = shape,
+    param2 = scale
+  ) %&gt;%
+  mutate(nested_data_wb = map2(param1, param2, ~ rweibull(n_sims, .x, .y)))
+
+#combine and calculate reliability for each pair to build reliability distribution
+all_post_samples_tbl &lt;- bind_cols(labeled_post_ln_tbl, labeled_post_wb_tbl) %&gt;%
+  select(nested_data_ln, nested_data_wb) %&gt;%
+  mutate(reliability = map2_dbl(nested_data_ln, nested_data_wb, ~ mean(.x &lt; .y)))</code></pre>
+<p>Visualize the results with some help from tidybayes::geom_halfeyeh()</p>
+<pre class="r"><code>#visualize
+all_post_samples_tbl %&gt;%
+  ggplot(aes(x = reliability, y = 0)) +
+  geom_halfeyeh(
+    fill = &quot;firebrick&quot;,
+    point_interval = median_qi, .width = .95, alpha = .9
+  ) +
+  geom_vline(xintercept = reliability_pt_est, color = &quot;dodgerblue&quot;, size = 1.1, alpha = .7) +
+  #  stat_dotsh(quantiles = 100, size = .5) +
+  scale_y_continuous(NULL, breaks = NULL) +
+  labs(
+    title = &quot;Distribution of Predicted Reliability&quot;,
+    subtitle = &quot;Marked by median and 95% probability interval. Vertical line is the point estimate&quot;
+  ) +
+  theme_bw() +
+  theme(panel.grid = element_blank())</code></pre>
+<p><img src="/post/2020-03-05-bayesian-stress-strength-inference-in-r-and-brms_files/figure-html/unnamed-chunk-22-1.png" width="100%" height="500px" /></p>
+<p>Behold, a full reliability distribution supported by the data! So much better for decision making than the point estimate!</p>
+<p>Thank you for reading.</p>
+</div>
+<div id="appendix---prior-predictive-simulation" class="section level2">
+<h2>Appendix - Prior Predictive Simulation</h2>
+<div id="prior-predictive-simulation-for-stress-in-service" class="section level3">
+<h3>Prior Predictive Simulation for Stress-in-Service</h3>
+<pre class="r"><code>set.seed(45)
+mu_prior &lt;- rlnorm(100000, meanlog = .5, sdlog = 1)
+mu_prior_tbl &lt;- mu_prior %&gt;%
+  as_tibble() %&gt;%
+  filter(value &gt; 0)
+
+muuuuu &lt;- mu_prior_tbl %&gt;% ggplot(aes(x = mu_prior)) +
+  geom_histogram(aes(y = ..density..), fill = &quot;#2c3e50&quot;, color = &quot;white&quot;, alpha = .6) +
+  scale_x_continuous(trans = &quot;log10&quot;)
+
+mu_prior_tbl %&gt;%
+  mutate(orig = log(value)) %&gt;%
+  pull(orig) %&gt;%
+  mean()</code></pre>
+<pre><code>## [1] 0.5033306</code></pre>
+<pre class="r"><code>mu_prior_tbl %&gt;%
+  mutate(orig = log(value)) %&gt;%
+  pull(orig) %&gt;%
+  sd()</code></pre>
+<pre><code>## [1] 1.001799</code></pre>
+<pre class="r"><code>set.seed(45)
+sigma_prior &lt;- runif(100000, .01, 8)
+
+p0_priors_tbl &lt;- sigma_prior %&gt;%
+  as_tibble() %&gt;%
+  bind_cols(mu_prior_tbl) %&gt;%
+  rename(sigma = value, mu = value1)
+
+
+sigmaaa &lt;- p0_priors_tbl %&gt;% ggplot(aes(x = sigma_prior)) +
+  geom_histogram(aes(y = ..density..), fill = &quot;#2c3e50&quot;, color = &quot;white&quot;, alpha = .6)
+
+muuuuu + sigmaaa + plot_annotation(title = &quot;Prior Predicitve Simulations for mu and sigma&quot;)</code></pre>
+<p><img src="/post/2020-03-05-bayesian-stress-strength-inference-in-r-and-brms_files/figure-html/unnamed-chunk-24-1.png" width="100%" height="500px" /></p>
+<p>Evaluate implied stress-in-service before seeing the data</p>
+<pre class="r"><code>p0 &lt;- p0_priors_tbl[1:1000, ] %&gt;%
+  mutate(row_id = row_number()) %&gt;%
+  mutate(plotted_y_data = pmap(
+    list(sigma, mu, row_id),
+    ~ tibble(
+      x = seq(.1, 100, length.out = 1000),
+      y = dlnorm(x, .x, .y),
+      z = row_id
+    )
+  )) %&gt;%
+  unnest(plotted_y_data) %&gt;%
+  filter(x &gt; 1) %&gt;%
+  ggplot(aes(x, y)) +
+  geom_line(aes(group = row_id), alpha = .15, color = &quot;#2c3e50&quot;) +
+  labs(
+    x = &quot;Stress-in-Service&quot;,
+    y = &quot;Density&quot;,
+    title = &quot;Implied Stress-in-Service Possibilities&quot;,
+    subtitle = &quot;Generated from Priors Only&quot;
+  ) +
+  scale_x_continuous(trans = &quot;log10&quot;) +
+  ylim(c(0, 1))
+
+p0</code></pre>
+<p><img src="/post/2020-03-05-bayesian-stress-strength-inference-in-r-and-brms_files/figure-html/unnamed-chunk-25-1.png" width="100%" height="500px" /></p>
+<p>Evaluate implied failure stress before seeing the data:</p>
+<pre class="r"><code># seed for reproducibility
+set.seed(12)
+
+# Evaluate Mildly Informed Priors
+shape_prior &lt;- runif(100000, 0, 10)
+shape_prior_tbl &lt;- shape_prior %&gt;% as_tibble()
+shaaaape &lt;- shape_prior_tbl %&gt;% ggplot(aes(x = shape_prior)) +
+  geom_histogram(aes(y = ..density..), binwidth = 1, boundary = 10, fill = &quot;#2c3e50&quot;, color = &quot;white&quot;, alpha = .6)
+
+
+intercept_prior &lt;- rstudent_t(100000, 3, 5, 5)
+
+priors_tbl &lt;- intercept_prior %&gt;%
+  as_tibble() %&gt;%
+  bind_cols(shape_prior_tbl) %&gt;%
+  rename(intercept = value, shape = value1) %&gt;%
+  mutate(scale_prior = exp(intercept) / (gamma(1 + 1 / shape))) %&gt;%
+  filter(scale_prior &lt; 1000) %&gt;%
+  select(-intercept)
+
+scaaaale &lt;- priors_tbl %&gt;% ggplot(aes(x = scale_prior)) +
+  geom_histogram(aes(y = ..density..), binwidth = 10, boundary = 100, fill = &quot;#2c3e50&quot;, color = &quot;white&quot;, alpha = .6) +
+  ylim(c(0, .005))
+
+shaaaape + scaaaale + plot_annotation(title = &quot;Prior Predicitve Simulations for Shape and Scale&quot;)</code></pre>
+<p><img src="/post/2020-03-05-bayesian-stress-strength-inference-in-r-and-brms_files/figure-html/unnamed-chunk-26-1.png" width="100%" height="500px" /></p>
+<p>These are the plausible distributions of failure stress we might expect before seeing the data (based on these priors):</p>
+<pre class="r"><code>p1 &lt;- priors_tbl[1:500, ] %&gt;%
+  mutate(plotted_y_data = map2(
+    shape, scale_prior,
+    ~ tibble(
+      x = seq(0, 200, length.out = 400),
+      y = dweibull(x, .x, .y)
+    )
+  )) %&gt;%
+  unnest(plotted_y_data) %&gt;%
+  ggplot(aes(x, y)) +
+  geom_line(aes(group = shape), alpha = .2, color = &quot;#2c3e50&quot;) +
+  xlim(c(0, 50)) +
+  ylim(c(0, .5)) +
+  labs(
+    x = &quot;Failure Stress Distributions&quot;,
+    y = &quot;Density&quot;,
+    title = &quot;Implied Failure Stress Possibilities&quot;,
+    subtitle = &quot;Generated from Priors Only&quot;
+  )
+
+p1</code></pre>
+<p><img src="/post/2020-03-05-bayesian-stress-strength-inference-in-r-and-brms_files/figure-html/unnamed-chunk-27-1.png" width="100%" height="500px" /></p>
+</div>
+</div>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Image from here: <a href="https://www.quanterion.com/interference-stressstrength-analysis/" class="uri">https://www.quanterion.com/interference-stressstrength-analysis/</a><a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>If the stress and strength distribution were exactly the same and overlapping, the probability of failures would be 50% since you would be pulling 2 draws randomly and comparing stress to strength<a href="#fnref2">↩</a></p></li>
+<li id="fn3"><p>Practical Applications of Bayesian Reliability, pg. 170<a href="#fnref3">↩</a></p></li>
+</ol>
+</div>
+
+  
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/post/bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/post/bayesian-modeling-of-censored-and-uncensored-fatigue-data-in-r/">Survival Analysis - Fitting Weibull Models for Improving Device Reliability in R</a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+  </div>
+</div>
+
+
+
+
+</div>
+
+</div>
+</div>
+<script src="/js/ui.js"></script>
+<script src="/js/menus.js"></script>
+
+
+<script>
+  
+  if (window.location.hostname != "localhost") {
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+    ga('create', 'Your Google Analytics tracking ID', 'auto');
+    ga('send', 'pageview');
+  }
+</script>
+
+
+
+
+
+<script src="/js/math-code.js"></script>
+  <script async src="//cdn.bootcss.com/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+  
+
+
+</body>
+</html>
+
