@@ -6,7 +6,7 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>&amp;copy; 2019. All rights reserved.</copyright>
-    <lastBuildDate>Tue, 07 Apr 2020 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Thu, 05 Mar 2020 00:00:00 +0000</lastBuildDate>
     
         <atom:link href="/tags/r/index.xml" rel="self" type="application/rss+xml" />
     
@@ -14,7 +14,7 @@
     <item>
       <title>Bayesian Stress-Strength Analysis for Product Design (in R and brms)</title>
       <link>/post/bayesian-stress-strength-inference-in-r-and-brms/</link>
-      <pubDate>Tue, 07 Apr 2020 00:00:00 +0000</pubDate>
+      <pubDate>Thu, 05 Mar 2020 00:00:00 +0000</pubDate>
       
       <guid>/post/bayesian-stress-strength-inference-in-r-and-brms/</guid>
       <description>

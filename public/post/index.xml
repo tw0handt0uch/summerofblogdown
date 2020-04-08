@@ -6,7 +6,7 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>&amp;copy; 2019. All rights reserved.</copyright>
-    <lastBuildDate>Tue, 07 Apr 2020 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Thu, 05 Mar 2020 00:00:00 +0000</lastBuildDate>
     
         <atom:link href="/post/index.xml" rel="self" type="application/rss+xml" />
     
@@ -14,7 +14,7 @@
     <item>
       <title>Bayesian Stress-Strength Analysis for Product Design (in R and brms)</title>
       <link>/post/bayesian-stress-strength-inference-in-r-and-brms/</link>
-      <pubDate>Tue, 07 Apr 2020 00:00:00 +0000</pubDate>
+      <pubDate>Thu, 05 Mar 2020 00:00:00 +0000</pubDate>
       
       <guid>/post/bayesian-stress-strength-inference-in-r-and-brms/</guid>
       <description>
@@ -2724,7 +2724,7 @@ ablation_dta_tbl %&amp;gt;% skim()&lt;/code&gt;&lt;/pre&gt;
 ##  n obs: 331 
 ##  n variables: 2 
 ## 
-## -- Variable type:numeric -------------------------------------------------------
+## -- Variable type:numeric ------------------------------------------------------------------------------------------------------------
 ##  variable missing complete   n  mean   sd    p0   p25   p50   p75  p100
 ##      temp       0      331 331 77.37 3.9  68.26 74.61 77.15 80.33 89.53
 ##      time       0      331 331 22.57 3.22 15.83 20.22 22.54 24.69 31.5 
