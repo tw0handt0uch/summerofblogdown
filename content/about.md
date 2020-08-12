@@ -19,9 +19,9 @@ __Any opinions expressed here are my own and do not necessarily represent those 
 
 Devices that are near and dear to my heart:
 
-![plz_upload_img](/./img/muh_devices_2.png)
+<img src="/./img/muh_devices_2.png" width="815">
 
 Tiny humans that are near and dear to my heart:
 
-<img src="/./img/king-72.jpg" width="830">
+<img src="/./img/king-72.jpg" width="815">
 
