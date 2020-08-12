@@ -19,7 +19,7 @@ __Any opinions expressed here are my own and do not necessarily represent those 
 
 Devices that are near and dear to my heart:
 
-![plz_upload_img](/./img/muh_devices.png)
+![plz_upload_img](/./img/muh_devices_2.png)
 
 Tiny humans that are near and dear to my heart:
 
