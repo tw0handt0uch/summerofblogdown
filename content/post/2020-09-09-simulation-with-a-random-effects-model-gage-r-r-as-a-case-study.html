@@ -21,7 +21,7 @@ draft: FALSE
 <script src="/rmarkdown-libs/grViz-binding/grViz.js"></script>
 
 
-<p>I've heard it said that common statistical tests are just linear models.<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> I recently learned that Gage R&amp;R, a commonly used measurement system analysis (MSA), is no different. In this post I'll attempt to provide some background on Gage R&amp;R, describe the underlying model, and then walk through a method for simulation that can be useful for things like power analysis or visualization of uncertainty.</p>
+<p>I've heard it said that common statistical tests are just linear models.<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> It turns out that Gage R&amp;R, a commonly used measurement system analysis (MSA), is no different. In this post I'll attempt to provide some background on Gage R&amp;R, describe the underlying model, and then walk through a method for simulation that can be useful for things like power analysis or visualization of uncertainty.</p>
 <p>What is Gage R&amp;R?</p>
 <p>When evaluating implantable medical devices it is generally necessary to perform the following types of inspection to ensure product quality:</p>
 <ul>
@@ -51,7 +51,7 @@ draft: FALSE
 <span class="math inline">\(\ (PO)\)</span> = random variable for sample x operator interaction. Assumed normal: <span class="math inline">\(\ (PO)_{ij} \sim N(0,\sigma^2_{PO})\)</span><br />
 <span class="math inline">\(\ E\)</span> = random variable for unexplained, residual error (referred to as &quot;repeatability&quot; since differences in measurements taken under identical conditions are mapped here). <span class="math inline">\(\ E_{(ij)k} \sim N(0,\sigma^2_{E})\)</span></p>
 <p>This is really cool! - Understanding the model unlocks the insight behind the method and casts a bright light on the assumptions. It puts a seemingly obscure, memorized technique into a familiar regression framework. It also facilitates simulation.</p>
-<p>Why is it a random effects model? What is a random effects model? I am not a statistician and that discussion is way above my paygrade but there some good information <a href="http://www.stat.columbia.edu/~gelman/research/published/banova7.pdf">here</a> for those who want to dive deeper. <a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a> . While not a formal definition, it may be sufficient to know that random effects are estimated with partial pooling while others are not.</p>
+<p>Why is it a random effects model? What is a random effects model? I am not a statistician and that discussion is way above my paygrade but there some good information <a href="http://www.stat.columbia.edu/~gelman/research/published/banova7.pdf">here</a> for those who want to dive deeper. <a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a> While not a formal definition, it may be sufficient to know that random effects are estimated with partial pooling while others are not.</p>
 <p>In this post I will attempt to show how to use the lme4 to simulate outcomes using a random effects model like the one listed above and then repeat many such simulations to gain understanding of uncertainty and sensitivity in the underlying experiment.<a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a> Fun!</p>
 <p>Here are the libraries we'll use.</p>
 <pre class="r"><code>library(lme4)
@@ -104,37 +104,37 @@ grr_dummy_tbl %&gt;%
 <tr class="odd">
 <td align="center">part_1</td>
 <td align="center">oper_1</td>
-<td align="center">9.274802</td>
+<td align="center">9.079370</td>
 </tr>
 <tr class="even">
 <td align="center">part_1</td>
 <td align="center">oper_1</td>
-<td align="center">11.374728</td>
+<td align="center">9.930005</td>
 </tr>
 <tr class="odd">
 <td align="center">part_1</td>
 <td align="center">oper_2</td>
-<td align="center">10.788838</td>
+<td align="center">10.824556</td>
 </tr>
 <tr class="even">
 <td align="center">part_1</td>
 <td align="center">oper_2</td>
-<td align="center">10.494493</td>
+<td align="center">10.906321</td>
 </tr>
 <tr class="odd">
 <td align="center">part_1</td>
 <td align="center">oper_3</td>
-<td align="center">10.856978</td>
+<td align="center">8.920568</td>
 </tr>
 <tr class="even">
 <td align="center">part_1</td>
 <td align="center">oper_3</td>
-<td align="center">9.638885</td>
+<td align="center">6.820552</td>
 </tr>
 <tr class="odd">
 <td align="center">part_2</td>
 <td align="center">oper_1</td>
-<td align="center">9.708444</td>
+<td align="center">10.608366</td>
 </tr>
 </tbody>
 </table>
@@ -153,37 +153,37 @@ grr_dummy_tbl %&gt;%
 <tr class="odd">
 <td align="center">part_9</td>
 <td align="center">oper_3</td>
-<td align="center">10.395834</td>
+<td align="center">9.302383</td>
 </tr>
 <tr class="even">
 <td align="center">part_10</td>
 <td align="center">oper_1</td>
-<td align="center">10.150341</td>
+<td align="center">9.982164</td>
 </tr>
 <tr class="odd">
 <td align="center">part_10</td>
 <td align="center">oper_1</td>
-<td align="center">9.531275</td>
+<td align="center">8.509885</td>
 </tr>
 <tr class="even">
 <td align="center">part_10</td>
 <td align="center">oper_2</td>
-<td align="center">9.140115</td>
+<td align="center">9.831542</td>
 </tr>
 <tr class="odd">
 <td align="center">part_10</td>
 <td align="center">oper_2</td>
-<td align="center">9.098831</td>
+<td align="center">10.251599</td>
 </tr>
 <tr class="even">
 <td align="center">part_10</td>
 <td align="center">oper_3</td>
-<td align="center">10.765844</td>
+<td align="center">10.266258</td>
 </tr>
 <tr class="odd">
 <td align="center">part_10</td>
 <td align="center">oper_3</td>
-<td align="center">12.528905</td>
+<td align="center">10.376185</td>
 </tr>
 </tbody>
 </table>
