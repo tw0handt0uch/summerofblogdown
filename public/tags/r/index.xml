@@ -6,10 +6,1444 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>&amp;copy; 2019. All rights reserved.</copyright>
-    <lastBuildDate>Thu, 05 Mar 2020 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Wed, 09 Sep 2020 00:00:00 +0000</lastBuildDate>
     
         <atom:link href="/tags/r/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>Simulation With a Random Effects Model - Gage R&amp;R as a Case Study</title>
+      <link>/post/simulation-with-a-random-effects-model-gage-r-r-as-a-case-study/</link>
+      <pubDate>Wed, 09 Sep 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/post/simulation-with-a-random-effects-model-gage-r-r-as-a-case-study/</guid>
+      <description>
+&lt;script src=&#34;/rmarkdown-libs/htmlwidgets/htmlwidgets.js&#34;&gt;&lt;/script&gt;
+&lt;script src=&#34;/rmarkdown-libs/viz/viz.js&#34;&gt;&lt;/script&gt;
+&lt;link href=&#34;/rmarkdown-libs/DiagrammeR-styles/styles.css&#34; rel=&#34;stylesheet&#34; /&gt;
+&lt;script src=&#34;/rmarkdown-libs/grViz-binding/grViz.js&#34;&gt;&lt;/script&gt;
+
+
+&lt;p&gt;I&#39;ve heard it said that common statistical tests are just linear models.&lt;a href=&#34;#fn1&#34; class=&#34;footnoteRef&#34; id=&#34;fnref1&#34;&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt; I recently learned that Gage R&amp;amp;R, a commonly used measurement system analysis (MSA), is no different. In this post I&#39;ll attempt to provide some background on Gage R&amp;amp;R, describe the underlying model, and then walk through a method for simulation that can be useful for things like power analysis or visualization of uncertainty.&lt;/p&gt;
+&lt;p&gt;What is Gage R&amp;amp;R?&lt;/p&gt;
+&lt;p&gt;When evaluating implantable medical devices it is generally necessary to perform the following types of inspection to ensure product quality:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Dimensional inspection of implant features&lt;/li&gt;
+&lt;li&gt;Visual inspection of implant surface and component interfaces&lt;/li&gt;
+&lt;li&gt;Benchtop performance evaluation of implant&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The primary purpose of these costly and rigorous inspection processes is to screen out bad product. The ramifications of non-conforming parts reaching the field can be fatal. As such, it is important to understand any limitations of key measurement systems and, if possible, quantity their uncertainty. The primary statistical tool for this job is called Gage R&amp;amp;R. The Gage R&amp;amp;R attempts to quantify the total variation within a series of measurements and then describe the relative contributions of parts, operators, and repeated measurements (unexplained error). Operator error is called &amp;quot;reproducability&amp;quot;; unexplained error when a measurement is repeated under presumably identical conditions is called &amp;quot;repeatability&amp;quot;. The total variation among these components must be controlled and limited. A typical crossed structure is shown below: &lt;a href=&#34;#fn2&#34; class=&#34;footnoteRef&#34; id=&#34;fnref2&#34;&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/./img/crossed.png&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Gage R&amp;amp;R training for engineers usually involves:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Definitions of repeatability and reproducibility (the &amp;quot;R&amp;amp;R&amp;quot;)&lt;/li&gt;
+&lt;li&gt;Guidance for directing Minitab to set up the experiment&lt;/li&gt;
+&lt;li&gt;Guidance for directing Minitab to analyze the results and provide an output&lt;/li&gt;
+&lt;li&gt;An acceptance criteria (with no or limited context)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;When I was first exposed to the material, I recall grappling with terminology and definitions, struggling with rote memorization, and having no understanding of the assumptions or limitations of the technique. Here&#39;s the piece that was never explained to me (and many other engineers):&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;A Gage R&amp;amp;R study is a random effects regression model with two random variables: operator and part. By modeling the factors as random effects and applying a few assumptions, we can access and analyze the variance associated with each component using standard ANOVA techniques.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Specifically, the model commonly used for a crossed Gage R&amp;amp;R is:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[\ y_{ijk} = \mu + O_i + P_j + (PO)_{ij} + E_{(ij)k} \]&lt;/span&gt; where:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\ y_{ijk}\)&lt;/span&gt; = a specific, individual measurement&lt;br /&gt;
+&lt;span class=&#34;math inline&#34;&gt;\(\ \mu\)&lt;/span&gt; = overall mean of all the measurements&lt;br /&gt;
+&lt;span class=&#34;math inline&#34;&gt;\(\ O\)&lt;/span&gt; = random variable for effect of operator. Assumed normal: &lt;span class=&#34;math inline&#34;&gt;\(\ O_i \sim N(0,\sigma^2_O)\)&lt;/span&gt;&lt;br /&gt;
+&lt;span class=&#34;math inline&#34;&gt;\(\ P\)&lt;/span&gt; = random variable for effect of part. Assumed normal: &lt;span class=&#34;math inline&#34;&gt;\(\ P_i \sim N(0,\sigma^2_P)\)&lt;/span&gt;&lt;br /&gt;
+&lt;span class=&#34;math inline&#34;&gt;\(\ (PO)\)&lt;/span&gt; = random variable for sample x operator interaction. Assumed normal: &lt;span class=&#34;math inline&#34;&gt;\(\ (PO)_{ij} \sim N(0,\sigma^2_{PO})\)&lt;/span&gt;&lt;br /&gt;
+&lt;span class=&#34;math inline&#34;&gt;\(\ E\)&lt;/span&gt; = random variable for unexplained, residual error (referred to as &amp;quot;repeatability&amp;quot; since differences in measurements taken under identical conditions are mapped here). &lt;span class=&#34;math inline&#34;&gt;\(\ E_{(ij)k} \sim N(0,\sigma^2_{E})\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;This is really cool! - Understanding the model unlocks the insight behind the method and casts a bright light on the assumptions. It puts a seemingly obscure, memorized technique into a familiar regression framework. It also facilitates simulation.&lt;/p&gt;
+&lt;p&gt;Why is it a random effects model? What is a random effects model? I am not a statistician and that discussion is way above my paygrade but there some good information &lt;a href=&#34;http://www.stat.columbia.edu/~gelman/research/published/banova7.pdf&#34;&gt;here&lt;/a&gt; for those who want to dive deeper. &lt;a href=&#34;#fn3&#34; class=&#34;footnoteRef&#34; id=&#34;fnref3&#34;&gt;&lt;sup&gt;3&lt;/sup&gt;&lt;/a&gt; . While not a formal definition, it may be sufficient to know that random effects are estimated with partial pooling while others are not.&lt;/p&gt;
+&lt;p&gt;In this post I will attempt to show how to use the lme4 to simulate outcomes using a random effects model like the one listed above and then repeat many such simulations to gain understanding of uncertainty and sensitivity in the underlying experiment.&lt;a href=&#34;#fn4&#34; class=&#34;footnoteRef&#34; id=&#34;fnref4&#34;&gt;&lt;sup&gt;4&lt;/sup&gt;&lt;/a&gt; Fun!&lt;/p&gt;
+&lt;p&gt;Here are the libraries we&#39;ll use.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(lme4)
+library(tidyverse)
+library(knitr)
+library(here)
+library(broom.mixed)
+library(tidybayes)
+library(DiagrammeR)&lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;simulating-one-outcome-of-a-gage-rr-experiment&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Simulating One Outcome of a Gage R&amp;amp;R Experiment&lt;/h2&gt;
+&lt;p&gt;Before we worry about running a bunch of simulations, let&#39;s just figure out how to run one instance of a Gage R&amp;amp;R. There are some really good tutorials out there for simulating outcomes from random and mixed effects models.&lt;a href=&#34;#fn5&#34; class=&#34;footnoteRef&#34; id=&#34;fnref5&#34;&gt;&lt;sup&gt;5&lt;/sup&gt;&lt;/a&gt; &lt;a href=&#34;#fn6&#34; class=&#34;footnoteRef&#34; id=&#34;fnref6&#34;&gt;&lt;sup&gt;6&lt;/sup&gt;&lt;/a&gt; It ends up being a little bit tricky because the parameters that you select need to combine within the design matrix in a certain way such that an analysis of the simulated outcomes can recover the specified parameters. If you are good at matrix math you can do this manually. I am not very good at matrix mat - but fortunately Robert Long on Cross Validated&lt;a href=&#34;#fn7&#34; class=&#34;footnoteRef&#34; id=&#34;fnref7&#34;&gt;&lt;sup&gt;7&lt;/sup&gt;&lt;/a&gt; showed me a really cool little hack for figuring out the form of the Design Matrix Z and using it for simulation. Basically, we will first set up a dummy experiment with the desired number of parts, operators, and measurements and then use lme4 to extract Z and store it. Then we can set up a vector of all our simulated random effects and combine them with matrix multiplication to build the simulated observation. It sounds tricky but it&#39;s surprisingly simple! in summary, here is the plan:&lt;/p&gt;
+&lt;p&gt;&lt;div id=&#34;htmlwidget-1&#34; style=&#34;width:100%;height:500px;&#34; class=&#34;grViz html-widget&#34;&gt;&lt;/div&gt;
+&lt;script type=&#34;application/json&#34; data-for=&#34;htmlwidget-1&#34;&gt;{&#34;x&#34;:{&#34;diagram&#34;:&#34;digraph flowchart {\n      # node definitions with substituted label text\n      node [fontname = Helvetica, shape = rectangle, fillcolor = yellow]        \n      tab1 [label = \&#34;Step 1: Setup a dummy experiment\&#34;]\n      tab2 [label = \&#34;Step 2: Fit a model to the dummy data\&#34;]\n      tab3 [label = \&#34;Step 3: Extract and store the Design Matrix Z from the dummy model\&#34;]\n      tab4 [label = \&#34;Step 4: Simulate random effects using rnorm or similar\&#34;]\n      tab5 [label = \&#34;Step 5: Multiply Z by random effects vector\&#34;]\n      tab6 [label = \&#34;Step 6: Combine result with simulated residual error to generate simulated observations\&#34;]\n      tab7 [label = \&#34;Step 7: Fit a model to the simulated obervations\&#34;]\n      # edge definitions with the node IDs\n      tab1 -&gt; tab2 -&gt; tab3 -&gt; tab4 -&gt; tab5 -&gt; tab6 -&gt; tab7;\n      }\n      &#34;,&#34;config&#34;:{&#34;engine&#34;:&#34;dot&#34;,&#34;options&#34;:null}},&#34;evals&#34;:[],&#34;jsHooks&#34;:[]}&lt;/script&gt; The good news is that none of the above steps are very hard, even if they look unfamiliar. Let&#39;s go through it.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;step-1-set-up-a-dummy-experiment&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Step 1: Set up a dummy experiment&lt;/h2&gt;
+&lt;p&gt;I call this a dummy experiment because while it will have the proper number of operators/parts/replicates, we&#39;ll just drop in some dummy data as the observations. The goal here is to allow lme4 to create the structure of the experiment (the design matrix) which we can use later to get the real simulated observations.&lt;/p&gt;
+&lt;p&gt;First, we specify the number of parts, operators, and measurements we want the experiment be comprised of. 10, 3, and 2, respectively, is a common experimental setup in industry and we use it here.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;n_part &amp;lt;- 10 # number of parts
+n_oper &amp;lt;- 3 # number of opers
+n_measurements &amp;lt;- 2 # number of replications&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now assign names to each part, operator, trial and determine how many observations will be in the study: n_matrix.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# assign names to each part, operator, trial
+part &amp;lt;- str_glue(&amp;quot;part_{1:n_part}&amp;quot;) %&amp;gt;% as_factor()
+operator &amp;lt;- str_glue(&amp;quot;oper_{1:n_oper}&amp;quot;) %&amp;gt;% as_factor()
+measurement &amp;lt;- str_glue(&amp;quot;measurment_{1:n_measurements}&amp;quot;) %&amp;gt;% as_factor()
+
+n_matrix &amp;lt;- n_part * n_oper * n_measurements # number of observations in the study
+
+n_matrix&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## [1] 60&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now we use crossing() to build the full set of experimental conditions. Dummy observations are created for each setting and assigned to a new col: &amp;quot;measurement&amp;quot;. Overall mean of 10 is chosen arbitrarily and isn&#39;t important. Note: we are creating observations(measurements) here but have not concerned ourselves with specifying the parameters of any random variables yet. We just need a placeholder in the measurement column.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# generate experimental design and outcomes for dummy study
+grr_dummy_tbl &amp;lt;- crossing(part, operator, measurement) %&amp;gt;%
+  mutate(measurement = 10 + rnorm(n_matrix))
+
+grr_dummy_tbl %&amp;gt;%
+  head(7) %&amp;gt;%
+  kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;part&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;operator&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;measurement&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;9.274802&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;11.374728&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10.788838&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10.494493&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10.856978&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;9.638885&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;9.708444&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;grr_dummy_tbl %&amp;gt;%
+  tail(7) %&amp;gt;%
+  kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;part&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;operator&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;measurement&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_9&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10.395834&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10.150341&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;9.531275&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;9.140115&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;9.098831&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10.765844&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;12.528905&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;div id=&#34;step-2-fit-a-model-to-the-dummy-data&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Step 2: Fit a model to the dummy data&lt;/h2&gt;
+&lt;p&gt;Now we fit a model to the dummy data. The summary isn&#39;t important - we just want access to the structure which we will get in the next step.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# fit model for dummy study
+m1 &amp;lt;- lmer(measurement ~ (1 | part) + (1 | operator) + (1 | part:operator), data = grr_dummy_tbl)&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;step-3-extract-and-store-the-design-matrix-z-from-the-dummy-model&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Step 3: Extract and store the Design Matrix Z from the dummy model&lt;/h2&gt;
+&lt;p&gt;Here&#39;s the little hack: Use getME() to pull the design matrix Z from the dummy model. Alternately, you can use lFormula() but you will have to fish the matrix out and transpose it which is not as intuitive to me.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# extract design matrix Z from dummy model
+design_matrix_Z &amp;lt;- getME(m1, &amp;quot;Z&amp;quot;) %&amp;gt;% as.matrix()
+
+design_matrix_Z %&amp;gt;% head(1)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;##   part_1:oper_1 part_1:oper_2 part_1:oper_3 part_2:oper_1 part_2:oper_2
+## 1             1             0             0             0             0
+##   part_2:oper_3 part_3:oper_1 part_3:oper_2 part_3:oper_3 part_4:oper_1
+## 1             0             0             0             0             0
+##   part_4:oper_2 part_4:oper_3 part_5:oper_1 part_5:oper_2 part_5:oper_3
+## 1             0             0             0             0             0
+##   part_6:oper_1 part_6:oper_2 part_6:oper_3 part_7:oper_1 part_7:oper_2
+## 1             0             0             0             0             0
+##   part_7:oper_3 part_8:oper_1 part_8:oper_2 part_8:oper_3 part_9:oper_1
+## 1             0             0             0             0             0
+##   part_9:oper_2 part_9:oper_3 part_10:oper_1 part_10:oper_2 part_10:oper_3
+## 1             0             0              0              0              0
+##   part_1 part_2 part_3 part_4 part_5 part_6 part_7 part_8 part_9 part_10
+## 1      1      0      0      0      0      0      0      0      0       0
+##   oper_1 oper_2 oper_3
+## 1      1      0      0&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# alternate method:
+# mylF &amp;lt;- lFormula(m1, data = grr_dummy_tbl) # Process the formula against the data
+# design_matrix_Z &amp;lt;- mylF$reTrms$Zt %&amp;gt;% as.matrix() %&amp;gt;% t()  # Extract the Z matrix&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;So much easier than constructing this matrix yourself! (at least for me - it&#39;s been a while now since I took linear algebra course and tensor notation was always challenging).&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;step-4-simulate-random-effects-using-rnorm-or-similar&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Step 4: Simulate random effects using rnorm or similar&lt;/h2&gt;
+&lt;p&gt;With the matrix Z in hand we can get get rid of the dummy model and get down to business with specifying and simulating our random effects. Specify standard deviations for each effect and simulate using rnorm(). 1, 2, 9, and 4 are the parameters that we will compare our estimates against later on.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(0118)
+int_intercepts_sd &amp;lt;- 1 # standard dev of interaction random effects
+oper_intercepts_sd &amp;lt;- 2 # standard dev of operator random effects
+part_intercepts_sd &amp;lt;- 9 # standard dev of operator random effects
+random_error_repeatability &amp;lt;- 4 # standard dev of random error (repeatability)
+
+# simulate random effects using input params for sd
+int_intercepts &amp;lt;- rnorm(n = n_part * n_oper, mean = 0, sd = int_intercepts_sd)
+oper_intercepts &amp;lt;- rnorm(n = n_oper, mean = 0, sd = oper_intercepts_sd)
+part_intercepts &amp;lt;- rnorm(n = n_part, mean = 0, sd = part_intercepts_sd)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Combine all the random effects into a vector. Order does matter here - see comment below.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# vector of all random effect intercepts (order matters here: ineraction, part, oper if n_oper &amp;lt; n_part, else swith part and oper)
+
+random_effects_intercepts &amp;lt;- c(int_intercepts, part_intercepts, oper_intercepts)
+random_effects_intercepts&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;##  [1]  -1.676079782   0.167651720  -0.008545182   0.296888139  -1.706489201
+##  [6]  -1.049094451  -0.102206749   0.682492401  -0.511117703   0.487346673
+## [11]  -1.345812057   0.527128496   0.686104071  -0.221484626   0.532399538
+## [16]   0.597393622   0.831437918   0.735023009   0.830043214   0.769163682
+## [21]   1.830416344   0.182049999   1.018859437   0.844012288   0.575312043
+## [26]   0.006855854  -0.231251230   0.205834471   0.250942908  -1.575663200
+## [31]  19.280822421  10.499576059  -3.997253469  -7.111499870   6.986996777
+## [36]  -4.861684848 -13.031232590  14.723410605  16.967969396  22.293922487
+## [41]  -1.345816596  -3.905496830  -4.061788248&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;step-5-multiply-z-by-random-effects-vector&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Step 5: Multiply Z by random effects vector&lt;/h2&gt;
+&lt;/div&gt;
+&lt;div id=&#34;step-6-combine-result-with-simulated-residual-error-to-generate-simulated-observations&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Step 6: Combine result with simulated residual error to generate simulated observations&lt;/h2&gt;
+&lt;p&gt;We&#39;ll do steps 5 and 6 together here: multiply the design matrix Z by the vector of random effects intercepts and then add in a residual error. %*% is the matrix multiplication operator. Again - the overall mean of 10 is arbitrary and does not change the analysis.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# create observations (add in repeatability random error to each term). %*% is matrix multiplication
+grr_sim_tbl &amp;lt;- grr_dummy_tbl %&amp;gt;%
+  mutate(measurement = 10 + design_matrix_Z %*% random_effects_intercepts + rnorm(
+    n = nrow(grr_dummy_tbl),
+    mean = 0,
+    sd = random_error_repeatability
+  ))
+
+grr_sim_tbl %&amp;gt;%
+  head(10) %&amp;gt;%
+  kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;part&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;operator&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;measurement&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;25.335155&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;28.246367&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;15.799074&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;23.051405&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;22.791039&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;17.986515&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;19.378715&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;14.934401&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;9.109815&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part_2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;oper_2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;14.250238&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;div id=&#34;step-7-fit-a-model-to-the-simulated-obervations&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Step 7: Fit a model to the simulated obervations&lt;/h2&gt;
+&lt;p&gt;Once again we fit a model, but this time the observations are meaningful because we constructed them properly using the design matrix Z. broom.mixed::tidy() is able to bring the results into tibble format where we can clean a bit and view the variance contribution of each variable. This gives a point estimate of variance sd for the random effects that can be compared against the referent inputs.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# fit a model to the simulated dataset
+sim_m_fit &amp;lt;- lmer(measurement ~ (1 | part) + (1 | operator) + (1 | part:operator), data = grr_sim_tbl)
+
+# tibble of results for a single simulation
+one_grr_result_tbl &amp;lt;-
+  broom.mixed::tidy(sim_m_fit, effects = &amp;quot;ran_pars&amp;quot;) %&amp;gt;%
+  rename(
+    st_dev_estimate = estimate,
+    variable = group
+  ) %&amp;gt;%
+  mutate(
+    variance_estimate = st_dev_estimate^2,
+    sim_number = 1
+  ) %&amp;gt;%
+  select(sim_number, variable, st_dev_estimate, variance_estimate)
+
+one_grr_result_tbl %&amp;gt;% kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;sim_number&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;variable&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;st_dev_estimate&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;variance_estimate&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;part:operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.4484307&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.2010901&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;part&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;11.4718335&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;131.6029628&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.6062900&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.5801677&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;Residual&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3.9540576&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;15.6345714&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Recall that the true parameters for sd were 1, 9, 2, and 4. These estimates aren&#39;t dead on but we don&#39;t really understand how much uncertainty is involved with our estimate. We&#39;ll return to that in a moment.&lt;/p&gt;
+&lt;p&gt;One common performance metric for a Gage R&amp;amp;R is %tolerance: 6 (or some other constant) times the sum of the measurement system variance (everything except for part variance) divided by the tolerance span for this particular measurement.&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[\ Percent\space Tolerance = 6 \times (\hat\sigma_E^2 + \hat\sigma_O^2 + \hat\sigma_{PO}^2)\space/\space Tolerance \]&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;It is common for the tolerance span to be approximately 6 x the standard deviation of the parts population. Let&#39;s make that assumption here so we can estimate the percent tolerance from the data and compare to the true value. Once the simulation is established, the standard deviation of the parts can be adjusted to see how the percent tolerance changes for a given sd of operators, part:operator interaction, and residual.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;one_grr_tol_outcome_tbl &amp;lt;- one_grr_result_tbl %&amp;gt;%
+  filter(variable != &amp;quot;part&amp;quot;) %&amp;gt;%
+  group_by(sim_number) %&amp;gt;%
+  summarize(grr_variance_est = sum(variance_estimate)) %&amp;gt;%
+  mutate(true_tol_pct = scales::percent((int_intercepts_sd^2 + oper_intercepts_sd^2 + random_error_repeatability^2) / part_intercepts_sd)) %&amp;gt;%
+  rowwise() %&amp;gt;%
+  mutate(est_tol_pct = scales::percent(grr_variance_est / part_intercepts_sd))
+
+one_grr_tol_outcome_tbl %&amp;gt;% kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;sim_number&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;grr_variance_est&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;true_tol_pct&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;est_tol_pct&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;18.41583&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;233%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;205%&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Since 205% is &amp;gt; 30%, this experiment would &amp;quot;fail&amp;quot; and the measurement system would not be validated. Not really interesting since we just chose arbitrary numbers but the estimate is reasonably close to the true value which is more important. It would be good to know that if we repeated the simulation a lot of times, the average estimate will converge near the true value.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;scale-simulation-with-a-function&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Scale Simulation with a Function&lt;/h1&gt;
+&lt;p&gt;If want to simulate a lot of Gage R&amp;amp;R&#39;s, we can take all the code chunks above and wrap them in a function and then just swap out the values we want to adjust for argument in the function. The function below will take:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;n = number of simulations&lt;/li&gt;
+&lt;li&gt;np = number of parts&lt;/li&gt;
+&lt;li&gt;no = number of operators&lt;/li&gt;
+&lt;li&gt;nm = number of measurements per operator&lt;/li&gt;
+&lt;li&gt;iisd = interaction intercepts standard deviation&lt;/li&gt;
+&lt;li&gt;oisd = operator intercepts standard deviation&lt;/li&gt;
+&lt;li&gt;pisd = part intercepts standard deviation&lt;/li&gt;
+&lt;li&gt;rer = random error (repeatability) standard deviation&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;I&#39;m pretty sure this operation could be done faster and cleaner than the code shown below, but I like how the code maps to the single case simulation above for easy human readability. For this reason, I use a for loop instead of some map() variant.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;grr_fct &amp;lt;- function(n, np, no, nm, iisd, oisd, pisd, rer) {
+  all_grr_results_tbl &amp;lt;- NULL # tibble to hold results
+  n_sims &amp;lt;- n # number of simulations
+  n_part &amp;lt;- np # number of parts
+  n_oper &amp;lt;- no # number of opers
+  n_measurements &amp;lt;- nm # number of replications
+
+  int_intercepts_sd &amp;lt;- iisd # standard dev of interaction random effects
+  oper_intercepts_sd &amp;lt;- oisd # standard dev of operator random effects
+  part_intercepts_sd &amp;lt;- pisd # standard dev of operator random effects
+  random_error_repeatability &amp;lt;- rer # standard dev of random error (repeatability)
+
+  # assign names to each per, operator, trial
+  part &amp;lt;- str_glue(&amp;quot;part_{1:n_part}&amp;quot;) %&amp;gt;% as_factor()
+  operator &amp;lt;- str_glue(&amp;quot;oper_{1:n_oper}&amp;quot;) %&amp;gt;% as_factor()
+  measurement &amp;lt;- str_glue(&amp;quot;measurment_{1:n_measurements}&amp;quot;) %&amp;gt;% as_factor()
+
+  n_matrix &amp;lt;- n_part * n_oper * n_measurements # number of observations in the study
+
+  for (i in 1:n) {
+
+    # generate experimental designa and outcomes for dummy study
+    grr_dummy_tbl &amp;lt;- crossing(part, operator, measurement) %&amp;gt;%
+      mutate(measurement = 10 + rnorm(n_matrix))
+
+    # fit model for dummy study
+    m1 &amp;lt;- lmer(measurement ~ (1 | part) + (1 | operator) + (1 | part:operator), data = grr_dummy_tbl)
+
+    # extract design matrix Z from dummy model
+    design_matrix_Z &amp;lt;- getME(m1, &amp;quot;Z&amp;quot;) %&amp;gt;% as.matrix()
+
+    # simulate random effects using input params for sd
+    int_intercepts &amp;lt;- rnorm(n = n_part * n_oper, mean = 0, sd = int_intercepts_sd)
+    oper_intercepts &amp;lt;- rnorm(n = n_oper, mean = 0, sd = oper_intercepts_sd)
+    part_intercepts &amp;lt;- rnorm(n = n_part, mean = 0, sd = part_intercepts_sd)
+
+    # vector of all random effect intercepts (order matters here: ineraction, oper, part)
+    random_effects_intercepts &amp;lt;- c(int_intercepts, part_intercepts, oper_intercepts)
+
+    # create observations (add in repeatability random error to each term). %*% is matrix multiplication
+    grr_sim_tbl &amp;lt;- grr_dummy_tbl %&amp;gt;%
+      mutate(measurement = 10 + design_matrix_Z %*% random_effects_intercepts + rnorm(
+        n = nrow(grr_dummy_tbl),
+        mean = 0,
+        sd = random_error_repeatability
+      ))
+
+    # fit a model to the simulated dataset
+    sim_m_fit &amp;lt;- lmer(measurement ~ (1 | part) + (1 | operator) + (1 | part:operator), data = grr_sim_tbl)
+
+    # tibble of results for a single simulation
+    one_grr_result_tbl &amp;lt;-
+      broom.mixed::tidy(sim_m_fit, effects = &amp;quot;ran_pars&amp;quot;) %&amp;gt;%
+      rename(
+        st_dev_estimate = estimate,
+        variable = group
+      ) %&amp;gt;%
+      mutate(
+        variance_estimate = st_dev_estimate^2,
+        sim_number = i
+      ) %&amp;gt;%
+      select(sim_number, variable, st_dev_estimate, variance_estimate)
+
+    # append this recent simulation to the others
+    all_grr_results_tbl &amp;lt;- bind_rows(all_grr_results_tbl, one_grr_result_tbl)
+  }
+  return(all_grr_results_tbl)
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Test the function by calling it once, asking for just 3 simulations:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;fcn_test_tbl &amp;lt;- grr_fct(n = 3, np = 10, no = 3, nm = 2, iisd = 4, oisd = 3, pisd = 2, rer = 1)
+
+fcn_test_tbl %&amp;gt;% kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;sim_number&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;variable&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;st_dev_estimate&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;variance_estimate&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;part:operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3.4214284&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;11.7061726&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;part&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.1832882&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.7667475&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.6916881&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.8618086&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;Residual&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.0355244&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.0723107&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;part:operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.7726138&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;22.7778428&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;part&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0010317&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0000011&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0000000&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0000000&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;Residual&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.0763577&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.1585460&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;part:operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.0704728&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;16.5687489&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;part&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.2724219&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.6190574&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3.2107023&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10.3086089&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;Residual&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.9178515&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.8424514&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Everything is looking good! The results from n=3 simulations have completed and are summarized nicely in the results tbl.&lt;/p&gt;
+&lt;p&gt;Rather than manually call the function and input the arguments every time, we can populate a &amp;quot;setup tbl&amp;quot; that contains all the arguments that we will want to look at. Within the tbl we can look at anything we want. For example, we might want several different values for number of operators, or several different levels of standard deviation for one of the random effects. In this case, I was interested in several different magnitudes of standard deviation for the population of parts because the part sd is used as a surrogate for the tolerance percentage calculation as shown above. This is a useful simulation because we should be able to visualize:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Does the average of the simulation converge near the true value for percent tolerance?&lt;/li&gt;
+&lt;li&gt;How often might individual estimates of pct tol &amp;quot;fail&amp;quot; (&amp;gt; 30%) when the average of the estimates passes (&amp;lt; 30%)?&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Fist, the setup_tbl. Note: the variance of the random variables for operator, repeatability(residual), and part:operator interaction are all held at 1 while the variance for part is increased.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;sim_setup_tbl &amp;lt;- tibble(
+  n_sims = 200,
+  n_part = 10,
+  n_oper = 3,
+  n_meas = 2,
+  int_sd = 1,
+  oper_sd = 1,
+  #  part_var = 1,
+  part_var = c(2^(0:10)),
+  repeatab_sd = 1
+) %&amp;gt;%
+  mutate(
+    row_id = row_number()
+  ) %&amp;gt;%
+  rowwise() %&amp;gt;%
+  mutate(part_sd = part_var^.5) %&amp;gt;%
+  mutate(tol_pct_true = 6 * (int_sd^2 + oper_sd^2 + repeatab_sd^2) / (6 * part_sd))
+
+sim_setup_tbl %&amp;gt;% kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;n_sims&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_part&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_oper&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_meas&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;int_sd&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;oper_sd&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;part_var&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;repeatab_sd&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;row_id&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;part_sd&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;tol_pct_true&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.000000&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3.0000000&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.414214&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.1213203&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.000000&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.5000000&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;8&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.828427&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.0606602&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;16&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.000000&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.7500000&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;32&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;6&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5.656854&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.5303301&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;64&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;7&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;8.000000&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.3750000&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;128&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;8&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;11.313709&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.2651650&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;256&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;9&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;16.000000&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1875000&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;512&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;22.627417&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1325825&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1024&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;11&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;32.000000&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0937500&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;The following code executes many simulations, one for each set of arguments from the rows above. Each simulation from each row results in a tibble of outcomes which is stored in a list column and the unnested later on to make a big tibble. I&#39;m not actually 100% sure that you need rowwise() here - it works fine with it in place and makes sense to me that you would group by rows here but I&#39;m still trying to figure out what row-based workflow works best for me. I believe there are other good options that use the map family.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;sim_outcomes_tbl %&amp;gt;%
+  select(sim_number, variable, st_dev_estimate, n_sims, n_part, n_meas, int_sd, oper_sd, repeatab_sd, part_sd) %&amp;gt;%
+  head(12) %&amp;gt;%
+  kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;sim_number&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;variable&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;st_dev_estimate&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_sims&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_part&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_meas&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;int_sd&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;oper_sd&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;repeatab_sd&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;part_sd&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;part:operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.5511238&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;part&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.8165034&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.5369841&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;Residual&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.0638795&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;part:operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.8046511&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;part&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.1717770&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.9339445&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;Residual&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.9631640&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;part:operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.0850250&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;part&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0031052&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.7490297&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;Residual&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.9284068&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;We might look at the results for a single group of arguments in the setup tbl by filtering to a specific row (I choose row 4 arbitrarily here). Note that &amp;quot;row_id&amp;quot; is a little misleading here because the data has been reshaped. Filtering fora specific row_id returns results from the set of simulations from a single row of parameters in the original setup_tbl. Here we look at the results form row_4 where the true part sd was 2.82 while the sd for operator, Residual, and interaction were all 1.)&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;a &amp;lt;- sim_outcomes_tbl %&amp;gt;%
+  filter(row_id == 4) %&amp;gt;%
+  filter(st_dev_estimate &amp;gt; .001) %&amp;gt;%
+  ggplot(aes(x = variable, y = st_dev_estimate)) +
+  geom_jitter(width = .05, alpha = .5, size = .6) +
+  geom_hline(yintercept = 1, lty = 2, color = &amp;quot;#2c3e50&amp;quot;) +
+  geom_hline(yintercept = 2.8428472, lty = 2, color = &amp;quot;#2c3e50&amp;quot;) +
+  #    stat_summary(fun.y= mean, fun.ymin=mean, fun.ymax=mean, geom=&amp;quot;crossbar&amp;quot;, width=0.2, color=&amp;quot;red&amp;quot;) +
+  stat_halfeye(aes(fill = variable), point_interval = mean_qi, alpha = .7, position = position_nudge(x = .15)) +
+  labs(
+    title = &amp;quot;Gage R&amp;amp;R - Estimates for Standard Deviation of Different Components of Variation&amp;quot;,
+    subtitle = str_glue(&amp;quot;Settings: {sim_outcomes_tbl$n_part[1]} Parts, {sim_outcomes_tbl$n_oper[1]} Operators, {sim_outcomes_tbl$n_meas[1]} Measurements&amp;quot;),
+    x = &amp;quot;&amp;quot;,
+    y = &amp;quot;Standard Deviation Estimate&amp;quot;,
+    caption = &amp;quot;dotted line marks true population standard dev\n Interval marks median, .66 quantile, .95 quantile&amp;quot;
+  ) +
+  theme(legend.position = &amp;quot;none&amp;quot;) +
+  scale_fill_viridis_d(option = &amp;quot;c&amp;quot;, end = .7)
+
+a&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-09-09-simulation-with-a-random-effects-model-gage-r-r-as-a-case-study_files/figure-html/unnamed-chunk-20-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Looks good! The averages of the set of simulations is converging nicely and we get a good feel for how much uncertainty would be expected for a single trial.&lt;/p&gt;
+&lt;p&gt;Now to plot multiple simulations. A bit of data preparation is required to plot the true values on the same canvas as the individual sims. There is probably a cleaner way to do this directly within ggplot - but the way I do it here is to pull the values from the rows down into tidy format with pivot_longer and then do some grouping and joining.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;sim_tbl &amp;lt;- sim_outcomes_tbl %&amp;gt;% select(sim_number, row_id)
+
+t &amp;lt;- sim_outcomes_tbl %&amp;gt;%
+  select(sim_number, variable, row_id, int_sd, oper_sd, part_sd, repeatab_sd, st_dev_estimate) %&amp;gt;%
+  pivot_longer(cols = c(int_sd, oper_sd, part_sd, repeatab_sd)) %&amp;gt;%
+  right_join(sim_tbl) %&amp;gt;%
+  group_by(variable, name, value, row_id) %&amp;gt;%
+  count() %&amp;gt;%
+  ungroup() %&amp;gt;%
+  mutate(variable = case_when(
+    name == &amp;quot;int_sd&amp;quot; ~ &amp;quot;part:operator&amp;quot;,
+    name == &amp;quot;oper_sd&amp;quot; ~ &amp;quot;operator&amp;quot;,
+    name == &amp;quot;part_sd&amp;quot; ~ &amp;quot;part&amp;quot;,
+    TRUE ~ &amp;quot;Residual&amp;quot;
+  )) %&amp;gt;%
+  right_join(sim_setup_tbl)
+
+t %&amp;gt;%
+  head(10) %&amp;gt;%
+  select(variable, value, row_id, n_sims, n_part, n_oper, n_meas, int_sd, oper_sd, part_sd, repeatab_sd, tol_pct_true) %&amp;gt;%
+  kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;variable&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;value&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;row_id&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_sims&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_part&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_oper&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_meas&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;int_sd&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;oper_sd&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;part_sd&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;repeatab_sd&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;tol_pct_true&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part:operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;Residual&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part:operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;Residual&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;part:operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;operator&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;200&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;It would be cool to see all the data from all the simulations. Recall that the true values of sd for operator, part:operator interaction, and Residual were 1 and that part variation increased across the different sims. All tof this is plotted below, with the true values in red while the results of the simulation shown in black. It can be seen that the simulations group nicely around the true values and we can see the uncertainty.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;sim_outcomes_tbl %&amp;gt;%
+  ggplot(aes(x = part_sd, y = st_dev_estimate)) +
+  geom_point(size = .4) +
+  geom_point(data = t, aes(x = part_sd, y = value), color = &amp;quot;firebrick&amp;quot;) +
+  facet_wrap(~variable, scales = &amp;quot;free&amp;quot;) +
+  labs(
+    title = &amp;quot;Simulation Results Across a Range of Possible Part Standard Deviations&amp;quot;,
+    subtitle = &amp;quot;Gage R&amp;amp;R with n=10 parts, n=3 operators, n=2 measurements&amp;quot;,
+    x = &amp;quot;True Part Standard Deviation&amp;quot;,
+    y = &amp;quot;Estimate of Standard Deviation&amp;quot;,
+    caption = &amp;quot;red points mark true value of standard deviation for the effect&amp;quot;
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-09-09-simulation-with-a-random-effects-model-gage-r-r-as-a-case-study_files/figure-html/unnamed-chunk-22-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt; Let&#39;s see how the estimated percent tolerance lines up with the true values from the population. This tbl calculates the percent tol across all the simulations.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;tol_outcomes_tbl &amp;lt;- sim_outcomes_tbl %&amp;gt;%
+  filter(variable != &amp;quot;part&amp;quot;) %&amp;gt;%
+  group_by(sim_number, row_id) %&amp;gt;%
+  summarize(grr_variance_est = sum(variance_estimate)) %&amp;gt;%
+  right_join(sim_setup_tbl) %&amp;gt;%
+  rowwise() %&amp;gt;%
+  mutate(est_tol_pct = (grr_variance_est) / (part_sd)) %&amp;gt;%
+  select(n_part, n_oper, n_meas, int_sd, oper_sd, part_sd, tol_pct_true, est_tol_pct, everything())
+
+tol_outcomes_tbl %&amp;gt;%
+  select(n_part, n_oper, n_meas, int_sd, oper_sd, part_sd, tol_pct_true, est_tol_pct, sim_number, row_id) %&amp;gt;%
+  head(10) %&amp;gt;%
+  kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;n_part&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_oper&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_meas&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;int_sd&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;oper_sd&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;part_sd&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;tol_pct_true&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;est_tol_pct&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;sim_number&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;row_id&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.723929&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.447401&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5.098323&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.882222&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.702724&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.381758&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;6&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.619832&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;7&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.986048&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;8&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.440299&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;9&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.441025&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;This summary tbl captures the mean from simulations conducted at each level.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;tol_est_tbl &amp;lt;- tol_outcomes_tbl %&amp;gt;%
+  group_by(row_id, part_var) %&amp;gt;%
+  summarize(mean_est_tol_pct = mean(est_tol_pct))
+
+tol_est_tbl %&amp;gt;% kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;row_id&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;part_var&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;mean_est_tol_pct&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.9902181&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.1352549&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.5002527&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;4&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;8&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.0354094&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;5&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;16&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.7362949&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;6&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;32&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.5330749&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;7&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;64&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.3708208&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;8&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;128&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.2657111&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;9&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;256&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1880981&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;512&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1372343&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;11&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1024&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0937739&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Visualize the mean from the simulations vs. the true tol percent:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;tol_outcomes_tbl %&amp;gt;%
+  ggplot(aes(x = part_var, y = est_tol_pct)) +
+  #  geom_point(size = .5) +
+  geom_point(aes(x = part_var, y = tol_pct_true), size = 3, color = &amp;quot;limegreen&amp;quot;, position = position_nudge(2), alpha = .85) +
+  geom_line(aes(x = part_var, y = tol_pct_true), color = &amp;quot;limegreen&amp;quot;) +
+  geom_point(data = tol_est_tbl, aes(x = part_var, y = mean_est_tol_pct), size = 3, color = &amp;quot;firebrick&amp;quot;, position = position_nudge(-2), alpha = .85) +
+  geom_hline(yintercept = .3, lty = 2, color = &amp;quot;#2c3e50&amp;quot;) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = &amp;quot;Comparison of Simulation Results to True: Tolerance Percent Metric&amp;quot;,
+    subtitle = &amp;quot;Green is true population, Red is mean of simulation estimates&amp;quot;,
+    x = &amp;quot;Part Variance&amp;quot;,
+    y = &amp;quot;Tolerance Percent&amp;quot;,
+    caption = &amp;quot;dotted line shows 30% acceptance limit&amp;quot;
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-09-09-simulation-with-a-random-effects-model-gage-r-r-as-a-case-study_files/figure-html/unnamed-chunk-25-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Very nice agreement between the simulations and the true population values. But the above plot just shows the mean. How much uncertainty is expected across experiments at the same settings? Here I show a subset of data below the 100% level (just to keep the plot a little less messy).&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;tol_outcomes_tbl %&amp;gt;%
+  ggplot(aes(x = part_var, y = est_tol_pct)) +
+  geom_point(size = .5) +
+  geom_point(aes(x = part_var, y = tol_pct_true), size = 3, color = &amp;quot;limegreen&amp;quot;, position = position_nudge(2), alpha = .85) +
+  geom_line(aes(x = part_var, y = tol_pct_true), color = &amp;quot;limegreen&amp;quot;) +
+  geom_point(data = tol_est_tbl, aes(x = part_var, y = mean_est_tol_pct), size = 3, color = &amp;quot;firebrick&amp;quot;, position = position_nudge(-2), alpha = .85) +
+  geom_hline(yintercept = .3, lty = 2) +
+  scale_y_continuous(
+    labels = scales::percent,
+    expand = expansion(),
+    limits = c(0, 1)
+  ) +
+  labs(
+    title = &amp;quot;Comparison of Simulation Results to True: Tolerance Percent Metric&amp;quot;,
+    subtitle = &amp;quot;Green is true population, Red is mean of simulation estimates, Black is intividual estimates&amp;quot;,
+    x = &amp;quot;Part Variance&amp;quot;,
+    y = &amp;quot;Tolerance Percent&amp;quot;,
+    caption = &amp;quot;dotted line shows 30% acceptance limit&amp;quot;
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-09-09-simulation-with-a-random-effects-model-gage-r-r-as-a-case-study_files/figure-html/unnamed-chunk-26-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Pretty interesting. There is quite a bit of uncertainty here and there are quite a few cases where individual simulations fail just due to chance. The probability of this happening is worst when the part variance is around 100-400% of the operator and repeatability sd.&lt;/p&gt;
+&lt;p&gt;From this point one could start tweaking any values of interest to see how the uncertainty of the performance metric is affected. For example, you might look at the optimal number of operators or replicates to give the best chance of passing when the true population value would pass. Pretty powerful stuff!&lt;/p&gt;
+&lt;p&gt;In this post I attempted to show how a Gage R&amp;amp;R test can be modeled with random effects model. A simulation was constructed using the extracted design matrix Z and a vector of random effects. The simulation was then scaled to see how well the mean of the simulations converge with the true population parameter and the uncertainty was visualized by plotting individual estimates on the same grid. Good luck and I hope this post is useful!&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class=&#34;footnotes&#34;&gt;
+&lt;hr /&gt;
+&lt;ol&gt;
+&lt;li id=&#34;fn1&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://lindeloev.github.io/tests-as-linear/&#34; class=&#34;uri&#34;&gt;https://lindeloev.github.io/tests-as-linear/&lt;/a&gt;&lt;a href=&#34;#fnref1&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn2&#34;&gt;&lt;p&gt;Assessment of the Adequacy of Gauge Repeatability and Reproducibility Study Using a Monte Carlo Simulation, &lt;a href=&#34;https://www.hindawi.com/journals/mpe/2017/7237486/&#34; class=&#34;uri&#34;&gt;https://www.hindawi.com/journals/mpe/2017/7237486/&lt;/a&gt;&lt;a href=&#34;#fnref2&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn3&#34;&gt;&lt;p&gt;Conflicting definitions of random/mixed effects &lt;a href=&#34;https://statmodeling.stat.columbia.edu/2005/01/25/why_i_dont_use/&#34; class=&#34;uri&#34;&gt;https://statmodeling.stat.columbia.edu/2005/01/25/why_i_dont_use/&lt;/a&gt;&lt;a href=&#34;#fnref3&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn4&#34;&gt;&lt;p&gt;Some simulations are motivated/recreated/expanded from the excellent paper by Ha et al, &lt;a href=&#34;https://doi.org/10.1155/2017/7237486&#34; class=&#34;uri&#34;&gt;https://doi.org/10.1155/2017/7237486&lt;/a&gt;&lt;a href=&#34;#fnref4&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn5&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://debruine.github.io/tutorials/sim-lmer.html&#34; class=&#34;uri&#34;&gt;https://debruine.github.io/tutorials/sim-lmer.html&lt;/a&gt;&lt;a href=&#34;#fnref5&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn6&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://aosmith.rbind.io/2018/04/23/simulate-simulate-part-2/&#34; class=&#34;uri&#34;&gt;https://aosmith.rbind.io/2018/04/23/simulate-simulate-part-2/&lt;/a&gt;&lt;a href=&#34;#fnref6&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn7&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://stats.stackexchange.com/questions/483509/simulating-observations-for-a-2-way-anova-in-r-w-mixed-effects-model-and-reco&#34; class=&#34;uri&#34;&gt;https://stats.stackexchange.com/questions/483509/simulating-observations-for-a-2-way-anova-in-r-w-mixed-effects-model-and-reco&lt;/a&gt;&lt;a href=&#34;#fnref7&#34;&gt;↩&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
+</description>
+    </item>
     
     <item>
       <title>Bayesian Stress-Strength Analysis for Product Design (in R and brms)</title>
