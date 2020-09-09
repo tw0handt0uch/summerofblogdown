@@ -51,7 +51,7 @@ draft: FALSE
 <span class="math inline">\(\ (PO)\)</span> = random variable for sample x operator interaction. Assumed normal: <span class="math inline">\(\ (PO)_{ij} \sim N(0,\sigma^2_{PO})\)</span><br />
 <span class="math inline">\(\ E\)</span> = random variable for unexplained, residual error (referred to as &quot;repeatability&quot; since differences in measurements taken under identical conditions are mapped here). <span class="math inline">\(\ E_{(ij)k} \sim N(0,\sigma^2_{E})\)</span></p>
 <p>This is really cool! - Understanding the model unlocks the insight behind the method and casts a bright light on the assumptions. It puts a seemingly obscure, memorized technique into a familiar regression framework. It also facilitates simulation.</p>
-<p>Why is it a random effects model? What is a random effects model? I am not a statistician and that discussion is way above my paygrade but there some good information <a href="http://www.stat.columbia.edu/~gelman/research/published/banova7.pdf">here</a> for those who want to dive deeper. <a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a> While not a formal definition, it may be sufficient to know that random effects are estimated with partial pooling while others are not.</p>
+<p>Why is it a random effects model? What is a random effects model? The answer to that question is actually tricky (and beyond the scope of this post) but there is some good information <a href="http://www.stat.columbia.edu/~gelman/research/published/banova7.pdf">here</a> for those who want to dive deeper. <a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a> While not a formal definition, it may be sufficient to know that random effects are estimated with partial pooling while others are not.</p>
 <p>In this post I will attempt to show how to use the lme4 to simulate outcomes using a random effects model like the one listed above and then repeat many such simulations to gain understanding of uncertainty and sensitivity in the underlying experiment.<a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a> Fun!</p>
 <p>Here are the libraries we'll use.</p>
 <pre class="r"><code>library(lme4)
@@ -104,37 +104,37 @@ grr_dummy_tbl %&gt;%
 <tr class="odd">
 <td align="center">part_1</td>
 <td align="center">oper_1</td>
-<td align="center">9.079370</td>
+<td align="center">9.570086</td>
 </tr>
 <tr class="even">
 <td align="center">part_1</td>
 <td align="center">oper_1</td>
-<td align="center">9.930005</td>
+<td align="center">11.608917</td>
 </tr>
 <tr class="odd">
 <td align="center">part_1</td>
 <td align="center">oper_2</td>
-<td align="center">10.824556</td>
+<td align="center">10.118139</td>
 </tr>
 <tr class="even">
 <td align="center">part_1</td>
 <td align="center">oper_2</td>
-<td align="center">10.906321</td>
+<td align="center">10.056188</td>
 </tr>
 <tr class="odd">
 <td align="center">part_1</td>
 <td align="center">oper_3</td>
-<td align="center">8.920568</td>
+<td align="center">9.873649</td>
 </tr>
 <tr class="even">
 <td align="center">part_1</td>
 <td align="center">oper_3</td>
-<td align="center">6.820552</td>
+<td align="center">9.464683</td>
 </tr>
 <tr class="odd">
 <td align="center">part_2</td>
 <td align="center">oper_1</td>
-<td align="center">10.608366</td>
+<td align="center">9.194090</td>
 </tr>
 </tbody>
 </table>
@@ -153,37 +153,37 @@ grr_dummy_tbl %&gt;%
 <tr class="odd">
 <td align="center">part_9</td>
 <td align="center">oper_3</td>
-<td align="center">9.302383</td>
+<td align="center">9.551520</td>
 </tr>
 <tr class="even">
 <td align="center">part_10</td>
 <td align="center">oper_1</td>
-<td align="center">9.982164</td>
+<td align="center">10.581223</td>
 </tr>
 <tr class="odd">
 <td align="center">part_10</td>
 <td align="center">oper_1</td>
-<td align="center">8.509885</td>
+<td align="center">9.947959</td>
 </tr>
 <tr class="even">
 <td align="center">part_10</td>
 <td align="center">oper_2</td>
-<td align="center">9.831542</td>
+<td align="center">8.559630</td>
 </tr>
 <tr class="odd">
 <td align="center">part_10</td>
 <td align="center">oper_2</td>
-<td align="center">10.251599</td>
+<td align="center">10.013356</td>
 </tr>
 <tr class="even">
 <td align="center">part_10</td>
 <td align="center">oper_3</td>
-<td align="center">10.266258</td>
+<td align="center">9.661049</td>
 </tr>
 <tr class="odd">
 <td align="center">part_10</td>
 <td align="center">oper_3</td>
-<td align="center">10.376185</td>
+<td align="center">11.068420</td>
 </tr>
 </tbody>
 </table>
