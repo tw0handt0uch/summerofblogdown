@@ -366,6 +366,7 @@ Rather than manually call the function and input the arguments every time, we ca
 * How often might individual estimates of pct tol "fail" (> 30%) when the average of the estimates passes (< 30%)?
 
 Fist, the setup_tbl.  Note: the variance of the random variables for operator, repeatability(residual), and part:operator interaction are all held at 1 while the variance for part is increased. 
+
 ```{r}
 sim_setup_tbl <- tibble(
   n_sims = 200,
@@ -390,10 +391,11 @@ sim_setup_tbl %>% kable(align = "c")
 
 The following code executes many simulations, one for each set of arguments from the rows above.  Each simulation from each row results in a tibble of outcomes which is stored in a list column and the unnested later on to make a big tibble. I'm not actually 100% sure that you need rowwise() here - it works fine with it in place and makes sense to me that you would group by rows here but I'm still trying to figure out what row-based workflow works best for me.  I believe there are other good options that use the map family.
 
-```{r echo=FALSE}
+```{r}
 set.seed(0118)
 
 #commented out because this takes a while to run
+
 # sim_outcomes_tbl <- sim_setup_tbl %>%
 #   rowwise() %>% # may not be needed
 #   mutate(sim_outcomes = list(grr_fct(n = n_sims, np = n_part, no = n_oper, nm = n_meas, iisd = int_sd, oisd = oper_sd, pisd = part_sd, rer = repeatab_sd))) %>%

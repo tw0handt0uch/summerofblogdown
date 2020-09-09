@@ -104,37 +104,37 @@ grr_dummy_tbl %&gt;%
 <tr class="odd">
 <td align="center">part_1</td>
 <td align="center">oper_1</td>
-<td align="center">9.570086</td>
+<td align="center">9.658576</td>
 </tr>
 <tr class="even">
 <td align="center">part_1</td>
 <td align="center">oper_1</td>
-<td align="center">11.608917</td>
+<td align="center">10.897126</td>
 </tr>
 <tr class="odd">
 <td align="center">part_1</td>
 <td align="center">oper_2</td>
-<td align="center">10.118139</td>
+<td align="center">8.919642</td>
 </tr>
 <tr class="even">
 <td align="center">part_1</td>
 <td align="center">oper_2</td>
-<td align="center">10.056188</td>
+<td align="center">10.442563</td>
 </tr>
 <tr class="odd">
 <td align="center">part_1</td>
 <td align="center">oper_3</td>
-<td align="center">9.873649</td>
+<td align="center">10.706771</td>
 </tr>
 <tr class="even">
 <td align="center">part_1</td>
 <td align="center">oper_3</td>
-<td align="center">9.464683</td>
+<td align="center">9.217397</td>
 </tr>
 <tr class="odd">
 <td align="center">part_2</td>
 <td align="center">oper_1</td>
-<td align="center">9.194090</td>
+<td align="center">10.869825</td>
 </tr>
 </tbody>
 </table>
@@ -153,37 +153,37 @@ grr_dummy_tbl %&gt;%
 <tr class="odd">
 <td align="center">part_9</td>
 <td align="center">oper_3</td>
-<td align="center">9.551520</td>
+<td align="center">9.770813</td>
 </tr>
 <tr class="even">
 <td align="center">part_10</td>
 <td align="center">oper_1</td>
-<td align="center">10.581223</td>
+<td align="center">9.862329</td>
 </tr>
 <tr class="odd">
 <td align="center">part_10</td>
 <td align="center">oper_1</td>
-<td align="center">9.947959</td>
+<td align="center">9.044466</td>
 </tr>
 <tr class="even">
 <td align="center">part_10</td>
 <td align="center">oper_2</td>
-<td align="center">8.559630</td>
+<td align="center">8.769776</td>
 </tr>
 <tr class="odd">
 <td align="center">part_10</td>
 <td align="center">oper_2</td>
-<td align="center">10.013356</td>
+<td align="center">11.515547</td>
 </tr>
 <tr class="even">
 <td align="center">part_10</td>
 <td align="center">oper_3</td>
-<td align="center">9.661049</td>
+<td align="center">8.722872</td>
 </tr>
 <tr class="odd">
 <td align="center">part_10</td>
 <td align="center">oper_3</td>
-<td align="center">11.068420</td>
+<td align="center">10.689403</td>
 </tr>
 </tbody>
 </table>
@@ -777,6 +777,16 @@ sim_setup_tbl %&gt;% kable(align = &quot;c&quot;)</code></pre>
 </tbody>
 </table>
 <p>The following code executes many simulations, one for each set of arguments from the rows above. Each simulation from each row results in a tibble of outcomes which is stored in a list column and the unnested later on to make a big tibble. I'm not actually 100% sure that you need rowwise() here - it works fine with it in place and makes sense to me that you would group by rows here but I'm still trying to figure out what row-based workflow works best for me. I believe there are other good options that use the map family.</p>
+<pre class="r"><code>set.seed(0118)
+
+#commented out because this takes a while to run
+
+# sim_outcomes_tbl &lt;- sim_setup_tbl %&gt;%
+#   rowwise() %&gt;% # may not be needed
+#   mutate(sim_outcomes = list(grr_fct(n = n_sims, np = n_part, no = n_oper, nm = n_meas, iisd = int_sd, oisd = oper_sd, pisd = part_sd, rer = repeatab_sd))) %&gt;%
+#   select(sim_outcomes, everything()) %&gt;%
+#   unnest(cols = c(sim_outcomes)) %&gt;%
+#   mutate_if(is.character, as_factor)</code></pre>
 <pre class="r"><code>sim_outcomes_tbl %&gt;%
   select(sim_number, variable, st_dev_estimate, n_sims, n_part, n_meas, int_sd, oper_sd, repeatab_sd, part_sd) %&gt;%
   head(12) %&gt;%
