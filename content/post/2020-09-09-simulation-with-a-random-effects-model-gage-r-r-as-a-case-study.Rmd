@@ -220,7 +220,7 @@ grr_sim_tbl %>%
 
 ## Step 7: Fit a model to the simulated obervations
 
-Once again we fit a model, but this time the observations are meaningful because we constructed them properly using the design matrix Z. broom.mixed::tidy() is able to bring the results into tibble format where we can clean a bit and view the variance contribution of each variable.  This gives a point estimate of variance sd for the random effects that can be compared against the referent inputs.
+Once again we fit a model, but this time the observations are meaningful because we constructed them properly using the design matrix Z. broom.mixed::tidy() is able to bring the results into tibble format where we can clean a bit and view the variance contribution of each variable.  This gives a point estimate of standard deviations for the random effects that can be compared against the reference inputs.
 
 ```{r}
 # fit a model to the simulated dataset
@@ -432,7 +432,7 @@ a <- sim_outcomes_tbl %>%
   #    stat_summary(fun.y= mean, fun.ymin=mean, fun.ymax=mean, geom="crossbar", width=0.2, color="red") +
   stat_halfeye(aes(fill = variable), point_interval = mean_qi, alpha = .7, position = position_nudge(x = .15)) +
   labs(
-    title = "Gage R&R - Estimates for Standard Deviation of Different Components of Variation",
+    title = "Gage R&R - Estimates for Component Standard Deviations",
     subtitle = str_glue("Settings: {sim_outcomes_tbl$n_part[1]} Parts, {sim_outcomes_tbl$n_oper[1]} Operators, {sim_outcomes_tbl$n_meas[1]} Measurements"),
     x = "",
     y = "Standard Deviation Estimate",
