@@ -32,7 +32,7 @@
 &lt;li&gt;Visual inspection of implant surface and component interfaces&lt;/li&gt;
 &lt;li&gt;Benchtop performance evaluation of implant&lt;/li&gt;
 &lt;/ul&gt;
-&lt;p&gt;The primary purpose of these costly and rigorous inspection processes is to screen out bad product. The ramifications of non-conforming parts reaching the field can be fatal. As such, it is important to understand any limitations of key measurement systems and, if possible, quantity their uncertainty. The primary statistical tool for this job is called Gage R&amp;amp;R. The Gage R&amp;amp;R attempts to quantify the total variation within a series of measurements and then describe the relative contributions of parts, operators, and repeated measurements (unexplained error). Operator error is called &amp;quot;reproducability&amp;quot;; unexplained error when a measurement is repeated under presumably identical conditions is called &amp;quot;repeatability&amp;quot;. The total variation among these components must be controlled and limited. A typical crossed structure is shown below: &lt;a href=&#34;#fn2&#34; class=&#34;footnoteRef&#34; id=&#34;fnref2&#34;&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;The primary purpose of these costly and rigorous inspection processes is to screen out bad product. The ramifications of non-conforming parts reaching the field can be fatal. As such, it is important to understand any limitations of key measurement systems and, if possible, quantity their uncertainty. The primary statistical tool for this job is called Gage R&amp;amp;R. The Gage R&amp;amp;R attempts to quantify the total variation within a series of measurements and then describe the relative contributions of parts, operators, and repeated measurements (unexplained error). Operator error is called &amp;quot;reproducibility&amp;quot;; unexplained error when a measurement is repeated under presumably identical conditions is called &amp;quot;repeatability&amp;quot;. The total variation among these components must be controlled and limited. A typical crossed structure is shown below: &lt;a href=&#34;#fn2&#34; class=&#34;footnoteRef&#34; id=&#34;fnref2&#34;&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;&lt;img src=&#34;/./img/crossed.png&#34; width=&#34;100%&#34; height=&#34;100%&#34; style=&#34;display: block; margin: auto;&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;Gage R&amp;amp;R training for engineers usually involves:&lt;/p&gt;
 &lt;ul&gt;
@@ -107,37 +107,37 @@ grr_dummy_tbl %&amp;gt;%
 &lt;tr class=&#34;odd&#34;&gt;
 &lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;oper_1&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;9.658576&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;11.521931&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class=&#34;even&#34;&gt;
 &lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;oper_1&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;10.897126&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;11.434057&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class=&#34;odd&#34;&gt;
 &lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;oper_2&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;8.919642&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10.773945&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class=&#34;even&#34;&gt;
 &lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;oper_2&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;10.442563&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;11.629946&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class=&#34;odd&#34;&gt;
 &lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;oper_3&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;10.706771&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10.672087&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class=&#34;even&#34;&gt;
 &lt;td align=&#34;center&#34;&gt;part_1&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;oper_3&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;9.217397&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;9.976531&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class=&#34;odd&#34;&gt;
 &lt;td align=&#34;center&#34;&gt;part_2&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;oper_1&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;10.869825&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;11.543520&lt;/td&gt;
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
@@ -156,37 +156,37 @@ grr_dummy_tbl %&amp;gt;%
 &lt;tr class=&#34;odd&#34;&gt;
 &lt;td align=&#34;center&#34;&gt;part_9&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;oper_3&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;9.770813&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10.001443&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class=&#34;even&#34;&gt;
 &lt;td align=&#34;center&#34;&gt;part_10&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;oper_1&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;9.862329&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;9.087449&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class=&#34;odd&#34;&gt;
 &lt;td align=&#34;center&#34;&gt;part_10&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;oper_1&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;9.044466&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10.722729&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class=&#34;even&#34;&gt;
 &lt;td align=&#34;center&#34;&gt;part_10&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;oper_2&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;8.769776&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;9.975832&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class=&#34;odd&#34;&gt;
 &lt;td align=&#34;center&#34;&gt;part_10&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;oper_2&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;11.515547&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;8.495529&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class=&#34;even&#34;&gt;
 &lt;td align=&#34;center&#34;&gt;part_10&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;oper_3&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;8.722872&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;9.980824&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class=&#34;odd&#34;&gt;
 &lt;td align=&#34;center&#34;&gt;part_10&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;oper_3&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;10.689403&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;11.526295&lt;/td&gt;
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
@@ -334,7 +334,7 @@ grr_sim_tbl %&amp;gt;%
 &lt;/div&gt;
 &lt;div id=&#34;step-7-fit-a-model-to-the-simulated-obervations&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;Step 7: Fit a model to the simulated obervations&lt;/h2&gt;
-&lt;p&gt;Once again we fit a model, but this time the observations are meaningful because we constructed them properly using the design matrix Z. broom.mixed::tidy() is able to bring the results into tibble format where we can clean a bit and view the variance contribution of each variable. This gives a point estimate of variance sd for the random effects that can be compared against the referent inputs.&lt;/p&gt;
+&lt;p&gt;Once again we fit a model, but this time the observations are meaningful because we constructed them properly using the design matrix Z. broom.mixed::tidy() is able to bring the results into tibble format where we can clean a bit and view the variance contribution of each variable. This gives a point estimate of standard deviations for the random effects that can be compared against the reference inputs.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# fit a model to the simulated dataset
 sim_m_fit &amp;lt;- lmer(measurement ~ (1 | part) + (1 | operator) + (1 | part:operator), data = grr_sim_tbl)
 
@@ -967,7 +967,7 @@ sim_setup_tbl %&amp;gt;% kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/p
   #    stat_summary(fun.y= mean, fun.ymin=mean, fun.ymax=mean, geom=&amp;quot;crossbar&amp;quot;, width=0.2, color=&amp;quot;red&amp;quot;) +
   stat_halfeye(aes(fill = variable), point_interval = mean_qi, alpha = .7, position = position_nudge(x = .15)) +
   labs(
-    title = &amp;quot;Gage R&amp;amp;R - Estimates for Standard Deviation of Different Components of Variation&amp;quot;,
+    title = &amp;quot;Gage R&amp;amp;R - Estimates for Component Standard Deviations&amp;quot;,
     subtitle = str_glue(&amp;quot;Settings: {sim_outcomes_tbl$n_part[1]} Parts, {sim_outcomes_tbl$n_oper[1]} Operators, {sim_outcomes_tbl$n_meas[1]} Measurements&amp;quot;),
     x = &amp;quot;&amp;quot;,
     y = &amp;quot;Standard Deviation Estimate&amp;quot;,

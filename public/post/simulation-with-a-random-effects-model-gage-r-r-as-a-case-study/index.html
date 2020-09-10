@@ -266,7 +266,7 @@
 <li>Visual inspection of implant surface and component interfaces</li>
 <li>Benchtop performance evaluation of implant</li>
 </ul>
-<p>The primary purpose of these costly and rigorous inspection processes is to screen out bad product. The ramifications of non-conforming parts reaching the field can be fatal. As such, it is important to understand any limitations of key measurement systems and, if possible, quantity their uncertainty. The primary statistical tool for this job is called Gage R&amp;R. The Gage R&amp;R attempts to quantify the total variation within a series of measurements and then describe the relative contributions of parts, operators, and repeated measurements (unexplained error). Operator error is called &quot;reproducability&quot;; unexplained error when a measurement is repeated under presumably identical conditions is called &quot;repeatability&quot;. The total variation among these components must be controlled and limited. A typical crossed structure is shown below: <a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a></p>
+<p>The primary purpose of these costly and rigorous inspection processes is to screen out bad product. The ramifications of non-conforming parts reaching the field can be fatal. As such, it is important to understand any limitations of key measurement systems and, if possible, quantity their uncertainty. The primary statistical tool for this job is called Gage R&amp;R. The Gage R&amp;R attempts to quantify the total variation within a series of measurements and then describe the relative contributions of parts, operators, and repeated measurements (unexplained error). Operator error is called &quot;reproducibility&quot;; unexplained error when a measurement is repeated under presumably identical conditions is called &quot;repeatability&quot;. The total variation among these components must be controlled and limited. A typical crossed structure is shown below: <a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a></p>
 <p><img src="/./img/crossed.png" width="100%" height="100%" style="display: block; margin: auto;" /></p>
 <p>Gage R&amp;R training for engineers usually involves:</p>
 <ul>
@@ -341,37 +341,37 @@ grr_dummy_tbl %&gt;%
 <tr class="odd">
 <td align="center">part_1</td>
 <td align="center">oper_1</td>
-<td align="center">9.658576</td>
+<td align="center">11.521931</td>
 </tr>
 <tr class="even">
 <td align="center">part_1</td>
 <td align="center">oper_1</td>
-<td align="center">10.897126</td>
+<td align="center">11.434057</td>
 </tr>
 <tr class="odd">
 <td align="center">part_1</td>
 <td align="center">oper_2</td>
-<td align="center">8.919642</td>
+<td align="center">10.773945</td>
 </tr>
 <tr class="even">
 <td align="center">part_1</td>
 <td align="center">oper_2</td>
-<td align="center">10.442563</td>
+<td align="center">11.629946</td>
 </tr>
 <tr class="odd">
 <td align="center">part_1</td>
 <td align="center">oper_3</td>
-<td align="center">10.706771</td>
+<td align="center">10.672087</td>
 </tr>
 <tr class="even">
 <td align="center">part_1</td>
 <td align="center">oper_3</td>
-<td align="center">9.217397</td>
+<td align="center">9.976531</td>
 </tr>
 <tr class="odd">
 <td align="center">part_2</td>
 <td align="center">oper_1</td>
-<td align="center">10.869825</td>
+<td align="center">11.543520</td>
 </tr>
 </tbody>
 </table>
@@ -390,37 +390,37 @@ grr_dummy_tbl %&gt;%
 <tr class="odd">
 <td align="center">part_9</td>
 <td align="center">oper_3</td>
-<td align="center">9.770813</td>
+<td align="center">10.001443</td>
 </tr>
 <tr class="even">
 <td align="center">part_10</td>
 <td align="center">oper_1</td>
-<td align="center">9.862329</td>
+<td align="center">9.087449</td>
 </tr>
 <tr class="odd">
 <td align="center">part_10</td>
 <td align="center">oper_1</td>
-<td align="center">9.044466</td>
+<td align="center">10.722729</td>
 </tr>
 <tr class="even">
 <td align="center">part_10</td>
 <td align="center">oper_2</td>
-<td align="center">8.769776</td>
+<td align="center">9.975832</td>
 </tr>
 <tr class="odd">
 <td align="center">part_10</td>
 <td align="center">oper_2</td>
-<td align="center">11.515547</td>
+<td align="center">8.495529</td>
 </tr>
 <tr class="even">
 <td align="center">part_10</td>
 <td align="center">oper_3</td>
-<td align="center">8.722872</td>
+<td align="center">9.980824</td>
 </tr>
 <tr class="odd">
 <td align="center">part_10</td>
 <td align="center">oper_3</td>
-<td align="center">10.689403</td>
+<td align="center">11.526295</td>
 </tr>
 </tbody>
 </table>
@@ -568,7 +568,7 @@ grr_sim_tbl %&gt;%
 </div>
 <div id="step-7-fit-a-model-to-the-simulated-obervations" class="section level2">
 <h2>Step 7: Fit a model to the simulated obervations</h2>
-<p>Once again we fit a model, but this time the observations are meaningful because we constructed them properly using the design matrix Z. broom.mixed::tidy() is able to bring the results into tibble format where we can clean a bit and view the variance contribution of each variable. This gives a point estimate of variance sd for the random effects that can be compared against the referent inputs.</p>
+<p>Once again we fit a model, but this time the observations are meaningful because we constructed them properly using the design matrix Z. broom.mixed::tidy() is able to bring the results into tibble format where we can clean a bit and view the variance contribution of each variable. This gives a point estimate of standard deviations for the random effects that can be compared against the reference inputs.</p>
 <pre class="r"><code># fit a model to the simulated dataset
 sim_m_fit &lt;- lmer(measurement ~ (1 | part) + (1 | operator) + (1 | part:operator), data = grr_sim_tbl)
 
@@ -1201,7 +1201,7 @@ sim_setup_tbl %&gt;% kable(align = &quot;c&quot;)</code></pre>
   #    stat_summary(fun.y= mean, fun.ymin=mean, fun.ymax=mean, geom=&quot;crossbar&quot;, width=0.2, color=&quot;red&quot;) +
   stat_halfeye(aes(fill = variable), point_interval = mean_qi, alpha = .7, position = position_nudge(x = .15)) +
   labs(
-    title = &quot;Gage R&amp;R - Estimates for Standard Deviation of Different Components of Variation&quot;,
+    title = &quot;Gage R&amp;R - Estimates for Component Standard Deviations&quot;,
     subtitle = str_glue(&quot;Settings: {sim_outcomes_tbl$n_part[1]} Parts, {sim_outcomes_tbl$n_oper[1]} Operators, {sim_outcomes_tbl$n_meas[1]} Measurements&quot;),
     x = &quot;&quot;,
     y = &quot;Standard Deviation Estimate&quot;,
