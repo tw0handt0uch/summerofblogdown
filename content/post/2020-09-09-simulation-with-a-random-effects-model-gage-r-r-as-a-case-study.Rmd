@@ -290,7 +290,7 @@ grr_fct <- function(n, np, no, nm, iisd, oisd, pisd, rer) {
 
   int_intercepts_sd <- iisd # standard dev of interaction random effects
   oper_intercepts_sd <- oisd # standard dev of operator random effects
-  part_intercepts_sd <- pisd # standard dev of operator random effects
+  part_intercepts_sd <- pisd # standard dev of parts random effects
   random_error_repeatability <- rer # standard dev of random error (repeatability)
 
   # assign names to each per, operator, trial
