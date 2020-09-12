@@ -104,37 +104,37 @@ grr_dummy_tbl %&gt;%
 <tr class="odd">
 <td align="center">part_1</td>
 <td align="center">oper_1</td>
-<td align="center">10.834312</td>
+<td align="center">11.87815</td>
 </tr>
 <tr class="even">
 <td align="center">part_1</td>
 <td align="center">oper_1</td>
-<td align="center">9.783931</td>
+<td align="center">10.82016</td>
 </tr>
 <tr class="odd">
 <td align="center">part_1</td>
 <td align="center">oper_2</td>
-<td align="center">8.388864</td>
+<td align="center">11.12168</td>
 </tr>
 <tr class="even">
 <td align="center">part_1</td>
 <td align="center">oper_2</td>
-<td align="center">10.598249</td>
+<td align="center">10.21272</td>
 </tr>
 <tr class="odd">
 <td align="center">part_1</td>
 <td align="center">oper_3</td>
-<td align="center">9.854349</td>
+<td align="center">10.55464</td>
 </tr>
 <tr class="even">
 <td align="center">part_1</td>
 <td align="center">oper_3</td>
-<td align="center">10.433325</td>
+<td align="center">10.18606</td>
 </tr>
 <tr class="odd">
 <td align="center">part_2</td>
 <td align="center">oper_1</td>
-<td align="center">7.282758</td>
+<td align="center">11.95731</td>
 </tr>
 </tbody>
 </table>
@@ -153,37 +153,37 @@ grr_dummy_tbl %&gt;%
 <tr class="odd">
 <td align="center">part_9</td>
 <td align="center">oper_3</td>
-<td align="center">9.112433</td>
+<td align="center">9.661665</td>
 </tr>
 <tr class="even">
 <td align="center">part_10</td>
 <td align="center">oper_1</td>
-<td align="center">8.379639</td>
+<td align="center">10.319520</td>
 </tr>
 <tr class="odd">
 <td align="center">part_10</td>
 <td align="center">oper_1</td>
-<td align="center">9.904626</td>
+<td align="center">10.668104</td>
 </tr>
 <tr class="even">
 <td align="center">part_10</td>
 <td align="center">oper_2</td>
-<td align="center">9.947838</td>
+<td align="center">11.483027</td>
 </tr>
 <tr class="odd">
 <td align="center">part_10</td>
 <td align="center">oper_2</td>
-<td align="center">10.902279</td>
+<td align="center">9.700252</td>
 </tr>
 <tr class="even">
 <td align="center">part_10</td>
 <td align="center">oper_3</td>
-<td align="center">9.758976</td>
+<td align="center">10.967124</td>
 </tr>
 <tr class="odd">
 <td align="center">part_10</td>
 <td align="center">oper_3</td>
-<td align="center">11.397272</td>
+<td align="center">9.627140</td>
 </tr>
 </tbody>
 </table>
@@ -975,7 +975,7 @@ sim_setup_tbl %&gt;% kable(align = &quot;c&quot;)</code></pre>
 
 a</code></pre>
 <p><img src="/post/2020-09-09-simulation-with-a-random-effects-model-gage-r-r-as-a-case-study_files/figure-html/unnamed-chunk-20-1.png" width="100%" height="500px" /></p>
-<p>Looks good! The averages of the set of simulations is converging nicely and we get a good feel for how much uncertainty would be expected for a single trial.</p>
+<p>Looks good! The averages of the set of simulations are converging nicely and we get a good feel for how much uncertainty would be expected for a single trial.</p>
 <p>Now to plot multiple simulations. A bit of data preparation is required to plot the true values on the same canvas as the individual sims. There is probably a cleaner way to do this directly within ggplot - but the way I do it here is to pull the values from the rows down into tidy format with pivot_longer and then do some grouping and joining.</p>
 <pre class="r"><code>sim_tbl &lt;- sim_outcomes_tbl %&gt;% select(sim_number, row_id)
 
@@ -1158,7 +1158,7 @@ t %&gt;%
 </tr>
 </tbody>
 </table>
-<p>It would be cool to see all the data from all the simulations. Recall that the true values of sd for operator, part:operator interaction, and Residual were 1 and that part variation increased across the different sims. All tof this is plotted below, with the true values in red while the results of the simulation shown in black. It can be seen that the simulations group nicely around the true values and we can see the uncertainty.</p>
+<p>It would be cool to see all the data from all the simulations. Recall that the true values of sd for operator, part:operator interaction, and Residual were 1 and that part variation increased across the different sims. All of this is plotted below, with the true values in red while the results of the simulation shown in black. It can be seen that the simulations group nicely around the true values and we can see the uncertainty.</p>
 <pre class="r"><code>sim_outcomes_tbl %&gt;%
   ggplot(aes(x = part_sd, y = st_dev_estimate)) +
   geom_point(size = .4) +

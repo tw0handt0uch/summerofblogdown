@@ -444,7 +444,7 @@ a <- sim_outcomes_tbl %>%
 a
 ```
 
-Looks good!  The averages of the set of simulations is converging nicely and we get a good feel for how much uncertainty would be expected for a single trial.
+Looks good!  The averages of the set of simulations are converging nicely and we get a good feel for how much uncertainty would be expected for a single trial.
 
 Now to plot multiple simulations. A bit of data preparation is required to plot the true values on the same canvas as the individual sims. There is probably a cleaner way to do this directly within ggplot - but the way I do it here is to pull the values from the rows down into tidy format with pivot_longer and then do some grouping and joining. 
 
@@ -472,7 +472,7 @@ t %>%
   kable(align = "c")
 ```
 
-It would be cool to see all the data from all the simulations.  Recall that the true values of sd for operator, part:operator interaction, and Residual were 1 and that part variation increased across the different sims.  All tof this is plotted below, with the true values in red while the results of the simulation shown in black.  It can be seen that the simulations group nicely around the true values and we can see the uncertainty. 
+It would be cool to see all the data from all the simulations.  Recall that the true values of sd for operator, part:operator interaction, and Residual were 1 and that part variation increased across the different sims.  All of this is plotted below, with the true values in red while the results of the simulation shown in black.  It can be seen that the simulations group nicely around the true values and we can see the uncertainty. 
 
 ```{r}
 sim_outcomes_tbl %>%
