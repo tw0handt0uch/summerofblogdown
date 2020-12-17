@@ -6,10 +6,1649 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>&amp;copy; 2019. All rights reserved.</copyright>
-    <lastBuildDate>Wed, 09 Sep 2020 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Thu, 17 Dec 2020 00:00:00 +0000</lastBuildDate>
     
         <atom:link href="/post/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>Boundary Conditions and Anatomy - Exploring Correlated Data Simulation in R</title>
+      <link>/post/boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r/</link>
+      <pubDate>Thu, 17 Dec 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/post/boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r/</guid>
+      <description>
+&lt;script src=&#34;/rmarkdown-libs/header-attrs/header-attrs.js&#34;&gt;&lt;/script&gt;
+&lt;link href=&#34;/rmarkdown-libs/anchor-sections/anchor-sections.css&#34; rel=&#34;stylesheet&#34; /&gt;
+&lt;script src=&#34;/rmarkdown-libs/anchor-sections/anchor-sections.js&#34;&gt;&lt;/script&gt;
+&lt;script src=&#34;/rmarkdown-libs/htmlwidgets/htmlwidgets.js&#34;&gt;&lt;/script&gt;
+&lt;script src=&#34;/rmarkdown-libs/viz/viz.js&#34;&gt;&lt;/script&gt;
+&lt;link href=&#34;/rmarkdown-libs/DiagrammeR-styles/styles.css&#34; rel=&#34;stylesheet&#34; /&gt;
+&lt;script src=&#34;/rmarkdown-libs/grViz-binding/grViz.js&#34;&gt;&lt;/script&gt;
+
+
+&lt;p&gt;Today we have been assigned the task of identifying boundary conditions for a benchtop durability test of an implantable, artificial heart valve. In other words, we need to identify credible parameters for a physical test such that our test engineers can challenge the device under severe but realistic geometries and loads. To facilitate this task our clinical team has analyzed images and extracted pressure measurements and geometric features for a sample of n=300 patients. The rest of this post explores what we should do with these data.&lt;/p&gt;
+&lt;p&gt;For the sake of simplicity, assume that the three parameters we care about are the &lt;strong&gt;&lt;em&gt;ellipticity&lt;/em&gt;&lt;/strong&gt; of the vessel cross section, &lt;strong&gt;&lt;em&gt;curvature&lt;/em&gt;&lt;/strong&gt; of the vessel in the vessel region of interest, and the blood &lt;strong&gt;&lt;em&gt;pressure&lt;/em&gt;&lt;/strong&gt;. Features such as these are important because they influence both the equilibrium geometry and the magnitude of forces acting on the implantable valve (in other words: the boundary conditions). The image below shows a schematic/example of ellipticity and vessel curvature in the LVOT and aortic valve annulus as observed in CT imaging.&lt;a href=&#34;#fn1&#34; class=&#34;footnote-ref&#34; id=&#34;fnref1&#34;&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/ellipticity_curvature.png&#34; style=&#34;width:100.0%;height:100.0%&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;There are two main challenges when working with these data:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;How do we use our sample to simulate the full population?&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+&lt;blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;How do we use the simulated, full population to identify groups of interest and recommend boundary conditions for the test&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Here is our dataset.&lt;a href=&#34;#fn2&#34; class=&#34;footnote-ref&#34; id=&#34;fnref2&#34;&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt; It turns out that each of these features can be well described by a &lt;strong&gt;lognormal distribution&lt;/strong&gt; and we will assume that this is confirmed via prior domain knowledge. Large pressures, large ellipticities, and small radius of curvature are all bad because they would represent more extreme geometries and/or loads for the implant to resist without migrating or fracturing.&lt;/p&gt;
+&lt;p&gt;As normal, we’re working in R and will lean on the tidyverse packages to accelerate things. I wasn’t intending for this post to go as long as it did so I’m also offering this table of contents to show I bear no malice.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(readxl)
+library(knitr)
+library(DiagrammeR)
+library(fitdistrplus)
+library(MASS)
+library(ggrepel)
+library(readxl)
+library(ks)
+library(broom)
+library(ggExtra)
+library(GGally)
+library(car)
+library(rgl)
+library(anySim)
+library(tidyverse)&lt;/code&gt;&lt;/pre&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;#correlations-in-the-original-dataset&#34;&gt;Correlations in the Original Dataset&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#approach-1---manually-transform-everything-to-normal&#34;&gt;Approach 1 - Manually Transform Everything to Normal&lt;/a&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;#step-1---fit-distributions-to-each-variable&#34;&gt;Step 1 - Fit Distributions to Each Variable&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#step-2---transform-all-variables-to-normal&#34;&gt;Step 2 - Transform all variables to normal&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#step-3---fit-normal-distributions-to-each-transformed-variable&#34;&gt;Step 3 - Fit normal distributions to each transformed variable&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#step-4---draw-joint-distribution-using-mvrnorm()-or-equivalent-function&#34;&gt;Step 4 - Draw joint distribution using mvrnorm() or equivalent function&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#step-5---back-transform-simulated-data-to-original-distribution&#34;&gt;Step 5 - Back-transform simulated data to original distribution&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#step-6---evaluate-parameters-and-marginal-distributions-of-the-back-transfomed-data&#34;&gt;Step 6 - Evaluate parameters and marginal distributions of the back-transfomed data&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#compare-original-data-to-simulated-data&#34;&gt;Compare Original Data to Simulated Data&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#approach-2---anysim&#34;&gt;Approach 2 - AnySim&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#using-the-simulated-population-to-define-desired-test-conditions-and-groups-of-interest&#34;&gt;Using the Simulated Population to Define Desired Test Conditions and Groups of Interest&lt;/a&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;#identify-a-percentage-of-worst-case-patients-relative-to-some-value-of-interest&#34;&gt;Identify a percentage of worst-case patients relative to some value of interest&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#identify-probability-contours-using-ks-package-and-kernel-density-estimation&#34;&gt;Identify probability contours using ks package and kernel density estimation&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#density-percentiles-from-kde-estimate&#34;&gt;Density percentiles from kde estimate&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#kde-estimates-in-the-range-of-the-variables&#34;&gt;KDE estimates in the range of the variables&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#density-plot-with-probability-contours-in-2d&#34;&gt;Density Plot with Probability Contours in 2d&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#density-plot-with-probability-contours-in-3d&#34;&gt;Density Plot with Probability Contours in 3d&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Start by reading in the data and taking a look at the format.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;sample_data &amp;lt;- readRDS(file = &amp;quot;sim_anatomy_data.rds&amp;quot;)
+sample_data&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## # A tibble: 300 x 3
+##    ellip  curv pressure
+##    &amp;lt;dbl&amp;gt; &amp;lt;dbl&amp;gt;    &amp;lt;dbl&amp;gt;
+##  1  1.26  4.51     92.7
+##  2  1.28  5.02    183. 
+##  3  1.29  4.03    154. 
+##  4  1.23  2.14    109. 
+##  5  1.13  3.67    124. 
+##  6  1.22  2.37    114. 
+##  7  1.10  3.06    113. 
+##  8  1.04  2.31    105. 
+##  9  1.11  5.31    115. 
+## 10  1.09  2.04    109. 
+## # ... with 290 more rows&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;As expected, 300 rows with our 3 features of interest.&lt;/p&gt;
+&lt;p&gt;Key Point:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;&lt;strong&gt;Since we are asked to find a worst-case set of values, it might seem reasonable or tempting to extract the maximum value from each group (or maybe something like the 95th percentile) and report those values together as a conservative worst-case for ellipticity, curvature, and pressure. Our test engineers would then set up a benchtop test to challenge our prototype devices in those same conditions to see if they survive. The problem with this approach is that each row of data is from a specific patient, so the variables may be correlated. It could be that those severe, 95th percentile values for each variable never occur together in the same patient. If we choose them together, we would over-test the device and over-design the device, potentially setting the program way behind. We must instead look at the data as a joint distribution and investigate correlations and covariance among the variables.&lt;/strong&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Let’s verify the shape of the distributions for each feature and see if there is any correlation between the variables:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;ellip_curv_plt &amp;lt;- sample_data %&amp;gt;%
+  ggplot(aes(x = ellip, y = curv)) +
+  geom_point(alpha = .5) +
+  labs(
+    title = &amp;quot;Patient Data From n=300 Scans&amp;quot;,
+    subtitle = &amp;quot;Vessel Ellipticity and Vessel Curvature Joint Distribution&amp;quot;,
+    x = &amp;quot;Ellipticity&amp;quot;,
+    y = &amp;quot;Curvature (mm)&amp;quot;
+  )
+
+ellip_pressure_plt &amp;lt;- sample_data %&amp;gt;%
+  ggplot(aes(x = ellip, y = pressure)) +
+  geom_point(alpha = .5, color = &amp;quot;firebrick&amp;quot;) +
+  labs(
+    title = &amp;quot;Patient Data From n=300 Scans&amp;quot;,
+    subtitle = &amp;quot;Vessel Ellipticity and Blood Pressure Joint Distribution&amp;quot;,
+    x = &amp;quot;Ellipticity&amp;quot;,
+    y = &amp;quot;Pressure (mm Hg)&amp;quot;
+  )
+
+curv_pressure_plt &amp;lt;- sample_data %&amp;gt;%
+  ggplot(aes(x = curv, y = pressure)) +
+  geom_point(alpha = .5, color = &amp;quot;limegreen&amp;quot;) +
+  labs(
+    title = &amp;quot;Patient Data From n=300 Scans&amp;quot;,
+    subtitle = &amp;quot;Vessel Curvature and Blood Pressure Joint Distribution&amp;quot;,
+    x = &amp;quot;Curvature (mm)&amp;quot;,
+    y = &amp;quot;Pressure (mm Hg&amp;quot;
+  )
+
+ellip_curv_mplt &amp;lt;- ggExtra::ggMarginal(ellip_curv_plt, type = &amp;quot;density&amp;quot;, fill = &amp;quot;#2c3e50&amp;quot;, alpha = .5)
+ellip_pressure_mplt &amp;lt;- ggExtra::ggMarginal(ellip_pressure_plt, type = &amp;quot;density&amp;quot;, fill = &amp;quot;firebrick&amp;quot;, alpha = .5)
+curv_pressure_mplt &amp;lt;- ggExtra::ggMarginal(curv_pressure_plt, type = &amp;quot;density&amp;quot;, fill = &amp;quot;limegreen&amp;quot;, alpha = .5)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-7-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;div id=&#34;correlations-in-the-original-dataset&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Correlations in the Original Dataset&lt;/h1&gt;
+&lt;p&gt;ggcorr() from the GGally package is very convenient for visualizing correlations.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;sample_data %&amp;gt;% ggcorr(
+  high = &amp;quot;#20a486ff&amp;quot;,
+  low = &amp;quot;#fde725ff&amp;quot;,
+  label = TRUE,
+  hjust = .75,
+  size = 3,
+  label_size = 3,
+  label_round = 3,
+  nbreaks = 3
+) +
+  labs(
+    title = &amp;quot;Correlation Matrix - n=300 Patient Set&amp;quot;,
+    subtitle = &amp;quot;Pearson Method Using Pairwise Observations&amp;quot;
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-8-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;
+We see that there are some positive correlations in this dataset.&lt;/p&gt;
+&lt;p&gt;To build out the sample into a simulated population we will fit a MLE estimate and use the model to push out a lot of predictions. If each variable was independent the job would be easy - just execute a few rlnorm()s and bind them together. The job is more challenging when the variables are correlated because they must be simulated all at once. I will show 2 approaches in the sections below. Note that the 2nd approach is more efficient but it helped me to walk through the first one to understand the workflow. If you are impatient I would skip to the section on approach 2.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;approach-1---manually-transform-everything-to-normal&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Approach 1 - Manually Transform Everything to Normal&lt;/h1&gt;
+&lt;p&gt;For cases where each variable is normal or can be easily transformed there is a straightforward and relatively simple workflow to generate simulated joint distribution using the &lt;strong&gt;mvrnorm()&lt;/strong&gt; function from the MASS package:&lt;/p&gt;
+&lt;div id=&#34;htmlwidget-1&#34; style=&#34;width:100%;height:500px;&#34; class=&#34;grViz html-widget&#34;&gt;&lt;/div&gt;
+&lt;script type=&#34;application/json&#34; data-for=&#34;htmlwidget-1&#34;&gt;{&#34;x&#34;:{&#34;diagram&#34;:&#34;digraph flowchart {\n      # node definitions with substituted label text\n      node [fontname = Helvetica, shape = rectangle, fillcolor = yellow]        \n      tab1 [label = \&#34;Step 1: Fit distributions to each variable in the original dataset.\n Note parameters, correlations, covariances in original data\&#34;]\n      tab2 [label = \&#34;Step 2: Transform all variables to normal\&#34;]\n      tab3 [label = \&#34;Step 3: Fit normal distributions to each transformed variablet.\n Note parameters, correlations, covariances in transformed data\&#34;]\n      tab4 [label = \&#34;Step 4: Draw joint distribution using MASS::mvrnorm() or equivalent function.\n Use parameters and covariance matrix from normal, transformed data\&#34;]\n      tab5 [label = \&#34;Step 5: Back-transform simulated data to original distribution\&#34;]\n      tab6 [label = \&#34;Step 6: Evaluate parameters and marginal distributions of the back-transfomed data.\n Compare to raw, original data to see if marginals and correlations were recreated in the sim\&#34;]\n      # edge definitions with the node IDs\n      tab1 -&gt; tab2 -&gt; tab3 -&gt; tab4 -&gt; tab5 -&gt; tab6;\n      }\n      &#34;,&#34;config&#34;:{&#34;engine&#34;:&#34;dot&#34;,&#34;options&#34;:null}},&#34;evals&#34;:[],&#34;jsHooks&#34;:[]}&lt;/script&gt;
+&lt;p&gt;In our case, we can easily convert our data from lognormal to normal and will then be able to use the mvrnorm() function to draw from a multivariate normal distribution and then undo the transformation later to recover a simulated population with desired correlations (as shown above). From there we can identify patients of interest, whether they be extreme challenging cases or a central, common group.&lt;/p&gt;
+&lt;p&gt;Per the workflow above, start by fitting the native data to lognormal distributions using fitdist() and extract the parameters. Storing all the parameters as objects is a bit tedious and I only do it here so we can make a nice summary table of everything at the end.&lt;/p&gt;
+&lt;div id=&#34;step-1---fit-distributions-to-each-variable&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Step 1 - Fit Distributions to Each Variable&lt;/h2&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;ellip_fit &amp;lt;- fitdist(sample_data$ellip, &amp;quot;lnorm&amp;quot;)
+curv_fit &amp;lt;- fitdist(sample_data$curv, &amp;quot;lnorm&amp;quot;)
+pressure_fit &amp;lt;- fitdist(sample_data$pressure, &amp;quot;lnorm&amp;quot;)
+
+# store lognormal parameters of original data
+ellip_meanlog &amp;lt;- ellip_fit$estimate[[&amp;quot;meanlog&amp;quot;]]
+ellip_sdlog &amp;lt;- ellip_fit$estimate[[&amp;quot;sdlog&amp;quot;]]
+curv_meanlog &amp;lt;- curv_fit$estimate[[&amp;quot;meanlog&amp;quot;]]
+curv_sdlog &amp;lt;- curv_fit$estimate[[&amp;quot;sdlog&amp;quot;]]
+pressure_meanlog &amp;lt;- pressure_fit$estimate[[&amp;quot;meanlog&amp;quot;]]
+pressure_sdlog &amp;lt;- pressure_fit$estimate[[&amp;quot;sdlog&amp;quot;]]
+
+# store correlations in original data
+cor_ec &amp;lt;- cor(x = sample_data$ellip, y = sample_data$curv)
+cor_ep &amp;lt;- cor(x = sample_data$ellip, y = sample_data$pressure)
+cor_cp &amp;lt;- cor(x = sample_data$curv, y = sample_data$pressure)
+
+# store covariances in original data
+cov_ellip_curv &amp;lt;- cov(x = sample_data$ellip, y = sample_data$curv)
+cov_ellip_ellip &amp;lt;- cov(x = sample_data$ellip, y = sample_data$ellip)
+cov_curv_curv &amp;lt;- cov(x = sample_data$curv, y = sample_data$curv)
+cov_ellip_pressure &amp;lt;- cov(x = sample_data$ellip, y = sample_data$pressure)
+cov_pressure_pressure &amp;lt;- cov(x = sample_data$pressure, y = sample_data$pressure)
+cov_curv_pressure &amp;lt;- cov(x = sample_data$curv, y = sample_data$pressure)
+
+# summarize the parameters and reshape a bit
+original_data_param_tbl &amp;lt;- tibble(
+  ellip_meanlog = ellip_meanlog,
+  ellip_sdlog = ellip_sdlog,
+  curv_meanlog = curv_meanlog,
+  curv_sdlog = curv_sdlog,
+  pressure_meanlog = pressure_meanlog,
+  pressure_sdlog = pressure_sdlog,
+  ellip_curv_correlation = cor_ec,
+  ellip_pressure_correlation = cor_ep,
+  curv_pressure_correlation = cor_cp,
+  ellip_ellip_covariance = cov_ellip_ellip,
+  ellip_curv_covariance = cov_ellip_curv,
+  curv_curv_covariance = cov_curv_curv,
+  ellip_pressure_covariance = cov_ellip_pressure,
+  pressure_pressure_covariance = cov_pressure_pressure,
+  curv_pressure_covariance = cov_curv_pressure
+) %&amp;gt;%
+  pivot_longer(cols = everything(), names_to = &amp;quot;feature&amp;quot;, values_to = &amp;quot;value&amp;quot;) %&amp;gt;%
+  mutate(dataset = &amp;quot;original_data&amp;quot;) %&amp;gt;%
+  mutate_if(is.character, as_factor)
+
+# View summary table of original data
+original_data_param_tbl %&amp;gt;%
+  kable(align = &amp;quot;c&amp;quot;, digits = 3)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;feature&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;value&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;dataset&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_meanlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.193&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;original_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_sdlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.064&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;original_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;curv_meanlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.158&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;original_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;curv_sdlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.309&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;original_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;pressure_meanlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.783&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;original_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;pressure_sdlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.191&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;original_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_curv_correlation&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.268&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;original_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_pressure_correlation&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.369&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;original_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;curv_pressure_correlation&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.213&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;original_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_ellip_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.006&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;original_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_curv_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.022&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;original_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;curv_curv_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.157&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;original_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_pressure_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.659&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;original_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;pressure_pressure_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;530.683&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;original_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;curv_pressure_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5.285&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;original_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;div id=&#34;step-2---transform-all-variables-to-normal&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Step 2 - Transform all variables to normal&lt;/h2&gt;
+&lt;p&gt;A simple log operation brings the lognormal variable to normal.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# transform original, lognormal data to normal
+normal_sample_data &amp;lt;- sample_data %&amp;gt;%
+  mutate(
+    n_ellip = log(ellip),
+    n_curv = log(curv),
+    n_pressure = log(pressure)
+  )
+
+normal_sample_data %&amp;gt;%
+  head() %&amp;gt;%
+  kable(align = &amp;quot;c&amp;quot;, digits = 3)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;ellip&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;curv&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;pressure&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_ellip&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_curv&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_pressure&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1.255&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.506&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;92.739&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.228&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.505&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.530&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1.285&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5.019&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;182.970&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.251&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.613&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5.209&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1.289&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.027&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;153.858&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.254&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.393&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5.036&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1.234&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.139&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;108.669&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.210&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.760&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.688&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1.133&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3.673&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;123.633&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.125&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.301&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.817&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1.219&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.373&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;113.944&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.198&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.864&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.736&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;div id=&#34;step-3---fit-normal-distributions-to-each-transformed-variable&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Step 3 - Fit normal distributions to each transformed variable&lt;/h2&gt;
+&lt;p&gt;We don’t actually have to formally fit normal distributions since it is convenient to obtain the mean and standard deviation at any time using the mean() or sd() functions. But we will extract and store correlations and covariances for the simulation to come.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# get correlations of transformed, normal data
+ncor_ec &amp;lt;- cor(
+  x = normal_sample_data$n_ellip,
+  normal_sample_data$n_curv
+)
+ncor_ep &amp;lt;- cor(
+  x = normal_sample_data$n_ellip,
+  normal_sample_data$n_pressure
+)
+ncor_cp &amp;lt;- cor(
+  x = normal_sample_data$n_curv,
+  normal_sample_data$n_pressure
+)
+
+# get covariance of transformed, normal data
+n_cov_ellip_curv &amp;lt;- cov(
+  x = normal_sample_data$n_ellip,
+  y = normal_sample_data$n_curv
+)
+n_cov_ellip_ellip &amp;lt;- cov(
+  x = normal_sample_data$n_ellip,
+  y = normal_sample_data$n_ellip
+)
+n_cov_curv_curv &amp;lt;- cov(
+  x = normal_sample_data$n_curv,
+  y = normal_sample_data$n_curv
+)
+
+n_cov_ellip_pressure &amp;lt;- cov(
+  x = normal_sample_data$n_ellip,
+  y = normal_sample_data$n_pressure
+)
+n_cov_pressure_pressure &amp;lt;- cov(
+  x = normal_sample_data$n_pressure,
+  y = normal_sample_data$n_pressure
+)
+n_cov_curv_pressure &amp;lt;- cov(
+  x = normal_sample_data$n_curv,
+  y = normal_sample_data$n_pressure
+)&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;step-4---draw-joint-distribution-using-mvrnorm-or-equivalent-function&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Step 4 - Draw joint distribution using mvrnorm() or equivalent function&lt;/h2&gt;
+&lt;p&gt;Time to actually draw the correlated values. I store them here in an object called mult_norm.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# draw from multivariate normal with parameters from transformed normal distributions and correlation
+set.seed(0118)
+
+mult_norm &amp;lt;- as_tibble(MASS::mvrnorm(
+  10000, c(
+    mean(normal_sample_data$n_ellip),
+    mean(normal_sample_data$n_curv),
+    mean(normal_sample_data$n_pressure)
+  ),
+  matrix(c(
+    n_cov_ellip_ellip,
+    n_cov_ellip_curv,
+    n_cov_ellip_pressure,
+    n_cov_ellip_curv,
+    n_cov_curv_curv,
+    n_cov_curv_pressure,
+    n_cov_ellip_pressure,
+    n_cov_curv_pressure,
+    n_cov_pressure_pressure
+  ), 3, 3)
+)) %&amp;gt;%
+  rename(
+    n_ellip_sim = V1,
+    n_curv_sim = V2,
+    n_pressure_sim = V3
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;step-5---back-transform-simulated-data-to-original-distribution&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Step 5 - Back-transform simulated data to original distribution&lt;/h2&gt;
+&lt;p&gt;Exponentiating the data brings it back to lognormal.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# convert back to lognormal
+log_norm &amp;lt;- mult_norm %&amp;gt;%
+  mutate(
+    ellip_sim = exp(n_ellip_sim),
+    curv_sim = exp(n_curv_sim),
+    pressure_sim = exp(n_pressure_sim)
+  )
+
+log_norm %&amp;gt;%
+  head() %&amp;gt;%
+  kable(align = &amp;quot;c&amp;quot;, digits = 3)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;n_ellip_sim&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_curv_sim&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_pressure_sim&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;ellip_sim&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;curv_sim&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;pressure_sim&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.254&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.600&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5.248&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.290&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.952&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;190.266&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.233&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.038&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5.107&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.262&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.823&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;165.178&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.236&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.152&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.812&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.266&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3.165&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;123.018&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.313&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.003&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5.048&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.368&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.727&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;155.636&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.224&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.622&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5.192&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.251&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5.066&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;179.912&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.197&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.486&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.822&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.218&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.422&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;124.185&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;div id=&#34;step-6---evaluate-parameters-and-marginal-distributions-of-the-back-transfomed-data&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Step 6 - Evaluate parameters and marginal distributions of the back-transfomed data&lt;/h2&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# evaluate the marginal distributions of the simulated data
+ellip_sim_fit &amp;lt;- fitdistrplus::fitdist(log_norm$ellip_sim, &amp;quot;lnorm&amp;quot;)
+curv_sim_fit &amp;lt;- fitdistrplus::fitdist(log_norm$curv_sim, &amp;quot;lnorm&amp;quot;)
+pressure_sim_fit &amp;lt;- fitdistrplus::fitdist(log_norm$pressure_sim, &amp;quot;lnorm&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Obtain and store the correlation, covariances, and parameters of simulated set:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# get correlation and covariances of simulated data
+sim_cor_ec &amp;lt;- cor(x = log_norm$ellip_sim, log_norm$curv_sim)
+sim_cor_ep &amp;lt;- cor(x = log_norm$ellip_sim, log_norm$pressure_sim)
+sim_cor_cp &amp;lt;- cor(x = log_norm$curv_sim, log_norm$pressure_sim)
+
+sim_cov_ellip_curv &amp;lt;- cov(x = log_norm$ellip_sim, y = log_norm$curv_sim)
+sim_cov_ellip_ellip &amp;lt;- cov(x = log_norm$ellip_sim, y = log_norm$ellip_sim)
+sim_cov_curv_curv &amp;lt;- cov(x = log_norm$curv_sim, y = log_norm$curv_sim)
+
+sim_cov_ellip_pressure &amp;lt;- cov(x = log_norm$ellip_sim, y = log_norm$pressure_sim)
+sim_cov_pressure_pressure &amp;lt;- cov(x = log_norm$pressure_sim, y = log_norm$pressure_sim)
+sim_cov_curv_pressure &amp;lt;- cov(x = log_norm$curv_sim, y = log_norm$pressure_sim)
+
+# store parameters of simulated data
+ellip_sim_meanlog &amp;lt;- ellip_sim_fit$estimate[[&amp;quot;meanlog&amp;quot;]]
+ellip_sim_sdlog &amp;lt;- ellip_sim_fit$estimate[[&amp;quot;sdlog&amp;quot;]]
+curv_sim_meanlog &amp;lt;- curv_sim_fit$estimate[[&amp;quot;meanlog&amp;quot;]]
+curv_sim_sdlog &amp;lt;- curv_sim_fit$estimate[[&amp;quot;sdlog&amp;quot;]]
+pressure_sim_meanlog &amp;lt;- pressure_sim_fit$estimate[[&amp;quot;meanlog&amp;quot;]]
+pressure_sim_sdlog &amp;lt;- pressure_sim_fit$estimate[[&amp;quot;sdlog&amp;quot;]]
+
+# collect parameters from simulated data
+sim_data_param_tbl &amp;lt;- tibble(
+  ellip_meanlog = ellip_sim_meanlog,
+  ellip_sdlog = ellip_sim_sdlog,
+  curv_meanlog = curv_sim_meanlog,
+  curv_sdlog = curv_sim_sdlog,
+  pressure_meanlog = pressure_sim_meanlog,
+  pressure_sdlog = pressure_sim_sdlog,
+
+  ellip_curv_correlation = sim_cor_ec,
+  ellip_pressure_correlation = sim_cor_ep,
+  curv_pressure_correlation = sim_cor_cp,
+
+  ellip_curv_covariance = sim_cov_ellip_curv,
+  ellip_ellip_covariance = sim_cov_ellip_ellip,
+  curv_curv_covariance = sim_cov_curv_curv,
+
+  ellip_pressure_covariance = sim_cov_ellip_pressure,
+  pressure_pressure_covariance = sim_cov_pressure_pressure,
+  curv_pressure_covariance = sim_cov_curv_pressure
+) %&amp;gt;%
+  pivot_longer(cols = everything(), names_to = &amp;quot;feature&amp;quot;, values_to = &amp;quot;value&amp;quot;) %&amp;gt;%
+  mutate(dataset = &amp;quot;simulated_data&amp;quot;) %&amp;gt;%
+  mutate_if(is.character, as_factor)
+
+sim_data_param_tbl %&amp;gt;%
+  kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;feature&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;value&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;dataset&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_meanlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1932042&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;simulated_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_sdlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0630117&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;simulated_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;curv_meanlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.1626798&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;simulated_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;curv_sdlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.3092643&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;simulated_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;pressure_meanlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.7878497&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;simulated_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;pressure_sdlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1900026&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;simulated_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_curv_correlation&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.2505145&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;simulated_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_pressure_correlation&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.3644292&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;simulated_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;curv_pressure_correlation&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1956149&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;simulated_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_curv_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0203344&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;simulated_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_ellip_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0058779&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;simulated_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;curv_curv_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.1209300&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;simulated_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_pressure_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.6534943&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;simulated_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;pressure_pressure_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;547.0647415&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;simulated_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;curv_pressure_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.8440727&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;simulated_data&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;div id=&#34;compare-original-data-to-simulated-data&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Compare Original Data to Simulated Data&lt;/h2&gt;
+&lt;p&gt;A bit more wrangling let’s us compare the feature of the original dataset to the new, simulated population to see if they agree.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;compare_tbl &amp;lt;- bind_rows(original_data_param_tbl, sim_data_param_tbl) %&amp;gt;%
+  pivot_wider(id_cols = everything(), names_from = dataset)
+
+compare_tbl %&amp;gt;%
+  kable(align = &amp;quot;c&amp;quot;, digits = 3)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;feature&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;original_data&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;simulated_data&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_meanlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.193&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.193&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_sdlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.064&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.063&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;curv_meanlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.158&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.163&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;curv_sdlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.309&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.309&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;pressure_meanlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.783&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.788&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;pressure_sdlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.191&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.190&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_curv_correlation&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.268&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.251&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_pressure_correlation&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.369&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.364&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;curv_pressure_correlation&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.213&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.196&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_ellip_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.006&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.006&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_curv_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.022&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.020&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;curv_curv_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.157&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.121&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ellip_pressure_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.659&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.653&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;pressure_pressure_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;530.683&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;547.065&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;curv_pressure_covariance&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5.285&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.844&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Everything appears to align well, but this sure took a while. Wouldn’t it be nice if there was a faster way than to manually fit and extract values from mvrnorm() ? Fortunately, we’re in the R ecosystem, where somebody smart has usually tackled the problem and provided the tools to the community. The tool that I had success with is the AnySim package.&lt;a href=&#34;#fn3&#34; class=&#34;footnote-ref&#34; id=&#34;fnref3&#34;&gt;&lt;sup&gt;3&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Here’s how to perform the simulation in a much more efficient way. Note: this is how I created the original dataset of 300 that we’ve been working with.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;approach-2---anysim&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Approach 2 - AnySim&lt;/h1&gt;
+&lt;p&gt;The AnySim workflow:&lt;/p&gt;
+&lt;div id=&#34;htmlwidget-2&#34; style=&#34;width:100%;height:500px;&#34; class=&#34;grViz html-widget&#34;&gt;&lt;/div&gt;
+&lt;script type=&#34;application/json&#34; data-for=&#34;htmlwidget-2&#34;&gt;{&#34;x&#34;:{&#34;diagram&#34;:&#34;digraph flowchart {\n      # node definitions with substituted label text\n      node [fontname = Helvetica, shape = rectangle, fillcolor = yellow]        \n      tab1 [label = \&#34;Step 1: Specify desired distributions for each variable and store as object\&#34;]\n      tab2 [label = \&#34;Step 2: Specify parameters for each variable and store as object\&#34;]\n      tab3 [label = \&#34;Step 3: Specify desired correlation matrix and store as object\&#34;]\n      tab4 [label = \&#34;Step 4: Provide the above information to EstCorrRVs() to estimate\n parameters of auxiliary Gaussian model\&#34;]\n      tab5 [label = \&#34;Step 5: Generate simulated values using SimcorrRVs()\&#34;]\n      # edge definitions with the node IDs\n      tab1 -&gt; tab2 -&gt; tab3 -&gt; tab4 -&gt; tab5;\n      }\n      &#34;,&#34;config&#34;:{&#34;engine&#34;:&#34;dot&#34;,&#34;options&#34;:null}},&#34;evals&#34;:[],&#34;jsHooks&#34;:[]}&lt;/script&gt;
+&lt;p&gt;It may look similar in the flowchart but in practice its way easier than Method 1. Here’s how it works in only a few lines of code:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(13)
+# Define the target distribution functions (ICDFs) of each random variable.
+
+ellip_dist &amp;lt;- &amp;quot;qlnorm&amp;quot;
+curv_dist &amp;lt;- &amp;quot;qlnorm&amp;quot;
+pressure_dist &amp;lt;- &amp;quot;qlnorm&amp;quot;
+
+# store the 3 ICDFs in a vector
+dist_vec &amp;lt;- c(ellip_dist, curv_dist, pressure_dist)
+
+# Define the parameters of the target distribution functions - store them in a list
+ellip_params &amp;lt;- list(meanlog = 0.20, sdlog = .067)
+curv_params &amp;lt;- list(meanlog = 1.15, sdlog = 0.3)
+pressure_params &amp;lt;- list(meanlog = 4.80, sdlog = 0.2)
+
+# this is a weird way to do it but I&amp;#39;m following along with an example from AnySim vignette :)
+params_list &amp;lt;- list(NULL)
+params_list[[1]] &amp;lt;- ellip_params
+params_list[[2]] &amp;lt;- curv_params
+params_list[[3]] &amp;lt;- pressure_params
+
+# Define the target correlation matrix.
+corr_matrix &amp;lt;- matrix(c(
+  1, 0.21, 0.4,
+  0.21, 1, .21,
+  0.4, 0.21, 1
+),
+ncol = 3,
+nrow = 3,
+byrow = T
+)
+# Estimate the parameters of the auxiliary Gaussian model.
+aux_gaussion_param_tbl &amp;lt;- EstCorrRVs(
+  R = corr_matrix, dist = dist_vec, params = params_list,
+  NatafIntMethod = &amp;quot;GH&amp;quot;, NoEval = 9, polydeg = 8
+)
+
+
+# Generate 10000 synthetic realizations of the 3 correlated RVs.
+correlated_ln_draws_tbl &amp;lt;- as_tibble(SimCorrRVs(n = 10000, paramsRVs = aux_gaussion_param_tbl)) %&amp;gt;%
+  rename(
+    ellip = V1,
+    curv = V2,
+    pressure = V3
+  )
+
+correlated_ln_draws_tbl %&amp;gt;%
+  head(10) %&amp;gt;%
+  kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;ellip&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;curv&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;pressure&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1.267618&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.158739&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;133.3040&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1.198681&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.437176&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;127.1982&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1.375663&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.649938&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;160.2052&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1.236829&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3.621202&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;141.5427&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1.318572&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.541340&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;129.3427&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1.255885&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3.236722&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;146.9361&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1.326279&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3.387357&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;167.8579&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1.240926&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.254830&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;145.7207&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1.191865&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.853877&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;87.7240&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1.315273&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.144667&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;90.5485&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Let’s see if we were able to produce the desired relationships between the variables:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# Fit synthetic data
+ellip_ln_fit &amp;lt;- tidy(fitdistr(correlated_ln_draws_tbl$ellip, &amp;quot;log-normal&amp;quot;)) %&amp;gt;% mutate(
+  var = &amp;quot;ellipticity&amp;quot;,
+  dataset = &amp;quot;sim_draws&amp;quot;
+)
+curv_ln_fit &amp;lt;- tidy(fitdistr(correlated_ln_draws_tbl$curv, &amp;quot;log-normal&amp;quot;)) %&amp;gt;% mutate(
+  var = &amp;quot;curvature&amp;quot;,
+  dataset = &amp;quot;sim_draws&amp;quot;
+)
+pressure_ln_fit &amp;lt;- tidy(fitdistr(correlated_ln_draws_tbl$pressure, &amp;quot;log-normal&amp;quot;)) %&amp;gt;% mutate(
+  var = &amp;quot;pressure&amp;quot;,
+  dataset = &amp;quot;sim_draws&amp;quot;
+)
+recovered_params_tbl &amp;lt;- bind_rows(ellip_ln_fit, curv_ln_fit, pressure_ln_fit)
+
+# Show target values
+target_tbl &amp;lt;- tibble(
+  term = rep(c(&amp;quot;meanlog&amp;quot;, &amp;quot;sdlog&amp;quot;), 3),
+  estimate = c(.20, .067, 1.15, .3, 4.80, .20),
+  var = c(&amp;quot;ellipticity&amp;quot;, &amp;quot;ellipticity&amp;quot;, &amp;quot;curvature&amp;quot;, &amp;quot;curvature&amp;quot;, &amp;quot;pressure&amp;quot;, &amp;quot;pressure&amp;quot;),
+  dataset = &amp;quot;target values&amp;quot;
+)
+
+# Compare simulated values to target values
+bind_rows(recovered_params_tbl, target_tbl) %&amp;gt;%
+  select(-std.error) %&amp;gt;%
+  pivot_wider(id_cols = everything(), names_from = dataset, values_from = estimate) %&amp;gt;%
+  mutate_if(is.numeric, round, 2) %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;term&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;var&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;sim_draws&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;target values&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;meanlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;ellipticity&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.20&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.20&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;sdlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;ellipticity&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.07&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.07&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;meanlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;curvature&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.15&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.15&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;sdlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;curvature&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.30&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.30&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;meanlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;pressure&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.80&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.80&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;sdlog&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;pressure&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.20&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.20&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Excellent agreement. Now check to see if the correlations were preserved:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# Check correlations
+correlated_ln_draws_tbl %&amp;gt;% ggcorr(
+  high = &amp;quot;#20a486ff&amp;quot;,
+  low = &amp;quot;#fde725ff&amp;quot;,
+  label = TRUE,
+  hjust = .75,
+  size = 3,
+  label_size = 3,
+  label_round = 3,
+  nbreaks = 3
+) +
+  labs(
+    title = &amp;quot;Correlation Matrix&amp;quot;,
+    subtitle = &amp;quot;Pearson Method Using Pairwise Observations&amp;quot;
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-27-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Again, perfect agreement to 2 decimal places. Thank you AnySim!&lt;/p&gt;
+&lt;p&gt;Now that I’ve shown 2 ways to preserve the correlation structure in a simulation, we can return to the original question: what are the worst-case (or most common) values of this (simulated) population?&lt;a href=&#34;#fn4&#34; class=&#34;footnote-ref&#34; id=&#34;fnref4&#34;&gt;&lt;sup&gt;4&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;using-the-simulated-population-to-define-desired-test-conditions-and-groups-of-interest&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Using the Simulated Population to Define Desired Test Conditions and Groups of Interest&lt;/h1&gt;
+&lt;p&gt;The simulated population is useful because its density properties provide a means to determine how extreme any values of interest are. The trick is that we have to define the boundary of interest based on the question we are trying to answer. Two common questions we have pertain to finding the most common set of patients, or the most extreme patients relative to some point or region of interest. I discuss both below.&lt;/p&gt;
+&lt;div id=&#34;identify-a-percentage-of-worst-case-patients-relative-to-some-value-of-interest&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Identify a percentage of worst-case patients relative to some value of interest&lt;/h2&gt;
+&lt;p&gt;Consider a 2d test case where we are interested in the joint distribution of 2 variables: curvature and pressure. These would be appropriate for something like a migration test, where the pressure wants to pull the implant out of place a curved configuration is worse than straight (like a pipe elbow).&lt;/p&gt;
+&lt;p&gt;If we know that the worst-case conditions that are physiologically relevant occur when the curvature is 1 mm (radius-of-curvature) and the pressure is 300 mm Hg (extremely high). How could we identify the worst-case 5% of patients using our simulated population data from above? In this case we don’t need an algorithm, just a bit of geometry.&lt;/p&gt;
+&lt;p&gt;We can leverage the standard geometric formula for distance between two points:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[ {\displaystyle d(p,q)={\sqrt {(p_{1}-q_{1})^{2}+(p_{2}-q_{2})^{2}}}} \]&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;Here’s how to calculate this number for each value in the joint distribution for curvature and pressure:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# specify theoretical worst-case point in space
+theoretical_worst_curv &amp;lt;- 1
+theoretical_worst_pressure &amp;lt;- 300
+
+# calculated each point&amp;#39;s distance from the theoretical worst-case
+d_data &amp;lt;- log_norm %&amp;gt;%
+  rowwise() %&amp;gt;%
+  mutate(d = ((theoretical_worst_curv - curv_sim)^2 + (theoretical_worst_pressure - pressure_sim)^2)^.5) %&amp;gt;%
+  arrange(desc(d)) %&amp;gt;%
+  ungroup()
+
+# make ecdf to map points to percentiles of empirical distribution
+d_ECDF_fcn &amp;lt;- ecdf(d_data$d)
+
+# map the ecdf over all the calculated distances to convert them to percentiles
+d_pct_data &amp;lt;- d_data %&amp;gt;%
+  mutate(d_pct = map_dbl(d, d_ECDF_fcn)) %&amp;gt;%
+  mutate(in_out = case_when(
+    d_pct &amp;lt;= .05 ~ &amp;quot;5% Worst-Case Points&amp;quot;,
+    TRUE ~ &amp;quot;95% Less Severe Population&amp;quot;
+  )) %&amp;gt;%
+  mutate(in_out = as_factor(in_out))
+
+wc_tbl &amp;lt;- tibble(x = 1, y = 300)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now visualize.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# visualize
+d_plt &amp;lt;- d_pct_data %&amp;gt;%
+  ggplot(aes(x = curv_sim, y = pressure_sim, color = in_out)) +
+  geom_point(alpha = .5, size = 1) +
+  geom_point(aes(x = 1, y = 300), color = &amp;quot;firebrick&amp;quot;) +
+  geom_label_repel(
+    data = wc_tbl, aes(x, y),
+    label = &amp;quot;Worst-Case Combination of \n vessel curvature and pressure&amp;quot;,
+    fill = &amp;quot;firebrick&amp;quot;,
+    color = &amp;quot;white&amp;quot;,
+    segment.color = &amp;quot;black&amp;quot;,
+    segment.size = 1,
+    #                   min.segment.length = unit(1, &amp;quot;lines&amp;quot;),
+    nudge_y = 50,
+    nudge_x = 2
+  ) +
+  labs(
+    title = &amp;quot;Joint Distribution of Curvature and Pressure&amp;quot;,
+    subtitle = &amp;quot;5% of points nearest to worst-case are identified&amp;quot;,
+    x = &amp;quot;Radius of Curvature (mm)&amp;quot;,
+    y = &amp;quot;Blood Presure (mm Hg)&amp;quot;
+  ) +
+  theme_classic() +
+  ylim(c(0, 300)) +
+  theme(
+    legend.position = &amp;quot;bottom&amp;quot;,
+    legend.title = element_blank()
+  ) +
+  scale_color_viridis_d(option = &amp;quot;D&amp;quot;, end = .7)
+
+d_plt&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-29-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;It’s a bit of an illusion since the axes aren’t scaled 1:1. Here’s a look at a scaled version showing the teal points closest to the point of interest.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-30-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Neat! We just split the data into the most severe 5% and least severe 95% based on a known point we want to avoid. You could imagine a similar calculation if we had a line that defined a worst-case boundary like we use for the failure threshold in a Goodman Diagram.&lt;a href=&#34;#fn5&#34; class=&#34;footnote-ref&#34; id=&#34;fnref5&#34;&gt;&lt;sup&gt;5&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;In other cases we just want to know the most common values (values in the region of highest probability) based on the multi-dimensional density calculation. In other words, we want to identify contours based on how close the points are to each other, not some arbitrary point in space or line. A kernel density estimate is going to be our tool of choice in all but the most basic cases. The KDE is non-parametric and can accommodate very complex joint distributions and density shapes.&lt;a href=&#34;#fn6&#34; class=&#34;footnote-ref&#34; id=&#34;fnref6&#34;&gt;&lt;sup&gt;6&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Typically, the default contours on a density plot show an output called “level” but they can be converted to denote upper percentages of highest density regions. This is the method I show below.&lt;a href=&#34;#fn7&#34; class=&#34;footnote-ref&#34; id=&#34;fnref7&#34;&gt;&lt;sup&gt;7&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;identify-probability-contours-using-ks-package-and-kernel-density-estimation&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Identify probability contours using ks package and kernel density estimation&lt;/h2&gt;
+&lt;p&gt;This first chunk converts the data and generated the KDE. The bandwidth parameters controls the “smoothness” or granularity of the estimate and can be hard to specify in multiple dimensions. Hscv() provides a method of determining a reasonable bandwidth through cross-validation; see documentation in footnotes for more information if interested.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# convert simulated data tibble to matrix
+d3m &amp;lt;- correlated_ln_draws_tbl %&amp;gt;%
+  as.matrix()
+
+# cross-validated bandwidth for kd (takes a while to calculate)
+# hscv1 &amp;lt;- Hscv(correlated_ln_draws_tbl)
+# hscv1 %&amp;gt;% write_rds(here::here(&amp;quot;hscv1.rds&amp;quot;))
+
+hscv1 &amp;lt;- read_rds(here::here(&amp;quot;hscv1.rds&amp;quot;))
+
+# generate kernel density estimate from simulated population
+kd_d3m &amp;lt;- ks::kde(d3m, H = hscv1, compute.cont = TRUE)&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;density-percentiles-from-kde-estimate&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Density percentiles from kde estimate&lt;/h2&gt;
+&lt;p&gt;The KDE estimate provides density percentiles that can be used to generate the contours the define the density regions in multiple dimensions.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# see the kde&amp;#39;s calculated density thresholds for specified proportions
+cont_vals_tbl &amp;lt;- tidy(kd_d3m$cont) %&amp;gt;%
+  mutate(n_row = row_number()) %&amp;gt;%
+  mutate(probs = 100 - n_row) %&amp;gt;%
+  select(probs, x)
+
+reference_grid_probs_tbl &amp;lt;- cont_vals_tbl %&amp;gt;%
+  rename(estimate = x)
+
+reference_grid_probs_tbl %&amp;gt;%
+  head(10) %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;probs&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;estimate&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;99&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0332949&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;98&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0321061&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;97&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0310773&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;96&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0303446&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;95&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0295937&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;94&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0288550&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;93&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0282270&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;92&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0276995&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;91&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0271418&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;90&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0266409&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;reference_grid_probs_tbl %&amp;gt;%
+  tail(10) %&amp;gt;%
+  kable(align = rep(&amp;quot;c&amp;quot;))&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;probs&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;estimate&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0018141&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;9&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0016195&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;8&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0014430&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;7&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0012654&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;6&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0010786&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;5&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0008795&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;4&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0007005&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0005288&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0003976&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0002657&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;div id=&#34;kde-estimates-in-the-range-of-the-variables&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;KDE estimates in the range of the variables&lt;/h2&gt;
+&lt;p&gt;By default the KDE provides density estimates for a grid of points that covers the space of the variables.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;kd_grid_estimates &amp;lt;- kd_d3m&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;If we want to know the value at each point in the simulated population we use the eval.points argument.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;mc_estimates &amp;lt;- ks::kde(
+  x = d3m, H = hscv1,
+  compute.cont = TRUE,
+  eval.points = correlated_ln_draws_tbl %&amp;gt;% as.matrix()
+)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Here are a couple different ways to convert the kde object features into a tibble:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;mc_est_tbl_10000 &amp;lt;- tibble(estimate = mc_estimates$estimate) %&amp;gt;%
+  bind_cols(correlated_ln_draws_tbl)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;kd_grid_est_tbl_29k &amp;lt;- broom:::tidy.kde(kd_grid_estimates) %&amp;gt;%
+  pivot_wider(names_from = variable, values_from = value) %&amp;gt;%
+  rename(ellip = x1, curv = x2, pressure = x3) %&amp;gt;%
+  select(-obs)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;mc_est_tbl_10000 %&amp;gt;%
+  head(10) %&amp;gt;%
+  kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;estimate&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;ellip&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;curv&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;pressure&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.0140082&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.267618&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.158739&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;133.3040&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.0118702&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.198681&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.437176&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;127.1982&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.0026530&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.375663&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.649938&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;160.2052&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.0194232&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.236829&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3.621202&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;141.5427&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.0122134&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.318572&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.541340&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;129.3427&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.0167723&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.255885&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3.236722&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;146.9361&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.0055484&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.326279&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3.387357&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;167.8579&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.0112270&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.240926&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.254830&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;145.7207&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.0082627&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.191865&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.853877&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;87.7240&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.0019651&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.315273&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.144667&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;90.5485&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;kd_grid_est_tbl_29k %&amp;gt;%
+  head(10) %&amp;gt;%
+  kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;estimate&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;ellip&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;curv&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;pressure&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.8880910&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1331512&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;31.02793&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.9131427&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1331512&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;31.02793&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.9381944&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1331512&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;31.02793&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.9632461&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1331512&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;31.02793&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.9882978&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1331512&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;31.02793&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.0133495&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1331512&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;31.02793&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.0384012&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1331512&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;31.02793&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.0634528&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1331512&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;31.02793&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.0885045&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1331512&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;31.02793&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.1135562&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1331512&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;31.02793&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Identify the 5% threshold value:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# 5% contour line from kd grid based on 10k MC data
+percentile_5 &amp;lt;- kd_d3m[[&amp;quot;cont&amp;quot;]][&amp;quot;5%&amp;quot;]&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Verify that 5% (500/10,000) values fall below the threshold:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;mc_est_tbl_10000 %&amp;gt;% filter(estimate &amp;lt;= percentile_5)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## # A tibble: 500 x 4
+##     estimate ellip  curv pressure
+##        &amp;lt;dbl&amp;gt; &amp;lt;dbl&amp;gt; &amp;lt;dbl&amp;gt;    &amp;lt;dbl&amp;gt;
+##  1 0.000243   1.19  6.67    166. 
+##  2 0.000371   1.37  2.29     81.7
+##  3 0.000356   1.22  2.73    200. 
+##  4 0.000134   1.27  7.91    114. 
+##  5 0.000560   1.47  3.89    163. 
+##  6 0.0000732  1.47  4.67    282. 
+##  7 0.000527   1.29  6.13    185. 
+##  8 0.000254   1.48  2.44    136. 
+##  9 0.000644   1.19  6.63    135. 
+## 10 0.000856   1.43  4.98    156. 
+## # ... with 490 more rows&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;If we wanted to know the nearest probability contour line for every point we could make a function to do so.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;get_probs_fcn &amp;lt;- function(value) {
+  t &amp;lt;- reference_grid_probs_tbl %&amp;gt;%
+    mutate(value = value) %&amp;gt;%
+    mutate(dif = abs(estimate - value)) %&amp;gt;%
+    filter(dif == min(dif))
+
+  t[[1, 1]]
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Map the function over each value in the dataset.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# mc_1_to_99_tbl &amp;lt;- mc_est_tbl_10000 %&amp;gt;%
+#   mutate(nearest_prob = map_dbl(estimate, get_probs_fcn))
+
+# mc_1_to_99_tbl %&amp;gt;% write_rds(here::here(&amp;quot;mc_1_to_99_tbl.rds&amp;quot;))
+mc_1_to_99_tbl &amp;lt;- read_rds(here::here(&amp;quot;mc_1_to_99_tbl.rds&amp;quot;))
+
+mc_1_to_99_tbl&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## # A tibble: 10,000 x 5
+##    estimate ellip  curv pressure nearest_prob
+##       &amp;lt;dbl&amp;gt; &amp;lt;dbl&amp;gt; &amp;lt;dbl&amp;gt;    &amp;lt;dbl&amp;gt;        &amp;lt;dbl&amp;gt;
+##  1  0.0140   1.27  2.16    133.            59
+##  2  0.0119   1.20  4.44    127.            52
+##  3  0.00265  1.38  2.65    160.            14
+##  4  0.0194   1.24  3.62    142.            75
+##  5  0.0122   1.32  2.54    129.            53
+##  6  0.0168   1.26  3.24    147.            68
+##  7  0.00555  1.33  3.39    168.            28
+##  8  0.0112   1.24  4.25    146.            50
+##  9  0.00826  1.19  1.85     87.7           39
+## 10  0.00197  1.32  4.14     90.5           11
+## # ... with 9,990 more rows&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Let’s see what this actually did by comparing the probability contours estimated from the function above vs. the reference contours produced during generation of the kde object:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;n &amp;lt;- mc_1_to_99_tbl %&amp;gt;%
+  select(nearest_prob, estimate) %&amp;gt;%
+  mutate(set = as_factor(&amp;quot;manual_fit_10k&amp;quot;))
+
+p &amp;lt;- cont_vals_tbl %&amp;gt;%
+  mutate(set = as_factor(&amp;quot;kde_output&amp;quot;)) %&amp;gt;%
+  rename(estimate = x, nearest_prob = probs)
+
+bind_rows(n, p) %&amp;gt;%
+  filter(estimate &amp;lt; .005 &amp;amp; estimate &amp;gt; 0) %&amp;gt;%
+  ggplot(aes(x = estimate, y = nearest_prob)) +
+  geom_point(aes(color = set)) +
+  geom_vline(xintercept = percentile_5)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-42-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;So it appropriately rounded each value in the simulated population to the nearest whole percentile, as desired.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;density-plot-with-probability-contours-in-2d&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Density Plot with Probability Contours in 2d&lt;/h2&gt;
+&lt;p&gt;Now the fun part - Visualization. Here’s how I’d go about creating a 2d density plots. If you don’t care about specific probability contours, you can use the built in ggplot method. All you need is the raw data points, not the kde object or estimates. ggplot can do that for you.&lt;/p&gt;
+&lt;p&gt;Here’s ellipticity vs. curvature:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;cp_plt &amp;lt;- correlated_ln_draws_tbl %&amp;gt;%
+  ggplot(aes(x = ellip, y = curv)) +
+  geom_point(alpha = .3, size = .5) +
+  geom_density2d(size = 1.3) +
+  theme_classic() +
+  xlim(c(.9, 1.6)) +
+  ylim(c(1, 7.5)) +
+  labs(
+    title = &amp;quot;Joint Distribution of Vessel Ellipticity and Curvature&amp;quot;,
+    subtitle = &amp;quot;Density Contours at Default Settings&amp;quot;,
+    x = &amp;quot;Ellipticity (unitless)&amp;quot;,
+    y = &amp;quot;Radius of Curvature (mm)&amp;quot;
+  )
+
+cp_plt&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-43-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;This is pretty good. But for specifying specific contours and specifically we’ll need a bit more. Here’s a solution that I adapted from one I found on Cross Validated.&lt;/p&gt;
+&lt;p&gt;First, select the 2 variables of interest.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;d &amp;lt;- correlated_ln_draws_tbl %&amp;gt;% select(ellip, curv)
+
+## density function
+kd &amp;lt;- ks::kde(d, compute.cont = TRUE, h = 0.05)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now a a function to extract the points of the contour line from the kde:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;get_contour &amp;lt;- function(kd_out = kd, prob = &amp;quot;5%&amp;quot;) {
+  contour_95 &amp;lt;- with(kd_out, contourLines(
+    x = eval.points[[1]], y = eval.points[[2]],
+    z = estimate, levels = cont[prob]
+  )[[1]])
+  as_tibble(contour_95) %&amp;gt;%
+    mutate(prob = prob)
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Map it over the kd object.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;dat_out &amp;lt;- map_dfr(c(&amp;quot;5%&amp;quot;, &amp;quot;20%&amp;quot;, &amp;quot;40%&amp;quot;, &amp;quot;60%&amp;quot;, &amp;quot;80%&amp;quot;, &amp;quot;95%&amp;quot;), ~ get_contour(kd, .)) %&amp;gt;%
+  group_by(prob) %&amp;gt;%
+  mutate(n_val = 1:n()) %&amp;gt;%
+  ungroup()
+
+dat_out %&amp;gt;%
+  head(10) %&amp;gt;%
+  kable(align = &amp;quot;c&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;level&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;x&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;y&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;prob&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;n_val&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.1050379&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.024919&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.053556&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.1050379&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.023034&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.112579&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.1050379&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.022015&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.176684&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;3&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.1050379&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.021665&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.240789&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.1050379&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.021762&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.304894&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.1050379&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.022205&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.368999&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;6&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.1050379&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.022956&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.433104&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;7&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.1050379&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.024009&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.497208&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;8&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.1050379&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.024919&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.540507&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;9&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.1050379&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.025311&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.561313&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;10&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Clean kde output&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;kd_df &amp;lt;- expand_grid(x = kd$eval.points[[1]], y = kd$eval.points[[2]]) %&amp;gt;%
+  mutate(z = c(kd$estimate %&amp;gt;% t()))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now visualize again, this time with probability contours at specified values and the 5% curve labeled with geom_label_repel().&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;label_tbl &amp;lt;- dat_out %&amp;gt;%
+  filter(
+    prob == &amp;quot;5%&amp;quot;,
+    n_val == 100
+  )
+
+# visualize
+ellip_curv_2plt &amp;lt;- ggplot(data = kd_df, aes(x, y)) +
+  geom_tile(aes(fill = z)) +
+  geom_point(data = d, aes(x = ellip, y = curv), alpha = .4, size = .4, colour = &amp;quot;white&amp;quot;) +
+  geom_path(aes(x, y, group = prob),
+    data = dat_out %&amp;gt;% filter(prob %in% c(&amp;quot;5%&amp;quot;, &amp;quot;20%&amp;quot;, &amp;quot;40%&amp;quot;, &amp;quot;60%&amp;quot;, &amp;quot;80%&amp;quot;, &amp;quot;95%&amp;quot;)), colour = &amp;quot;white&amp;quot;, size = 1.2, alpha = .8
+  ) +
+  #  geom_text(aes(label = prob), data =
+  #              filter(dat_out, (prob %in% c(&amp;quot;5%&amp;quot;) &amp;amp; n_val==1)), # | (prob %in% c(&amp;quot;90%&amp;quot;) &amp;amp; n_val==20)),
+  #            colour = &amp;quot;yellow&amp;quot;, size = 5)+
+  geom_label_repel(
+    data = label_tbl, aes(x, y),
+    label = label_tbl$prob[1],
+    fill = &amp;quot;yellow&amp;quot;,
+    color = &amp;quot;black&amp;quot;,
+    segment.color = &amp;quot;yellow&amp;quot;,
+    #    segment.size = 1,
+    min.segment.length = unit(1, &amp;quot;lines&amp;quot;),
+    nudge_y = .5,
+    nudge_x = -.025
+  ) +
+  xlim(c(.95, 1.5)) +
+  ylim(c(0, 7.5)) +
+  labs(
+    title = &amp;quot;Joint Distribution [Ellipticity and Radius of Curvature]&amp;quot;,
+    subtitle = &amp;quot;Simulated Data&amp;quot;,
+    caption = &amp;quot;Density Contours shown at 5%, 20%, 40%, 60%, 80%, 95%&amp;quot;
+  ) +
+  scale_fill_viridis_c(end = .9) +
+  theme_bw() +
+  theme(legend.position = &amp;quot;none&amp;quot;) +
+  labs(x = &amp;quot;Ellipticity (unitless)&amp;quot;, y = &amp;quot;Radius of Curvature (mm)&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;ggExtra::ggMarginal(ellip_curv_2plt, type = &amp;quot;density&amp;quot;, fill = &amp;quot;#403891ff&amp;quot;, alpha = .7)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-49-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Nice! Now we have a clear delineation of the most common patients and most extreme patients and we can group them as desired. Almost done - the last thing to do is to see how to extend into 3d.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;density-plot-with-probability-contours-in-3d&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Density Plot with Probability Contours in 3d&lt;/h2&gt;
+&lt;p&gt;Honestly, this part is pretty easy thanks to a built in plot.kde method. Just use the cont argument to specify with probability contours you want.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;plot(x = kd_d3m, cont = c(45, 70, 95), drawpoints = FALSE, col.pt = 1)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/3d_cont_1.png&#34; style=&#34;width:100.0%;height:100.0%&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Add points using the points3d function. In this case I add 2 sets, 1 for the 5% most extreme and 1 for the 95% most common.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# plot(x = kd_d3m, cont = c(95) ,drawpoints = FALSE, col.pt = 1)
+mc_lowest_5_tbl &amp;lt;- mc_1_to_99_tbl %&amp;gt;% filter(estimate &amp;lt; percentile_5)
+mc_6_to_100_tbl &amp;lt;- mc_1_to_99_tbl %&amp;gt;% filter(estimate &amp;gt;= percentile_5)
+
+# points3d(x = mc_lowest_5_tbl$ellip, y = mc_lowest_5_tbl$curv, z = mc_lowest_5_tbl$pressure, color = &amp;quot;dodgerblue&amp;quot;,  size = 3, alpha = 1)
+
+# points3d(x = mc_6_to_100_tbl$ellip, y = mc_6_to_100_tbl$curv, z = mc_6_to_100_tbl$pressure, color = &amp;quot;black&amp;quot;,  size = 3, alpha = 1)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/3dd1.png&#34; style=&#34;width:100.0%;height:100.0%&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/3dd2.png&#34; style=&#34;width:100.0%;height:100.0%&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/3dd3.png&#34; style=&#34;width:100.0%;height:100.0%&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;And there we have it! A 3d joint distribution with 95% probability density contour and groups separated by color and confirmed to cover 95/5% of the population.&lt;/p&gt;
+&lt;p&gt;If you’ve made it this far, I thank you. Here is a brief summary of what I tried to capture in this post:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Manual method to simulate a population from a sample with known correlation structure using mvrnorm()&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Simplified / Efficient way to do the same using AnySim package&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Method for identifying worst-case 5% of patients when there is a known target point to stay away from&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Method for identifying most common 95% of patients with respect the their density&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Simple way to plot 2d density with ggplot, showing “levels”&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Generate 2d density plots with specified probability density contours and labels&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Method for creating 3d plots with specified probability density contours and in/out groups&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class=&#34;footnotes&#34;&gt;
+&lt;hr /&gt;
+&lt;ol&gt;
+&lt;li id=&#34;fn1&#34;&gt;&lt;p&gt;Hamdan et. al. Journal of the American College of Cardiology, Volume 59, Issue 2, 2012, Pages 119-127&lt;a href=&#34;#fnref1&#34; class=&#34;footnote-back&#34;&gt;↩︎&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn2&#34;&gt;&lt;p&gt;The units of measure aren’t really important for the analysis but just for calibration the ellipticity is generally unitless (it is a ratio of the long axis over the short axis); curvature is usually in mm and represents the radius of curvature on the inner curve of the vessel; pressure is usually in mm Hg and can be assumed to be the systolic blood pressure.&lt;a href=&#34;#fnref2&#34; class=&#34;footnote-back&#34;&gt;↩︎&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn3&#34;&gt;&lt;p&gt;see Water 2020, 12, 1645; &lt;a href=&#34;doi:10.3390/w12061645&#34; class=&#34;uri&#34;&gt;doi:10.3390/w12061645&lt;/a&gt;&lt;a href=&#34;#fnref3&#34; class=&#34;footnote-back&#34;&gt;↩︎&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn4&#34;&gt;&lt;p&gt;simulated population conditional on the model - no sampling error is considered here. For population inference that takes into account sampling error, see tolerance intervals and the tolerance package in R&lt;a href=&#34;#fnref4&#34; class=&#34;footnote-back&#34;&gt;↩︎&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn5&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://en.wikipedia.org/wiki/Goodman_relation&#34; class=&#34;uri&#34;&gt;https://en.wikipedia.org/wiki/Goodman_relation&lt;/a&gt;&lt;a href=&#34;#fnref5&#34; class=&#34;footnote-back&#34;&gt;↩︎&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn6&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://bookdown.org/egarpor/NP-UC3M/#welcome&#34; class=&#34;uri&#34;&gt;https://bookdown.org/egarpor/NP-UC3M/#welcome&lt;/a&gt;&lt;a href=&#34;#fnref6&#34; class=&#34;footnote-back&#34;&gt;↩︎&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn7&#34;&gt;&lt;p&gt;Adapted from this Stack Overflow response: &lt;a href=&#34;https://stackoverflow.com/questions/23437000/how-to-plot-a-contour-line-showing-where-95-of-values-fall-within-in-r-and-in&#34; class=&#34;uri&#34;&gt;https://stackoverflow.com/questions/23437000/how-to-plot-a-contour-line-showing-where-95-of-values-fall-within-in-r-and-in&lt;/a&gt;&lt;a href=&#34;#fnref7&#34; class=&#34;footnote-back&#34;&gt;↩︎&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
+</description>
+    </item>
     
     <item>
       <title>Simulation With a Random Effects Model - Gage R&amp;R as a Case Study</title>
