@@ -156,6 +156,7 @@ curv_pressure_mplt &lt;- ggExtra::ggMarginal(curv_pressure_plt, type = &quot;den
 <p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-8-1.png" width="100%" height="500px" />
 We see that there are some positive correlations in this dataset.</p>
 <p>To build out the sample into a simulated population we will fit a MLE estimate and use the model to push out a lot of predictions. If each variable was independent the job would be easy - just execute a few rlnorm()s and bind them together. The job is more challenging when the variables are correlated because they must be simulated all at once. I will show 2 approaches in the sections below. Note that the 2nd approach is more efficient but it helped me to walk through the first one to understand the workflow. If you are impatient I would skip to the section on approach 2.</p>
+<p><strong><em>EDIT 10 JANUARY 2021: After publishing this post I came to understand that the kernel density estimations towards the end require a boundary adjustment due to the lognormal shape of the data. I will be posting an update as soon as I can free up a bit of time. The coverage in that section is not wrong on a percentage basis but assigns positive probability to regions where no points would exist</em></strong></p>
 </div>
 <div id="approach-1---manually-transform-everything-to-normal" class="section level1">
 <h1>Approach 1 - Manually Transform Everything to Normal</h1>
