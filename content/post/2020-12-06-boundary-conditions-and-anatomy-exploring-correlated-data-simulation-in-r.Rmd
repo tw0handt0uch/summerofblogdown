@@ -216,6 +216,8 @@ We see that there are some positive correlations in this dataset.
 
 To build out the sample into a simulated population we will fit a MLE estimate and use the model to push out a lot of predictions.  If each variable was independent the job would be easy - just execute a few rlnorm()s and bind them together.  The job is more challenging when the variables are correlated because they must be simulated all at once.  I will show 2 approaches in the sections below.  Note that the 2nd approach is more efficient but it helped me to walk through the first one to understand the workflow. If you are impatient I would skip to the section on approach 2.
 
+*EDIT 10 JANUARY 2021: After publishing this post I came to understand that the kernel density estimations towards the end require a boundary adjustment due to the lognormal shape of the data.  I will be posting an update as soon as I can free up a bit of time.  The coverage in that section is not wrong on a percentage basis but assigns positive probability to regions where no points would exist*
+
 # Approach 1 - Manually Transform Everything to Normal 
 
 For cases where each variable is normal or can be easily transformed there is a straightforward and relatively simple workflow to generate simulated joint distribution using the __mvrnorm()__ function from the MASS package:
