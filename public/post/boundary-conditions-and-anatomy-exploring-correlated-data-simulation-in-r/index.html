@@ -261,10 +261,7 @@
 
 
 <p>Measurements taken from patient anatomy are often correlated. For example, larger blood vessels might tend to have less curvature. Additionally, data are rarely Gaussian, favoring skewed shapes with some very large values and a lower bound of zero. These properties can make simulation and inference hard. In this post I will walk through a workflow for an engineering problem that might be presented in my industry. It involves simulating a population of patients and identifying a subset of interest.</p>
-<p>Imagine we have been assigned the task of identifying boundary conditions for a benchtop durability test of an implantable, artificial heart valve. In other words, we need to identify credible parameters for a physical test such that our test engineers can challenge the device under severe but realistic geometries and loads. To facilitate this task our clinical team has analyzed images and extracted pressure measurements and geometric features for a sample of n=300 patients. The rest of this post explores what we should do with these data.</p>
-<p>For the sake of simplicity, assume that the three parameters we care about are the <strong><em>ellipticity</em></strong> of the vessel cross section, <strong><em>curvature</em></strong> of the vessel in the vessel region of interest, and the blood <strong><em>pressure</em></strong>. Features such as these are important because they influence both the equilibrium geometry and the magnitude of forces acting on the implantable valve (in other words: the boundary conditions). The image below shows a schematic/example of ellipticity and vessel curvature in the LVOT and aortic valve annulus as observed in CT imaging.<a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a></p>
-<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/ellipticity_curvature.png" style="width:100.0%;height:100.0%" /></p>
-<p>There are two main challenges when working with these data:</p>
+<p>Imagine we have been assigned the task of identifying boundary conditions for a benchtop durability test of an implantable, artificial heart valve. In other words, we need to identify credible parameters for a physical test such that our test engineers can challenge the device under severe but realistic geometries and loads. To facilitate this task our clinical team has analyzed images and extracted measurements for the features of interest in a subset of n=300 patients. There are two main challenges when working with these data:</p>
 <blockquote>
 <ul>
 <li><strong>How do we use our sample to simulate the full population?</strong></li>
@@ -275,8 +272,12 @@
 <li><strong>How do we use the simulated, full population to identify groups of interest and recommend boundary conditions for the test</strong></li>
 </ul>
 </blockquote>
-<p>Here is our dataset.<a href="#fn2" class="footnote-ref" id="fnref2"><sup>2</sup></a> It turns out that each of these features can be well described by a <strong>lognormal distribution</strong> and we will assume that this is confirmed via prior domain knowledge. Large pressures, large ellipticities, and small radius of curvature are all bad because they would represent more extreme geometries and/or loads for the implant to resist without migrating or fracturing.</p>
-<p>As normal, we’re working in R and will lean on the tidyverse packages to accelerate things. I wasn’t intending for this post to go as long as it did so I’m also offering this table of contents to show I bear no malice.</p>
+<p>The rest of this post explores what we should do with these data to resolve these challenges and identify appropriate and realistic test conditions.</p>
+<div id="the-data" class="section level1">
+<h1>The Data</h1>
+<p>Suppose the three parameters our team cares about are the <strong><em>ellipticity</em></strong> of the vessel cross section, <strong><em>curvature</em></strong> of the vessel in the vessel region of interest, and the blood <strong><em>pressure</em></strong>. Features such as these are important because they influence both the equilibrium geometry and the magnitude of forces acting on the implantable valve (in other words: the boundary conditions). The image below shows a schematic/example of ellipticity and vessel curvature in the LVOT and aortic valve annulus as observed in CT imaging.<a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a></p>
+<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/ellipticity_angulation.png" style="width:100.0%;height:100.0%" /></p>
+<p>I enjoy the tidyverse toolset for exploring and working with data so let’s get that loaded up along with some other packages that will help in the analysis to come.</p>
 <pre class="r"><code>library(readxl)
 library(knitr)
 library(DiagrammeR)
@@ -291,10 +292,30 @@ library(GGally)
 library(car)
 library(rgl)
 library(anySim)
-library(tidyverse)</code></pre>
+library(tidyverse)
+library(plotly)</code></pre>
 <ul>
+<li><a href="#the-data">The Data</a></li>
 <li><a href="#correlations-in-the-original-dataset">Correlations in the Original Dataset</a></li>
-<li><a href="#approach-1---manually-transform-everything-to-normal">Approach 1 - Manually Transform Everything to Normal</a>
+<li><a href="#anysim---generate-simulated-population-of-correlated-patient-data">AnySim - Generate Simulated Population of Correlated Patient Data</a></li>
+<li><a href="#kernel-density-estimation---map-density-contours-to-data">Kernel Density Estimation - Map Density Contours to Data</a></li>
+<li><a href="#naive-method---apply-default-kde-to-lognormal-data">Naive Method - Apply Default KDE to Lognormal Data</a>
+<ul>
+<li><a href="#estimate-kde">Estimate kde</a></li>
+<li><a href="#density-proportions-from-kde-estimate">Density proportions from kde estimate</a></li>
+<li><a href="#kde-estimates-in-the-range-of-the-variables">KDE estimates in the range of the variables</a></li>
+<li><a href="#density-plot-with-probability-contours-in-3d">Density Plot with Probability Contours in 3d</a></li>
+</ul></li>
+<li><a href="#fit-kde-to-normal-data-transform-later">Fit KDE to normal data transform later</a>
+<ul>
+<li><a href="#density-proportions-from-kde-estimate">Density proportions from kde estimate</a></li>
+<li><a href="#kde-estimates-in-the-range-of-the-variables">KDE estimates in the range of the variables</a></li>
+<li><a href="#density-plot-with-probability-contours-in-3d">Density Plot with Probability Contours in 3d</a></li>
+<li><a href="#transform-data-and-kde-contour-to-original-scale">Transform data and kde contour to original scale</a></li>
+<li><a href="#plot-back-transformed-data-with-plotly">Plot Back-Transformed Data with Plotly</a></li>
+</ul></li>
+<li><a href="#filter-extreme-points-and-assess-points-on-95/5-contour">Filter extreme points and assess points on 95/5 contour</a></li>
+<li><a href="#appendix-a---simulating-a-multivariate-distribution-with-mass::mvnorm()">Appendix A - simulating a multivariate distribution with mass::mvnorm()</a>
 <ul>
 <li><a href="#step-1---fit-distributions-to-each-variable">Step 1 - Fit Distributions to Each Variable</a></li>
 <li><a href="#step-2---transform-all-variables-to-normal">Step 2 - Transform all variables to normal</a></li>
@@ -304,16 +325,7 @@ library(tidyverse)</code></pre>
 <li><a href="#step-6---evaluate-parameters-and-marginal-distributions-of-the-back-transfomed-data">Step 6 - Evaluate parameters and marginal distributions of the back-transfomed data</a></li>
 <li><a href="#compare-original-data-to-simulated-data">Compare Original Data to Simulated Data</a></li>
 </ul></li>
-<li><a href="#approach-2---anysim">Approach 2 - AnySim</a></li>
-<li><a href="#using-the-simulated-population-to-define-desired-test-conditions-and-groups-of-interest">Using the Simulated Population to Define Desired Test Conditions and Groups of Interest</a>
-<ul>
-<li><a href="#identify-a-percentage-of-worst-case-patients-relative-to-some-value-of-interest">Identify a percentage of worst-case patients relative to some value of interest</a></li>
-<li><a href="#identify-probability-contours-using-ks-package-and-kernel-density-estimation">Identify probability contours using ks package and kernel density estimation</a></li>
-<li><a href="#density-percentiles-from-kde-estimate">Density percentiles from kde estimate</a></li>
-<li><a href="#kde-estimates-in-the-range-of-the-variables">KDE estimates in the range of the variables</a></li>
-<li><a href="#density-plot-with-probability-contours-in-2d">Density Plot with Probability Contours in 2d</a></li>
-<li><a href="#density-plot-with-probability-contours-in-3d">Density Plot with Probability Contours in 3d</a></li>
-</ul></li>
+<li><a href="#appendix-b---2d-kde-plot-with-probability-traces">Appendix B - 2d kde plot with probability traces</a></li>
 </ul>
 <p>Start by reading in the data and taking a look at the format.</p>
 <pre class="r"><code>sample_data &lt;- readRDS(file = &quot;sim_anatomy_data.rds&quot;)
@@ -333,11 +345,8 @@ sample_data</code></pre>
 ## 10  1.09  2.04    109. 
 ## # ... with 290 more rows</code></pre>
 <p>As expected, 300 rows with our 3 features of interest.</p>
-<p>Key Point:</p>
-<blockquote>
-<p><strong><strong>Since we are asked to find a worst-case set of values, it might seem reasonable or tempting to extract the maximum value from each group (or maybe something like the 95th percentile) and report those values together as a conservative worst-case for ellipticity, curvature, and pressure. Our test engineers would then set up a benchtop test to challenge our prototype devices in those same conditions to see if they survive. The problem with this approach is that each row of data is from a specific patient, so the variables may be correlated. It could be that those severe, 95th percentile values for each variable never occur together in the same patient. If we choose them together, we would over-test the device and over-design the device, potentially setting the program way behind. We must instead look at the data as a joint distribution and investigate correlations and covariance among the variables.</strong></strong></p>
-</blockquote>
-<p>Let’s verify the shape of the distributions for each feature and see if there is any correlation between the variables:</p>
+<p>It might seem tempting at this point to extract the maximum value from each group (or maybe something like the 95th percentile) and report those values together as a conservative worst-case. The problem with this approach is that each row of data is from a specific patient, so the variables are likely to be correlated. It could be that those severe values for each variable never occur together in the same patient. If we choose them all, we could over-test the device and over-design the device, potentially setting the program way behind. A more sophisticated approach is to consider the variables as a joint distribution and respect any correlation that may be present.</p>
+<p>Here is some code to visualize the marginal distributions.</p>
 <pre class="r"><code>ellip_curv_plt &lt;- sample_data %&gt;%
   ggplot(aes(x = ellip, y = curv)) +
   geom_point(alpha = .5) +
@@ -374,6 +383,8 @@ curv_pressure_mplt &lt;- ggExtra::ggMarginal(curv_pressure_plt, type = &quot;den
 <p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-5-1.png" width="100%" height="500px" /></p>
 <p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-6-1.png" width="100%" height="500px" /></p>
 <p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-7-1.png" width="100%" height="500px" /></p>
+<p>The variables are strictly positive and show some skew. Let’s assume that from domain knowledge we know these variables to be well described by a lognormal. The visuals would be consistent with this assumption.</p>
+</div>
 <div id="correlations-in-the-original-dataset" class="section level1">
 <h1>Correlations in the Original Dataset</h1>
 <p>ggcorr() from the GGally package is very convenient for visualizing correlations.</p>
@@ -393,16 +404,1247 @@ curv_pressure_mplt &lt;- ggExtra::ggMarginal(curv_pressure_plt, type = &quot;den
   )</code></pre>
 <p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-8-1.png" width="100%" height="500px" />
 We see that there are some positive correlations in this dataset.</p>
-<p>To build out the sample into a simulated population we will fit a MLE estimate and use the model to push out a lot of predictions. If each variable was independent the job would be easy - just execute a few rlnorm()s and bind them together. The job is more challenging when the variables are correlated because they must be simulated all at once. I will show 2 approaches in the sections below. Note that the 2nd approach is more efficient but it helped me to walk through the first one to understand the workflow. If you are impatient I would skip to the section on approach 2.</p>
-<p><strong><em>EDIT 10 JANUARY 2021: After publishing this post I came to understand that the kernel density estimations towards the end require a boundary adjustment due to the lognormal shape of the data. I will be posting an update as soon as I can free up a bit of time. The coverage in that section is not wrong on a percentage basis but assigns positive probability to regions where no points would exist</em></strong></p>
+<p>To build out the sample into a simulated population we will fit a MLE estimate and use the model to push out a lot of predictions.<a href="#fn2" class="footnote-ref" id="fnref2"><sup>2</sup></a> If the variables were not correlated, we could just execute a few rlnorm()’s and bind them together. The job is more challenging when the variables are correlated because they must be simulated all at once.</p>
+<p>I know of 2 convenient engines in R to generate an arbitrary number of random values from a correlated, multivariate distribution:</p>
+<p><strong>AnySim::SimCorrRVs</strong> : For this method you specify the parameters of the marginal distributions and correlation matrix.<a href="#fn3" class="footnote-ref" id="fnref3"><sup>3</sup></a><br />
+<strong>mass::mvnorm()</strong> : For this method you transform each distribution to normal and supply the mean and sd of each variable along with the covariance matrix.</p>
+<p>My personal preference is for the AnySim method which I’ll show below. The code for executing a similar simulation with mass::mvnorm() is shown in Appendix A.</p>
 </div>
-<div id="approach-1---manually-transform-everything-to-normal" class="section level1">
-<h1>Approach 1 - Manually Transform Everything to Normal</h1>
-<p>For cases where each variable is normal or can be easily transformed there is a straightforward and relatively simple workflow to generate simulated joint distribution using the <strong>mvrnorm()</strong> function from the MASS package:</p>
+<div id="anysim---generate-simulated-population-of-correlated-patient-data" class="section level1">
+<h1>AnySim - Generate Simulated Population of Correlated Patient Data</h1>
+<p>The AnySim workflow:</p>
 <div id="htmlwidget-1" style="width:100%;height:500px;" class="grViz html-widget"></div>
-<script type="application/json" data-for="htmlwidget-1">{"x":{"diagram":"digraph flowchart {\n      # node definitions with substituted label text\n      node [fontname = Helvetica, shape = rectangle, fillcolor = yellow]        \n      tab1 [label = \"Step 1: Fit distributions to each variable in the original dataset.\n Note parameters, correlations, covariances in original data\"]\n      tab2 [label = \"Step 2: Transform all variables to normal\"]\n      tab3 [label = \"Step 3: Fit normal distributions to each transformed variablet.\n Note parameters, correlations, covariances in transformed data\"]\n      tab4 [label = \"Step 4: Draw joint distribution using MASS::mvrnorm() or equivalent function.\n Use parameters and covariance matrix from normal, transformed data\"]\n      tab5 [label = \"Step 5: Back-transform simulated data to original distribution\"]\n      tab6 [label = \"Step 6: Evaluate parameters and marginal distributions of the back-transfomed data.\n Compare to raw, original data to see if marginals and correlations were recreated in the sim\"]\n      # edge definitions with the node IDs\n      tab1 -> tab2 -> tab3 -> tab4 -> tab5 -> tab6;\n      }\n      ","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>
-<p>In our case, we can easily convert our data from lognormal to normal and will then be able to use the mvrnorm() function to draw from a multivariate normal distribution and then undo the transformation later to recover a simulated population with desired correlations (as shown above). From there we can identify patients of interest, whether they be extreme challenging cases or a central, common group.</p>
-<p>Per the workflow above, start by fitting the native data to lognormal distributions using fitdist() and extract the parameters. Storing all the parameters as objects is a bit tedious and I only do it here so we can make a nice summary table of everything at the end.</p>
+<script type="application/json" data-for="htmlwidget-1">{"x":{"diagram":"digraph flowchart {\n      # node definitions with substituted label text\n      node [fontname = Helvetica, shape = rectangle, fillcolor = yellow]        \n      tab1 [label = \"Step 1: Specify desired distributions for each variable and store as object\"]\n      tab2 [label = \"Step 2: Specify parameters for each variable and store as object\"]\n      tab3 [label = \"Step 3: Specify desired correlation matrix and store as object\"]\n      tab4 [label = \"Step 4: Provide the above information to EstCorrRVs() to estimate\n parameters of auxiliary Gaussian model\"]\n      tab5 [label = \"Step 5: Generate simulated values using SimcorrRVs()\"]\n      # edge definitions with the node IDs\n      tab1 -> tab2 -> tab3 -> tab4 -> tab5;\n      }\n      ","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>
+<p>First: fit distributions to the original data and calculate correlations.</p>
+<pre class="r"><code>ellip_fit &lt;- fitdist(sample_data$ellip, &quot;lnorm&quot;)
+curv_fit &lt;- fitdist(sample_data$curv, &quot;lnorm&quot;)
+pressure_fit &lt;- fitdist(sample_data$pressure, &quot;lnorm&quot;)
+
+# store lognormal parameters of original data
+ellip_meanlog &lt;- ellip_fit$estimate[[&quot;meanlog&quot;]]
+ellip_sdlog &lt;- ellip_fit$estimate[[&quot;sdlog&quot;]]
+curv_meanlog &lt;- curv_fit$estimate[[&quot;meanlog&quot;]]
+curv_sdlog &lt;- curv_fit$estimate[[&quot;sdlog&quot;]]
+pressure_meanlog &lt;- pressure_fit$estimate[[&quot;meanlog&quot;]]
+pressure_sdlog &lt;- pressure_fit$estimate[[&quot;sdlog&quot;]]
+
+# store correlations in original data
+cor_ec &lt;- cor(x = sample_data$ellip, y = sample_data$curv)
+cor_ep &lt;- cor(x = sample_data$ellip, y = sample_data$pressure)
+cor_cp &lt;- cor(x = sample_data$curv, y = sample_data$pressure)</code></pre>
+<p>Apply the AnySim workflow. Note that this too goes through an auxiliary normal intermediate step.</p>
+<pre class="r"><code>set.seed(1234)
+
+# Define the target distribution functions (ICDFs) of each random variable.
+
+ellip_dist &lt;- &quot;qlnorm&quot;
+curv_dist &lt;- &quot;qlnorm&quot;
+pressure_dist &lt;- &quot;qlnorm&quot;
+
+# store the 3 ICDFs in a vector
+dist_vec &lt;- c(ellip_dist, curv_dist, pressure_dist)
+
+# Define the parameters of the target distribution functions - store them in a list
+ellip_params &lt;- list(meanlog = ellip_meanlog, sdlog = ellip_sdlog)
+curv_params &lt;- list(meanlog = curv_meanlog, sdlog = curv_sdlog)
+pressure_params &lt;- list(meanlog = pressure_meanlog, sdlog = pressure_sdlog)
+
+# this is a weird way to do it but I&#39;m following along with an example from AnySim vignette :)
+params_list &lt;- list(NULL)
+params_list[[1]] &lt;- ellip_params
+params_list[[2]] &lt;- curv_params
+params_list[[3]] &lt;- pressure_params
+
+# Define the target correlation matrix.
+corr_matrix &lt;- matrix(c(
+  1, 0.268, 0.369,
+  0.268, 1, .213,
+  0.369, 0.213, 1
+),
+ncol = 3,
+nrow = 3,
+byrow = T
+)
+# Estimate the parameters of the auxiliary Gaussian model.
+aux_gaussion_param_tbl &lt;- EstCorrRVs(
+  R = corr_matrix, dist = dist_vec, params = params_list,
+  NatafIntMethod = &quot;GH&quot;, NoEval = 9, polydeg = 8
+)
+
+
+# Generate 10000 synthetic realizations of the 3 correlated RVs.
+correlated_ln_draws_tbl &lt;- as_tibble(SimCorrRVs(n = 10000, paramsRVs = aux_gaussion_param_tbl)) %&gt;%
+  rename(
+    ellip = V1,
+    curv = V2,
+    pressure = V3
+  )
+
+correlated_ln_draws_tbl %&gt;%
+  head(10) %&gt;%
+  kable(align = &quot;c&quot;)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">ellip</th>
+<th align="center">curv</th>
+<th align="center">pressure</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">1.123496</td>
+<td align="center">1.674471</td>
+<td align="center">78.14516</td>
+</tr>
+<tr class="even">
+<td align="center">1.234755</td>
+<td align="center">3.927320</td>
+<td align="center">104.53631</td>
+</tr>
+<tr class="odd">
+<td align="center">1.299794</td>
+<td align="center">4.071074</td>
+<td align="center">116.55043</td>
+</tr>
+<tr class="even">
+<td align="center">1.045001</td>
+<td align="center">2.721336</td>
+<td align="center">106.23896</td>
+</tr>
+<tr class="odd">
+<td align="center">1.246727</td>
+<td align="center">5.091741</td>
+<td align="center">102.83055</td>
+</tr>
+<tr class="even">
+<td align="center">1.252843</td>
+<td align="center">2.869394</td>
+<td align="center">93.24030</td>
+</tr>
+<tr class="odd">
+<td align="center">1.169606</td>
+<td align="center">1.613312</td>
+<td align="center">125.12784</td>
+</tr>
+<tr class="even">
+<td align="center">1.171699</td>
+<td align="center">2.921069</td>
+<td align="center">156.06701</td>
+</tr>
+<tr class="odd">
+<td align="center">1.170371</td>
+<td align="center">2.672507</td>
+<td align="center">145.82545</td>
+</tr>
+<tr class="even">
+<td align="center">1.146382</td>
+<td align="center">3.030319</td>
+<td align="center">89.91766</td>
+</tr>
+</tbody>
+</table>
+<p>Evaluate recovered marginal distributions with some helper functions:</p>
+<pre class="r"><code>extract_params_sim_fcn &lt;- function(var, fit_to) {
+  tidy(fitdistr(correlated_ln_draws_tbl %&gt;% pull(var), fit_to)) %&gt;%
+    mutate(
+      var = {
+        var
+      },
+      dataset = &quot;sim_draws&quot;
+    )
+}
+
+extract_params_pat_fcn &lt;- function(var, fit_to) {
+  tidy(fitdistr(sample_data %&gt;% pull(var), fit_to)) %&gt;%
+    mutate(
+      var = {
+        var
+      },
+      dataset = &quot;patient_set&quot;
+    )
+}
+
+sim_results_tbl &lt;- tibble(
+  var = c(&quot;ellip&quot;, &quot;curv&quot;, &quot;pressure&quot;),
+  fit_to = rep(&quot;lognormal&quot;, 3)
+) %&gt;%
+  mutate(params = map2(.x = var, .y = fit_to, .f = extract_params_sim_fcn)) %&gt;%
+  unnest() %&gt;%
+  dplyr::select(-var1)
+
+pat_results_tbl &lt;- tibble(
+  var = c(&quot;ellip&quot;, &quot;curv&quot;, &quot;pressure&quot;),
+  fit_to = rep(&quot;lognormal&quot;, 3)
+) %&gt;%
+  mutate(params = map2(.x = var, .y = fit_to, .f = extract_params_pat_fcn)) %&gt;%
+  unnest() %&gt;%
+  dplyr::select(-var1)
+
+sim_results_tbl %&gt;%
+  bind_rows(pat_results_tbl) %&gt;%
+  select(-std.error) %&gt;%
+  pivot_wider(id_cols = everything(), names_from = &quot;dataset&quot;, values_from = &quot;estimate&quot;) %&gt;%
+  kable(align = &quot;c&quot;)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">var</th>
+<th align="center">fit_to</th>
+<th align="center">term</th>
+<th align="center">sim_draws</th>
+<th align="center">patient_set</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">ellip</td>
+<td align="center">lognormal</td>
+<td align="center">meanlog</td>
+<td align="center">0.1936145</td>
+<td align="center">0.1932254</td>
+</tr>
+<tr class="even">
+<td align="center">ellip</td>
+<td align="center">lognormal</td>
+<td align="center">sdlog</td>
+<td align="center">0.0628128</td>
+<td align="center">0.0636092</td>
+</tr>
+<tr class="odd">
+<td align="center">curv</td>
+<td align="center">lognormal</td>
+<td align="center">meanlog</td>
+<td align="center">1.1561942</td>
+<td align="center">1.1579793</td>
+</tr>
+<tr class="even">
+<td align="center">curv</td>
+<td align="center">lognormal</td>
+<td align="center">sdlog</td>
+<td align="center">0.3114360</td>
+<td align="center">0.3091606</td>
+</tr>
+<tr class="odd">
+<td align="center">pressure</td>
+<td align="center">lognormal</td>
+<td align="center">meanlog</td>
+<td align="center">4.7841496</td>
+<td align="center">4.7831767</td>
+</tr>
+<tr class="even">
+<td align="center">pressure</td>
+<td align="center">lognormal</td>
+<td align="center">sdlog</td>
+<td align="center">0.1896585</td>
+<td align="center">0.1910081</td>
+</tr>
+</tbody>
+</table>
+<p>Evaluate recovered correlations:</p>
+<pre class="r"><code>correlated_ln_draws_tbl %&gt;% ggcorr(
+  high = &quot;#20a486ff&quot;,
+  low = &quot;#fde725ff&quot;,
+  label = TRUE,
+  hjust = .75,
+  size = 3,
+  label_size = 3,
+  label_round = 3,
+  nbreaks = 3
+) +
+  labs(
+    title = &quot;Correlation Matrix - n=10000 Simulation Set&quot;,
+    subtitle = &quot;Pearson Method Using Pairwise Observations&quot;
+  )</code></pre>
+<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-13-1.png" width="100%" height="500px" /></p>
+<p>Let’s take a look at the simulated population:</p>
+<pre class="r"><code>fig &lt;- plotly::plot_ly()
+
+fig &lt;- fig %&gt;% add_trace(x = correlated_ln_draws_tbl$ellip, y = correlated_ln_draws_tbl$curv, z = correlated_ln_draws_tbl$pressure, type = &quot;scatter3d&quot;, opacity = .4, hoverinfo = &quot;none&quot;, size = .1)
+
+fig &lt;- fig %&gt;%
+  layout(scene = list(
+    xaxis = list(title = &quot;ellip&quot;),
+    yaxis = list(title = &quot;curv&quot;),
+    zaxis = list(title = &quot;pressure&quot;)
+  )) %&gt;%
+  layout(scene = list(
+    xaxis = list(showspikes = FALSE),
+    yaxis = list(showspikes = FALSE),
+    zaxis = list(showspikes = FALSE)
+  ))
+
+# fig</code></pre>
+<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/j1.png" style="width:100.0%;height:100.0%" /></p>
+<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/j2.png" style="width:100.0%;height:100.0%" />
+<img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/j3.png" style="width:100.0%;height:100.0%" /></p>
+</div>
+<div id="kernel-density-estimation---map-density-contours-to-data" class="section level1">
+<h1>Kernel Density Estimation - Map Density Contours to Data</h1>
+<p>The above tables and figures confirm the simulated population maintains the correlation structure and marginal distributions from the original sample as intended. The next step will be to build out some density estimates using a non-parametric, kernel density estimator. The reason we would want to do this is to understand the regions where data points are likely to fall and we can use the reference contours to identify the most extreme patients relative to the mode or to some region of interest.</p>
+<p><strong>Important Watch-Out</strong> : The exact workflow for generating and applying the kernel density estimate may vary depending on the data type. The default kde procedures may assign probabilities to regions outside the rigid boundaries when data does not have infinite support. This will occur for our dataset, since all of our variables are lognormal and should therefore never be negative. Methods for addressing this behavior include variable bandwidth estimators, transformations of estimators, and boundary estimators. To illustrate this problem and provide an example of resolution, I will show 2 parallel workflows below:</p>
+<ul>
+<li>In the first, I apply the default global bandwidth kde to the simulated data</li>
+<li>In the second, I transform the data from lognormal to normal, apply the kde, then backtransform to lognormal</li>
+</ul>
+<p>Towards that end, I’ll add some more variables for transformed, normal version of each variable:</p>
+<pre class="r"><code>corr_draws_tbl &lt;- correlated_ln_draws_tbl %&gt;%
+  mutate(
+    ellip_n = log(ellip),
+    curv_n = log(curv),
+    pressure_n = log(pressure)
+  ) %&gt;%
+  select(ellip_n, curv_n, pressure_n)
+
+corr_draws_tbl %&gt;%
+  head(5) %&gt;%
+  kable(aalign = &quot;c&quot;)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="right">ellip_n</th>
+<th align="right">curv_n</th>
+<th align="right">pressure_n</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">0.1164450</td>
+<td align="right">0.5154974</td>
+<td align="right">4.358568</td>
+</tr>
+<tr class="even">
+<td align="right">0.2108725</td>
+<td align="right">1.3679574</td>
+<td align="right">4.649534</td>
+</tr>
+<tr class="odd">
+<td align="right">0.2622058</td>
+<td align="right">1.4039068</td>
+<td align="right">4.758324</td>
+</tr>
+<tr class="even">
+<td align="right">0.0440175</td>
+<td align="right">1.0011228</td>
+<td align="right">4.665691</td>
+</tr>
+<tr class="odd">
+<td align="right">0.2205217</td>
+<td align="right">1.6276199</td>
+<td align="right">4.633083</td>
+</tr>
+</tbody>
+</table>
+<p>Quick visual check to verify the transformed properly:</p>
+<pre class="r"><code>corr_draws_tbl %&gt;%
+  pivot_longer(cols = everything()) %&gt;%
+  ggplot(aes(x = value)) +
+  geom_density() +
+  facet_wrap(~name, scales = &quot;free&quot;)</code></pre>
+<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-16-1.png" width="100%" height="500px" /></p>
+</div>
+<div id="naive-method---apply-default-kde-to-lognormal-data" class="section level1">
+<h1>Naive Method - Apply Default KDE to Lognormal Data</h1>
+<div id="estimate-kde" class="section level2">
+<h2>Estimate kde</h2>
+<p>The kde is constructed as follows:<a href="#fn4" class="footnote-ref" id="fnref4"><sup>4</sup></a></p>
+<p>This first chunk converts the data and generates the kde. The bandwidth parameters controls the “smoothness” or granularity of the estimate and can be hard to specify in multiple dimensions. Hscv() provides a method of determining a reasonable bandwidth through cross-validation; see documentation in footnotes for more information if interested.</p>
+<pre class="r"><code># convert simulated data tibble to matrix
+d3m &lt;- correlated_ln_draws_tbl %&gt;%
+  as.matrix()
+
+# cross-validated bandwidth for kd (takes a while to calculate)
+# hscv1 &lt;- Hscv(correlated_ln_draws_tbl)
+# hscv1 %&gt;% write_rds(here::here(&quot;hscv1.rds&quot;))
+
+hscv1 &lt;- read_rds(here::here(&quot;hscv1.rds&quot;))
+
+# generate kernel density estimate from simulated population
+kd_d3m &lt;- ks::kde(d3m, H = hscv1, compute.cont = TRUE)</code></pre>
+</div>
+<div id="density-proportions-from-kde-estimate" class="section level2">
+<h2>Density proportions from kde estimate</h2>
+<pre class="r"><code># see the kde&#39;s calculated density thresholds for specified proportions
+cont_vals_tbl &lt;- tidy(kd_d3m$cont) %&gt;%
+  mutate(n_row = row_number()) %&gt;%
+  mutate(probs = 100 - n_row) %&gt;%
+  select(probs, x)
+
+reference_grid_probs_tbl &lt;- cont_vals_tbl %&gt;%
+  rename(estimate = x)
+
+reference_grid_probs_tbl %&gt;%
+  head(10) %&gt;%
+  kable(align = rep(&quot;c&quot;))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">probs</th>
+<th align="center">estimate</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">99</td>
+<td align="center">0.0342569</td>
+</tr>
+<tr class="even">
+<td align="center">98</td>
+<td align="center">0.0333578</td>
+</tr>
+<tr class="odd">
+<td align="center">97</td>
+<td align="center">0.0326260</td>
+</tr>
+<tr class="even">
+<td align="center">96</td>
+<td align="center">0.0318672</td>
+</tr>
+<tr class="odd">
+<td align="center">95</td>
+<td align="center">0.0312299</td>
+</tr>
+<tr class="even">
+<td align="center">94</td>
+<td align="center">0.0305985</td>
+</tr>
+<tr class="odd">
+<td align="center">93</td>
+<td align="center">0.0300632</td>
+</tr>
+<tr class="even">
+<td align="center">92</td>
+<td align="center">0.0293781</td>
+</tr>
+<tr class="odd">
+<td align="center">91</td>
+<td align="center">0.0289256</td>
+</tr>
+<tr class="even">
+<td align="center">90</td>
+<td align="center">0.0283849</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="kde-estimates-in-the-range-of-the-variables" class="section level2">
+<h2>KDE estimates in the range of the variables</h2>
+<p>By default the KDE provides density estimates for a grid of points that covers the space of the variables.</p>
+<pre class="r"><code>kd_grid_estimates &lt;- kd_d3m</code></pre>
+<p>If we want to know the value at each point in the simulated population we use the eval.points argument.</p>
+<pre class="r"><code>mc_estimates &lt;- ks::kde(
+  x = d3m, H = hscv1,
+  compute.cont = TRUE,
+  eval.points = correlated_ln_draws_tbl %&gt;% as.matrix()
+)</code></pre>
+<p>Here are a couple different ways to convert the kde object features into a tibble:</p>
+<pre class="r"><code>mc_est_tbl_10000 &lt;- tibble(estimate = mc_estimates$estimate) %&gt;%
+  bind_cols(correlated_ln_draws_tbl)</code></pre>
+<pre class="r"><code>kd_grid_est_tbl_29k &lt;- broom:::tidy.kde(kd_grid_estimates) %&gt;%
+  pivot_wider(names_from = variable, values_from = value) %&gt;%
+  rename(ellip = x1, curv = x2, pressure = x3) %&gt;%
+  select(-obs)</code></pre>
+<p>Each data point in our population has a estimate. Each data point on the grid that covers the space of interest has an estimate.</p>
+<pre class="r"><code>mc_est_tbl_10000 %&gt;%
+  head(10) %&gt;%
+  kable(align = &quot;c&quot;)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">estimate</th>
+<th align="center">ellip</th>
+<th align="center">curv</th>
+<th align="center">pressure</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">0.0032540</td>
+<td align="center">1.123496</td>
+<td align="center">1.674471</td>
+<td align="center">78.14516</td>
+</tr>
+<tr class="even">
+<td align="center">0.0167218</td>
+<td align="center">1.234755</td>
+<td align="center">3.927320</td>
+<td align="center">104.53631</td>
+</tr>
+<tr class="odd">
+<td align="center">0.0114561</td>
+<td align="center">1.299794</td>
+<td align="center">4.071074</td>
+<td align="center">116.55043</td>
+</tr>
+<tr class="even">
+<td align="center">0.0042927</td>
+<td align="center">1.045001</td>
+<td align="center">2.721336</td>
+<td align="center">106.23896</td>
+</tr>
+<tr class="odd">
+<td align="center">0.0050883</td>
+<td align="center">1.246727</td>
+<td align="center">5.091741</td>
+<td align="center">102.83055</td>
+</tr>
+<tr class="even">
+<td align="center">0.0123645</td>
+<td align="center">1.252843</td>
+<td align="center">2.869394</td>
+<td align="center">93.24030</td>
+</tr>
+<tr class="odd">
+<td align="center">0.0073055</td>
+<td align="center">1.169606</td>
+<td align="center">1.613312</td>
+<td align="center">125.12784</td>
+</tr>
+<tr class="even">
+<td align="center">0.0061654</td>
+<td align="center">1.171699</td>
+<td align="center">2.921069</td>
+<td align="center">156.06701</td>
+</tr>
+<tr class="odd">
+<td align="center">0.0103851</td>
+<td align="center">1.170371</td>
+<td align="center">2.672507</td>
+<td align="center">145.82545</td>
+</tr>
+<tr class="even">
+<td align="center">0.0158417</td>
+<td align="center">1.146382</td>
+<td align="center">3.030319</td>
+<td align="center">89.91766</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>kd_grid_est_tbl_29k %&gt;%
+  head(10) %&gt;%
+  kable(align = &quot;c&quot;)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">estimate</th>
+<th align="center">ellip</th>
+<th align="center">curv</th>
+<th align="center">pressure</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">0</td>
+<td align="center">0.8949674</td>
+<td align="center">-0.0080549</td>
+<td align="center">30.51151</td>
+</tr>
+<tr class="even">
+<td align="center">0</td>
+<td align="center">0.9187883</td>
+<td align="center">-0.0080549</td>
+<td align="center">30.51151</td>
+</tr>
+<tr class="odd">
+<td align="center">0</td>
+<td align="center">0.9426092</td>
+<td align="center">-0.0080549</td>
+<td align="center">30.51151</td>
+</tr>
+<tr class="even">
+<td align="center">0</td>
+<td align="center">0.9664302</td>
+<td align="center">-0.0080549</td>
+<td align="center">30.51151</td>
+</tr>
+<tr class="odd">
+<td align="center">0</td>
+<td align="center">0.9902511</td>
+<td align="center">-0.0080549</td>
+<td align="center">30.51151</td>
+</tr>
+<tr class="even">
+<td align="center">0</td>
+<td align="center">1.0140720</td>
+<td align="center">-0.0080549</td>
+<td align="center">30.51151</td>
+</tr>
+<tr class="odd">
+<td align="center">0</td>
+<td align="center">1.0378929</td>
+<td align="center">-0.0080549</td>
+<td align="center">30.51151</td>
+</tr>
+<tr class="even">
+<td align="center">0</td>
+<td align="center">1.0617138</td>
+<td align="center">-0.0080549</td>
+<td align="center">30.51151</td>
+</tr>
+<tr class="odd">
+<td align="center">0</td>
+<td align="center">1.0855347</td>
+<td align="center">-0.0080549</td>
+<td align="center">30.51151</td>
+</tr>
+<tr class="even">
+<td align="center">0</td>
+<td align="center">1.1093556</td>
+<td align="center">-0.0080549</td>
+<td align="center">30.51151</td>
+</tr>
+</tbody>
+</table>
+<p>The ks package automatically stores the quantiles of the estimate variable when calculating the kde. We can access those probability boundaries by sub-setting the kd object.</p>
+<pre class="r"><code># 5% contour line from kd grid based on 10k MC data
+percentile_5 &lt;- kd_d3m[[&quot;cont&quot;]][&quot;5%&quot;]</code></pre>
+<p>Verify that 5% (500/10,000) values fall below the threshold:</p>
+<pre class="r"><code>mc_est_tbl_10000 %&gt;% filter(estimate &lt;= percentile_5)</code></pre>
+<pre><code>## # A tibble: 500 x 4
+##    estimate ellip  curv pressure
+##       &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;    &lt;dbl&gt;
+##  1 0.000418  1.41  4.68    184. 
+##  2 0.000377  1.30  7.27    144. 
+##  3 0.000951  1.06  3.32     72.1
+##  4 0.000704  1.28  7.10    125. 
+##  5 0.000719  1.17  2.59     62.1
+##  6 0.000114  1.47  3.18    189. 
+##  7 0.000905  1.01  3.21    102. 
+##  8 0.000182  1.06  5.85    103. 
+##  9 0.000521  1.36  4.04    200. 
+## 10 0.000742  1.40  3.58     97.4
+## # ... with 490 more rows</code></pre>
+<p>500 / 10,000 is the correct coverage for the 5/95 boundary.</p>
+<p>If we wanted to know the nearest probability contour line for every point we could make a function to do so.</p>
+<pre class="r"><code>get_probs_fcn &lt;- function(value) {
+  t &lt;- reference_grid_probs_tbl %&gt;%
+    mutate(value = value) %&gt;%
+    mutate(dif = abs(estimate - value)) %&gt;%
+    filter(dif == min(dif))
+
+  t[[1, 1]]
+}</code></pre>
+<p>Map the function over each value in the dataset.</p>
+<pre class="r"><code># mc_1_to_99_tbl &lt;- mc_est_tbl_10000 %&gt;%
+#   mutate(nearest_prob = map_dbl(estimate, get_probs_fcn))
+
+# mc_1_to_99_tbl %&gt;% write_rds(here::here(&quot;mc_1_to_99_tbl.rds&quot;))
+mc_1_to_99_tbl &lt;- read_rds(here::here(&quot;mc_1_to_99_tbl.rds&quot;))
+
+mc_1_to_99_tbl</code></pre>
+<pre><code>## # A tibble: 10,000 x 5
+##    estimate ellip  curv pressure nearest_prob
+##       &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;    &lt;dbl&gt;        &lt;dbl&gt;
+##  1  0.0140   1.27  2.16    133.            59
+##  2  0.0119   1.20  4.44    127.            52
+##  3  0.00265  1.38  2.65    160.            14
+##  4  0.0194   1.24  3.62    142.            75
+##  5  0.0122   1.32  2.54    129.            53
+##  6  0.0168   1.26  3.24    147.            68
+##  7  0.00555  1.33  3.39    168.            28
+##  8  0.0112   1.24  4.25    146.            50
+##  9  0.00826  1.19  1.85     87.7           39
+## 10  0.00197  1.32  4.14     90.5           11
+## # ... with 9,990 more rows</code></pre>
+<p>Now the data, kde estimate, and nearest probability contour region boundary are stored in one tibble. From here we can set up a 3d plot that shows probability contours of inter</p>
+</div>
+<div id="density-plot-with-probability-contours-in-3d" class="section level2">
+<h2>Density Plot with Probability Contours in 3d</h2>
+<p>Honestly, this part is pretty easy thanks to a built in plot.kde method. Just use the cont argument to specify with probability contours you want.</p>
+<pre class="r"><code>#plot(x = kd_d3m, cont = c(45, 70, 95), drawpoints = FALSE, col.pt = 1)</code></pre>
+<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/3d_cont_1.png" style="width:100.0%;height:100.0%" /></p>
+<p>Add points using the points3d function. In this case I add 2 sets, 1 for the 5% most extreme and 1 for the 95% most common.</p>
+<pre class="r"><code># plot(x = kd_d3m, cont = c(95) ,drawpoints = FALSE, col.pt = 1)
+mc_lowest_5_tbl &lt;- mc_1_to_99_tbl %&gt;% filter(estimate &lt; percentile_5)
+mc_6_to_100_tbl &lt;- mc_1_to_99_tbl %&gt;% filter(estimate &gt;= percentile_5)
+
+# points3d(x = mc_lowest_5_tbl$ellip, y = mc_lowest_5_tbl$curv, z = mc_lowest_5_tbl$pressure, color = &quot;dodgerblue&quot;,  size = 3, alpha = 1)
+
+# points3d(x = mc_6_to_100_tbl$ellip, y = mc_6_to_100_tbl$curv, z = mc_6_to_100_tbl$pressure, color = &quot;black&quot;,  size = 3, alpha = 1)</code></pre>
+<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/3d_cont_2.png" style="width:100.0%;height:100.0%" /></p>
+<p>See the problem here? In the areas on the lower right of the middle and right-most images, the data stops but the surface keeps going. This is because the data has a boundary there due to being log-normal but the kde doesn’t know. See closeup below.</p>
+<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/3dd3.png" style="width:100.0%;height:100.0%" /></p>
+<p>As previously mentioned, this can be addressed by using the normal dataset to fit the kde and then back-transforming both the data and the surface:</p>
+</div>
+</div>
+<div id="fit-kde-to-normal-data-transform-later" class="section level1">
+<h1>Fit KDE to normal data transform later</h1>
+<pre class="r"><code># convert simulated data tibble to matrix
+d3m_n &lt;- corr_draws_tbl %&gt;%
+  as.matrix()
+
+# cross-validated bandwidth for kd (takes a while to calculate)
+# hscv1_n &lt;- Hscv(corr_draws_tbl)
+# hscv1_n %&gt;% write_rds(here::here(&quot;hscv1_n.rds&quot;))
+
+hscv1_n &lt;- read_rds(here::here(&quot;hscv1_n.rds&quot;))
+
+# generate kernel density estimate from simulated population
+kd_d3m_n &lt;- ks::kde(d3m_n, H = hscv1_n, compute.cont = TRUE)</code></pre>
+<div id="density-proportions-from-kde-estimate-1" class="section level2">
+<h2>Density proportions from kde estimate</h2>
+<pre class="r"><code># see the kde&#39;s calculated density thresholds for specified proportions
+cont_vals_tbl_n &lt;- tidy(kd_d3m_n$cont) %&gt;%
+  mutate(n_row = row_number()) %&gt;%
+  mutate(probs = 100 - n_row) %&gt;%
+  select(probs, x)
+
+reference_grid_probs_tbl_n &lt;- cont_vals_tbl_n %&gt;%
+  rename(estimate = x)
+
+reference_grid_probs_tbl_n %&gt;%
+  head(10) %&gt;%
+  kable(align = rep(&quot;c&quot;))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">probs</th>
+<th align="center">estimate</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">99</td>
+<td align="center">15.39736</td>
+</tr>
+<tr class="even">
+<td align="center">98</td>
+<td align="center">14.90526</td>
+</tr>
+<tr class="odd">
+<td align="center">97</td>
+<td align="center">14.53676</td>
+</tr>
+<tr class="even">
+<td align="center">96</td>
+<td align="center">14.16539</td>
+</tr>
+<tr class="odd">
+<td align="center">95</td>
+<td align="center">13.86481</td>
+</tr>
+<tr class="even">
+<td align="center">94</td>
+<td align="center">13.56653</td>
+</tr>
+<tr class="odd">
+<td align="center">93</td>
+<td align="center">13.26884</td>
+</tr>
+<tr class="even">
+<td align="center">92</td>
+<td align="center">12.98302</td>
+</tr>
+<tr class="odd">
+<td align="center">91</td>
+<td align="center">12.72985</td>
+</tr>
+<tr class="even">
+<td align="center">90</td>
+<td align="center">12.51655</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="kde-estimates-in-the-range-of-the-variables-1" class="section level2">
+<h2>KDE estimates in the range of the variables</h2>
+<p>By default the KDE provides density estimates for a grid of points that covers the space of the variables.</p>
+<pre class="r"><code>kd_grid_estimates_n &lt;- kd_d3m_n</code></pre>
+<p>If we want to know the value at each point in the simulated population we use the eval.points argument.</p>
+<pre class="r"><code>mc_estimates_n &lt;- ks::kde(
+  x = d3m_n, H = hscv1_n,
+  compute.cont = TRUE,
+  eval.points = corr_draws_tbl %&gt;% as.matrix()
+)</code></pre>
+<p>Here are a couple different ways to convert the kde object features into a tibble:</p>
+<pre class="r"><code>mc_est_tbl_10000_n &lt;- tibble(estimate = mc_estimates_n$estimate) %&gt;%
+  bind_cols(corr_draws_tbl)</code></pre>
+<pre class="r"><code>kd_grid_est_tbl_29k_n &lt;- broom:::tidy.kde(kd_grid_estimates_n) %&gt;%
+  pivot_wider(names_from = variable, values_from = value) %&gt;%
+  rename(ellip_n = x1, curv_n = x2, pressure_n = x3) %&gt;%
+  select(-obs)</code></pre>
+<p>Each data point in our population has a estimate. Each data point on the grid that covers the space of interest has an estimate.</p>
+<pre class="r"><code>mc_est_tbl_10000_n %&gt;%
+  head(10) %&gt;%
+  kable(align = &quot;c&quot;)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">estimate</th>
+<th align="center">ellip_n</th>
+<th align="center">curv_n</th>
+<th align="center">pressure_n</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">0.5480641</td>
+<td align="center">0.1164450</td>
+<td align="center">0.5154974</td>
+<td align="center">4.358568</td>
+</tr>
+<tr class="even">
+<td align="center">8.5263883</td>
+<td align="center">0.2108725</td>
+<td align="center">1.3679574</td>
+<td align="center">4.649534</td>
+</tr>
+<tr class="odd">
+<td align="center">6.8647221</td>
+<td align="center">0.2622058</td>
+<td align="center">1.4039068</td>
+<td align="center">4.758324</td>
+</tr>
+<tr class="even">
+<td align="center">1.2686865</td>
+<td align="center">0.0440175</td>
+<td align="center">1.0011228</td>
+<td align="center">4.665691</td>
+</tr>
+<tr class="odd">
+<td align="center">3.4062801</td>
+<td align="center">0.2205217</td>
+<td align="center">1.6276199</td>
+<td align="center">4.633083</td>
+</tr>
+<tr class="even">
+<td align="center">4.3754649</td>
+<td align="center">0.2254152</td>
+<td align="center">1.0541010</td>
+<td align="center">4.535180</td>
+</tr>
+<tr class="odd">
+<td align="center">1.5083333</td>
+<td align="center">0.1566667</td>
+<td align="center">0.4782892</td>
+<td align="center">4.829336</td>
+</tr>
+<tr class="even">
+<td align="center">3.3766180</td>
+<td align="center">0.1584546</td>
+<td align="center">1.0719497</td>
+<td align="center">5.050286</td>
+</tr>
+<tr class="odd">
+<td align="center">5.0036132</td>
+<td align="center">0.1573211</td>
+<td align="center">0.9830169</td>
+<td align="center">4.982410</td>
+</tr>
+<tr class="even">
+<td align="center">4.9614118</td>
+<td align="center">0.1366109</td>
+<td align="center">1.1086680</td>
+<td align="center">4.498894</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>kd_grid_est_tbl_29k_n %&gt;%
+  head(10) %&gt;%
+  kable(align = &quot;c&quot;)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">estimate</th>
+<th align="center">ellip_n</th>
+<th align="center">curv_n</th>
+<th align="center">pressure_n</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">0</td>
+<td align="center">-0.0877414</td>
+<td align="center">-0.4268598</td>
+<td align="center">3.811282</td>
+</tr>
+<tr class="even">
+<td align="center">0</td>
+<td align="center">-0.0685395</td>
+<td align="center">-0.4268598</td>
+<td align="center">3.811282</td>
+</tr>
+<tr class="odd">
+<td align="center">0</td>
+<td align="center">-0.0493375</td>
+<td align="center">-0.4268598</td>
+<td align="center">3.811282</td>
+</tr>
+<tr class="even">
+<td align="center">0</td>
+<td align="center">-0.0301356</td>
+<td align="center">-0.4268598</td>
+<td align="center">3.811282</td>
+</tr>
+<tr class="odd">
+<td align="center">0</td>
+<td align="center">-0.0109337</td>
+<td align="center">-0.4268598</td>
+<td align="center">3.811282</td>
+</tr>
+<tr class="even">
+<td align="center">0</td>
+<td align="center">0.0082682</td>
+<td align="center">-0.4268598</td>
+<td align="center">3.811282</td>
+</tr>
+<tr class="odd">
+<td align="center">0</td>
+<td align="center">0.0274701</td>
+<td align="center">-0.4268598</td>
+<td align="center">3.811282</td>
+</tr>
+<tr class="even">
+<td align="center">0</td>
+<td align="center">0.0466721</td>
+<td align="center">-0.4268598</td>
+<td align="center">3.811282</td>
+</tr>
+<tr class="odd">
+<td align="center">0</td>
+<td align="center">0.0658740</td>
+<td align="center">-0.4268598</td>
+<td align="center">3.811282</td>
+</tr>
+<tr class="even">
+<td align="center">0</td>
+<td align="center">0.0850759</td>
+<td align="center">-0.4268598</td>
+<td align="center">3.811282</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code># 5% contour line from kd grid based on 10k MC data
+percentile_5_n &lt;- kd_d3m_n[[&quot;cont&quot;]][&quot;5%&quot;]</code></pre>
+<p>Verify that 5% (500/10,000) values fall below the threshold:</p>
+<pre class="r"><code>mc_est_tbl_10000_n %&gt;% filter(estimate &lt;= percentile_5_n)</code></pre>
+<pre><code>## # A tibble: 500 x 4
+##    estimate ellip_n curv_n pressure_n
+##       &lt;dbl&gt;   &lt;dbl&gt;  &lt;dbl&gt;      &lt;dbl&gt;
+##  1   0.437   0.347   1.54        5.21
+##  2   0.218   0.0546  1.20        4.28
+##  3   0.346   0.114   0.375       4.43
+##  4   0.340   0.121   0.382       4.96
+##  5   0.0880  0.153   0.951       4.13
+##  6   0.0860  0.387   1.16        5.24
+##  7   0.268   0.0116  1.17        4.62
+##  8   0.0957  0.0610  1.77        4.63
+##  9   0.513   0.310   1.40        5.30
+## 10   0.300   0.195   0.260       4.75
+## # ... with 490 more rows</code></pre>
+<p>500 / 10,000 is the correct coverage for the 5/95 boundary.</p>
+<pre class="r"><code>get_probs_fcn_n &lt;- function(value) {
+  t &lt;- reference_grid_probs_tbl_n %&gt;%
+    mutate(value = value) %&gt;%
+    mutate(dif = abs(estimate - value)) %&gt;%
+    filter(dif == min(dif))
+
+  t[[1, 1]]
+}</code></pre>
+<p>Map the function over each value in the dataset and then the grid.</p>
+<pre class="r"><code># mc_1_to_99_tbl_n &lt;- mc_est_tbl_10000_n %&gt;%
+#   mutate(nearest_prob = map_dbl(estimate, get_probs_fcn_n))
+# #
+# mc_1_to_99_tbl_n %&gt;% write_rds(here::here(&quot;mc_1_to_99_tbl_n.rds&quot;))
+mc_1_to_99_tbl_n &lt;- read_rds(here::here(&quot;mc_1_to_99_tbl_n.rds&quot;))
+
+mc_1_to_99_tbl_n</code></pre>
+<pre><code>## # A tibble: 10,000 x 5
+##    estimate ellip_n curv_n pressure_n nearest_prob
+##       &lt;dbl&gt;   &lt;dbl&gt;  &lt;dbl&gt;      &lt;dbl&gt;        &lt;dbl&gt;
+##  1    0.548  0.116   0.515       4.36            5
+##  2    8.53   0.211   1.37        4.65           70
+##  3    6.86   0.262   1.40        4.76           58
+##  4    1.27   0.0440  1.00        4.67           12
+##  5    3.41   0.221   1.63        4.63           32
+##  6    4.38   0.225   1.05        4.54           39
+##  7    1.51   0.157   0.478       4.83           14
+##  8    3.38   0.158   1.07        5.05           31
+##  9    5.00   0.157   0.983       4.98           44
+## 10    4.96   0.137   1.11        4.50           44
+## # ... with 9,990 more rows</code></pre>
+<pre class="r"><code>grid_probs_tbl_n &lt;- kd_grid_est_tbl_29k_n %&gt;%
+  mutate(nearest_prob = map_dbl(estimate, get_probs_fcn_n))
+
+grid_probs_tbl_n %&gt;% write_rds(here::here(&quot;grid_probs_tbl_n.rds&quot;))
+grid_probs_tbl_n &lt;- read_rds(here::here(&quot;grid_probs_tbl_n.rds&quot;))
+
+
+
+grid_probs_95_n &lt;- grid_probs_tbl_n %&gt;%
+  filter(nearest_prob == 95)
+
+grid_probs_95_n %&gt;% arrange(desc(nearest_prob))</code></pre>
+<pre><code>## # A tibble: 4 x 5
+##   estimate ellip_n curv_n pressure_n nearest_prob
+##      &lt;dbl&gt;   &lt;dbl&gt;  &lt;dbl&gt;      &lt;dbl&gt;        &lt;dbl&gt;
+## 1     13.8   0.162   1.09       4.68           95
+## 2     13.8   0.200   1.20       4.68           95
+## 3     13.8   0.219   1.20       4.74           95
+## 4     13.8   0.219   1.09       4.80           95</code></pre>
+<pre class="r"><code>grid_probs_95_n %&gt;%
+  head(5) %&gt;%
+  kable(align = &quot;c&quot;)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">estimate</th>
+<th align="center">ellip_n</th>
+<th align="center">curv_n</th>
+<th align="center">pressure_n</th>
+<th align="center">nearest_prob</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">13.84582</td>
+<td align="center">0.1618836</td>
+<td align="center">1.094335</td>
+<td align="center">4.679386</td>
+<td align="center">95</td>
+</tr>
+<tr class="even">
+<td align="center">13.75222</td>
+<td align="center">0.2002874</td>
+<td align="center">1.195748</td>
+<td align="center">4.679386</td>
+<td align="center">95</td>
+</tr>
+<tr class="odd">
+<td align="center">13.83862</td>
+<td align="center">0.2194893</td>
+<td align="center">1.195748</td>
+<td align="center">4.741394</td>
+<td align="center">95</td>
+</tr>
+<tr class="even">
+<td align="center">13.83317</td>
+<td align="center">0.2194893</td>
+<td align="center">1.094335</td>
+<td align="center">4.803401</td>
+<td align="center">95</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="density-plot-with-probability-contours-in-3d-1" class="section level2">
+<h2>Density Plot with Probability Contours in 3d</h2>
+<p>Honestly, this part is pretty easy thanks to a built in plot.kde method. Just use the cont argument to specify with probability contours you want.</p>
+<pre class="r"><code>plot(x = kd_d3m_n, cont = c(45, 70, 95), drawpoints = FALSE, col.pt = 1)</code></pre>
+<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/pp1.png" style="width:100.0%;height:100.0%" /></p>
+<p>and with points</p>
+<pre class="r"><code>mc_lowest_5_tbl_n &lt;- mc_1_to_99_tbl_n %&gt;% filter(estimate &lt; percentile_5_n)
+mc_6_to_100_tbl_n &lt;- mc_1_to_99_tbl_n %&gt;% filter(estimate &gt;= percentile_5_n)
+
+plot(x = kd_d3m_n, cont = c(95), drawpoints = FALSE, col.pt = 1)
+
+
+points3d(x = mc_lowest_5_tbl_n$ellip_n, y = mc_lowest_5_tbl_n$curv_n, z = mc_lowest_5_tbl_n$pressure_n, color = &quot;dodgerblue&quot;, size = 3, alpha = 1)
+
+points3d(x = mc_6_to_100_tbl_n$ellip_n, y = mc_6_to_100_tbl_n$curv_n, z = mc_6_to_100_tbl_n$pressure_n, color = &quot;black&quot;, size = 3, alpha = 1)
+
+points3d(x = grid_probs_tbl_n$ellip_n, y = grid_probs_tbl_n$curv_n, z = grid_probs_tbl_n$pressure_n, color = &quot;firebrick&quot;, size = 2, alpha = 1)</code></pre>
+<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/pp2.png" style="width:100.0%;height:100.0%" /></p>
+</div>
+<div id="transform-data-and-kde-contour-to-original-scale" class="section level2">
+<h2>Transform data and kde contour to original scale</h2>
+<pre class="r"><code>mc_lowest_5_tbl_nbt &lt;- mc_lowest_5_tbl_n %&gt;% mutate(
+  ellip_bt = exp(ellip_n),
+  curv_bt = exp(curv_n),
+  pressure_bt = exp(pressure_n)
+)
+mc_6_to_100_tbl_nbt &lt;- mc_6_to_100_tbl_n %&gt;% mutate(
+  ellip_bt = exp(ellip_n),
+  curv_bt = exp(curv_n),
+  pressure_bt = exp(pressure_n)
+)
+
+full_mc_bt_tbl &lt;- mc_lowest_5_tbl_nbt %&gt;%
+  bind_rows(mc_6_to_100_tbl_nbt)
+
+grid_probs_95_bt &lt;- grid_probs_tbl_n %&gt;%
+  filter(nearest_prob == 05) %&gt;%
+  mutate(
+    ellip_bt = exp(ellip_n),
+    curv_bt = exp(curv_n),
+    pressure_bt = exp(pressure_n)
+  )</code></pre>
+</div>
+<div id="plot-back-transformed-data-with-plotly" class="section level2">
+<h2>Plot Back-Transformed Data with Plotly</h2>
+<pre class="r"><code>fig &lt;- plotly::plot_ly()
+
+fig &lt;- fig %&gt;% add_trace(x = grid_probs_95_bt$ellip_bt, y = grid_probs_95_bt$curv_bt, z = grid_probs_95_bt$pressure_bt, type = &quot;mesh3d&quot;, alphahull = 0, opacity = .5, hoverinfo = &quot;none&quot;)
+
+
+fig &lt;- fig %&gt;% add_trace(x = mc_lowest_5_tbl_nbt$ellip_bt, y = mc_lowest_5_tbl_nbt$curv_bt, z = mc_lowest_5_tbl_nbt$pressure_bt, type = &quot;scatter3d&quot;, size = 30)
+
+fig &lt;- fig %&gt;% add_trace(x = mc_6_to_100_tbl_nbt$ellip_bt, y = mc_6_to_100_tbl_nbt$curv_bt, z = mc_6_to_100_tbl_nbt$pressure_bt, type = &quot;scatter3d&quot;, size = 30)
+
+fig &lt;- fig %&gt;%
+  layout(scene = list(
+    xaxis = list(title = &quot;ellip&quot;),
+    yaxis = list(title = &quot;curv&quot;),
+    zaxis = list(title = &quot;pressure&quot;)
+  )) %&gt;%
+  layout(scene = list(
+    xaxis = list(showspikes = FALSE),
+    yaxis = list(showspikes = FALSE),
+    zaxis = list(showspikes = FALSE)
+  ))
+
+# fig</code></pre>
+<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/pp3.png" style="width:100.0%;height:100.0%" /></p>
+<p>The new image (shown on right) looks different near the boundary. Because we transformed everything from normal, no portion of the contour goes beyond the point cloud. This is what we want!</p>
+</div>
+</div>
+<div id="filter-extreme-points-and-assess-points-on-955-contour" class="section level1">
+<h1>Filter extreme points and assess points on 95/5 contour</h1>
+<p>Now that our kde contour is set up to properly segregate the extreme points relative to the mode, we can filter them away and assess the remaining points which lie on the contour. We do this by pulling the grid points that make up the 95/5 surface and evaluating them as percentiles.</p>
+<p>First, the ecdfs to get the percentiles from each variable</p>
+<pre class="r"><code>e1f &lt;- ecdf(full_mc_bt_tbl$ellip_bt)
+e2f &lt;- ecdf(full_mc_bt_tbl$curv_bt)
+e3f &lt;- ecdf(full_mc_bt_tbl$pressure_bt)</code></pre>
+<p>Map ecdfs over the variables and then use the sum of the percentiles as a way to identify the largest values.</p>
+<pre class="r"><code>full_probs_95_tbl &lt;- grid_probs_95_bt %&gt;%
+  rowwise() %&gt;%
+  mutate(
+    percentile_e = map_dbl(ellip_bt, e1f),
+    percentile_c = map_dbl(curv_bt, e2f),
+    percentile_p = map_dbl(pressure_bt, e3f)
+  ) %&gt;%
+  rowwise() %&gt;%
+  mutate(pct_sum = sum(c(percentile_e, percentile_c, percentile_p))) %&gt;%
+  ungroup() %&gt;%
+  arrange(desc(pct_sum)) %&gt;%
+  mutate(pct_sum_rank = row_number()) %&gt;%
+  select(ellip_bt, curv_bt, pressure_bt, percentile_e, percentile_c, percentile_p, pct_sum)
+
+full_probs_95_tbl %&gt;%
+  head(10) %&gt;%
+  kable(align = &quot;c&quot;, digits = 2)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="center">ellip_bt</th>
+<th align="center">curv_bt</th>
+<th align="center">pressure_bt</th>
+<th align="center">percentile_e</th>
+<th align="center">percentile_c</th>
+<th align="center">percentile_p</th>
+<th align="center">pct_sum</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">1.40</td>
+<td align="center">5.49</td>
+<td align="center">176.88</td>
+<td align="center">0.99</td>
+<td align="center">0.96</td>
+<td align="center">0.98</td>
+<td align="center">2.93</td>
+</tr>
+<tr class="even">
+<td align="center">1.37</td>
+<td align="center">5.49</td>
+<td align="center">188.19</td>
+<td align="center">0.97</td>
+<td align="center">0.96</td>
+<td align="center">0.99</td>
+<td align="center">2.92</td>
+</tr>
+<tr class="odd">
+<td align="center">1.37</td>
+<td align="center">6.08</td>
+<td align="center">166.24</td>
+<td align="center">0.97</td>
+<td align="center">0.98</td>
+<td align="center">0.96</td>
+<td align="center">2.92</td>
+</tr>
+<tr class="even">
+<td align="center">1.34</td>
+<td align="center">5.49</td>
+<td align="center">188.19</td>
+<td align="center">0.95</td>
+<td align="center">0.96</td>
+<td align="center">0.99</td>
+<td align="center">2.90</td>
+</tr>
+<tr class="odd">
+<td align="center">1.37</td>
+<td align="center">4.96</td>
+<td align="center">188.19</td>
+<td align="center">0.97</td>
+<td align="center">0.92</td>
+<td align="center">0.99</td>
+<td align="center">2.89</td>
+</tr>
+<tr class="even">
+<td align="center">1.42</td>
+<td align="center">4.96</td>
+<td align="center">166.24</td>
+<td align="center">1.00</td>
+<td align="center">0.92</td>
+<td align="center">0.96</td>
+<td align="center">2.88</td>
+</tr>
+<tr class="odd">
+<td align="center">1.32</td>
+<td align="center">6.08</td>
+<td align="center">176.88</td>
+<td align="center">0.91</td>
+<td align="center">0.98</td>
+<td align="center">0.98</td>
+<td align="center">2.87</td>
+</tr>
+<tr class="even">
+<td align="center">1.32</td>
+<td align="center">5.49</td>
+<td align="center">188.19</td>
+<td align="center">0.91</td>
+<td align="center">0.96</td>
+<td align="center">0.99</td>
+<td align="center">2.86</td>
+</tr>
+<tr class="odd">
+<td align="center">1.40</td>
+<td align="center">4.48</td>
+<td align="center">188.19</td>
+<td align="center">0.99</td>
+<td align="center">0.86</td>
+<td align="center">0.99</td>
+<td align="center">2.84</td>
+</tr>
+<tr class="even">
+<td align="center">1.42</td>
+<td align="center">4.48</td>
+<td align="center">176.88</td>
+<td align="center">1.00</td>
+<td align="center">0.86</td>
+<td align="center">0.98</td>
+<td align="center">2.84</td>
+</tr>
+</tbody>
+</table>
+<p>Finally, we can show a few of the points with large percentiles on the 95/5 surface:</p>
+<pre class="r"><code>top_10 &lt;- full_probs_95_tbl %&gt;%
+  head(10)
+
+fig &lt;- fig %&gt;% add_trace(x = top_10$ellip_bt, y = top_10$curv_bt, z = top_10$pressure_bt, type = &quot;scatter3d&quot;, size = 30)
+
+# fig</code></pre>
+<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/pp4.png" style="width:100.0%;height:100.0%" /></p>
+<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/pp5.png" style="width:100.0%;height:100.0%" /></p>
+<p>And there we have it! 10 candidate points representing credible points on the edge of the 5% probability region for 3 correlated lognormal variables with proper treatment of the boundary.</p>
+<p>If you’ve made it this far, I thank you. Here are a couple appendices as a reward!</p>
+</div>
+<div id="appendix-a---simulating-a-multivariate-distribution-with-massmvnorm" class="section level1">
+<h1>Appendix A - simulating a multivariate distribution with mass::mvnorm()</h1>
+<p>Workflow:</p>
+<div id="htmlwidget-2" style="width:100%;height:500px;" class="grViz html-widget"></div>
+<script type="application/json" data-for="htmlwidget-2">{"x":{"diagram":"digraph flowchart {\n      # node definitions with substituted label text\n      node [fontname = Helvetica, shape = rectangle, fillcolor = yellow]        \n      tab1 [label = \"Step 1: Fit distributions to each variable in the original dataset.\n Note parameters, correlations, covariances in original data\"]\n      tab2 [label = \"Step 2: Transform all variables to normal\"]\n      tab3 [label = \"Step 3: Fit normal distributions to each transformed variablet.\n Note parameters, correlations, covariances in transformed data\"]\n      tab4 [label = \"Step 4: Draw joint distribution using MASS::mvrnorm() or equivalent function.\n Use parameters and covariance matrix from normal, transformed data\"]\n      tab5 [label = \"Step 5: Back-transform simulated data to original distribution\"]\n      tab6 [label = \"Step 6: Evaluate parameters and marginal distributions of the back-transfomed data.\n Compare to raw, original data to see if marginals and correlations were recreated in the sim\"]\n      # edge definitions with the node IDs\n      tab1 -> tab2 -> tab3 -> tab4 -> tab5 -> tab6;\n      }\n      ","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>
 <div id="step-1---fit-distributions-to-each-variable" class="section level2">
 <h2>Step 1 - Fit Distributions to Each Variable</h2>
 <pre class="r"><code>ellip_fit &lt;- fitdist(sample_data$ellip, &quot;lnorm&quot;)
@@ -1006,670 +2248,13 @@ compare_tbl %&gt;%
 </tr>
 </tbody>
 </table>
-<p>Everything appears to align well, but this sure took a while. Wouldn’t it be nice if there was a faster way than to manually fit and extract values from mvrnorm() ? Fortunately, we’re in the R ecosystem, where somebody smart has usually tackled the problem and provided the tools to the community. The tool that I had success with is the AnySim package.<a href="#fn3" class="footnote-ref" id="fnref3"><sup>3</sup></a></p>
-<p>Here’s how to perform the simulation in a much more efficient way. Note: this is how I created the original dataset of 300 that we’ve been working with.</p>
-</div>
-</div>
-<div id="approach-2---anysim" class="section level1">
-<h1>Approach 2 - AnySim</h1>
-<p>The AnySim workflow:</p>
-<div id="htmlwidget-2" style="width:100%;height:500px;" class="grViz html-widget"></div>
-<script type="application/json" data-for="htmlwidget-2">{"x":{"diagram":"digraph flowchart {\n      # node definitions with substituted label text\n      node [fontname = Helvetica, shape = rectangle, fillcolor = yellow]        \n      tab1 [label = \"Step 1: Specify desired distributions for each variable and store as object\"]\n      tab2 [label = \"Step 2: Specify parameters for each variable and store as object\"]\n      tab3 [label = \"Step 3: Specify desired correlation matrix and store as object\"]\n      tab4 [label = \"Step 4: Provide the above information to EstCorrRVs() to estimate\n parameters of auxiliary Gaussian model\"]\n      tab5 [label = \"Step 5: Generate simulated values using SimcorrRVs()\"]\n      # edge definitions with the node IDs\n      tab1 -> tab2 -> tab3 -> tab4 -> tab5;\n      }\n      ","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>
-<p>It may look similar in the flowchart but in practice its way easier than Method 1. Here’s how it works in only a few lines of code:</p>
-<pre class="r"><code>set.seed(13)
-# Define the target distribution functions (ICDFs) of each random variable.
+<p>#Appendix B - 2d kde plot with probability traces</p>
+<p>First, select the 2 variables of interest.</p>
+<pre class="r"><code>d &lt;- correlated_ln_draws_tbl %&gt;% select(ellip, curv)
 
-ellip_dist &lt;- &quot;qlnorm&quot;
-curv_dist &lt;- &quot;qlnorm&quot;
-pressure_dist &lt;- &quot;qlnorm&quot;
-
-# store the 3 ICDFs in a vector
-dist_vec &lt;- c(ellip_dist, curv_dist, pressure_dist)
-
-# Define the parameters of the target distribution functions - store them in a list
-ellip_params &lt;- list(meanlog = 0.20, sdlog = .067)
-curv_params &lt;- list(meanlog = 1.15, sdlog = 0.3)
-pressure_params &lt;- list(meanlog = 4.80, sdlog = 0.2)
-
-# this is a weird way to do it but I&#39;m following along with an example from AnySim vignette :)
-params_list &lt;- list(NULL)
-params_list[[1]] &lt;- ellip_params
-params_list[[2]] &lt;- curv_params
-params_list[[3]] &lt;- pressure_params
-
-# Define the target correlation matrix.
-corr_matrix &lt;- matrix(c(
-  1, 0.21, 0.4,
-  0.21, 1, .21,
-  0.4, 0.21, 1
-),
-ncol = 3,
-nrow = 3,
-byrow = T
-)
-# Estimate the parameters of the auxiliary Gaussian model.
-aux_gaussion_param_tbl &lt;- EstCorrRVs(
-  R = corr_matrix, dist = dist_vec, params = params_list,
-  NatafIntMethod = &quot;GH&quot;, NoEval = 9, polydeg = 8
-)
-
-
-# Generate 10000 synthetic realizations of the 3 correlated RVs.
-correlated_ln_draws_tbl &lt;- as_tibble(SimCorrRVs(n = 10000, paramsRVs = aux_gaussion_param_tbl)) %&gt;%
-  rename(
-    ellip = V1,
-    curv = V2,
-    pressure = V3
-  )
-
-correlated_ln_draws_tbl %&gt;%
-  head(10) %&gt;%
-  kable(align = &quot;c&quot;)</code></pre>
-<table>
-<thead>
-<tr class="header">
-<th align="center">ellip</th>
-<th align="center">curv</th>
-<th align="center">pressure</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="center">1.267618</td>
-<td align="center">2.158739</td>
-<td align="center">133.3040</td>
-</tr>
-<tr class="even">
-<td align="center">1.198681</td>
-<td align="center">4.437176</td>
-<td align="center">127.1982</td>
-</tr>
-<tr class="odd">
-<td align="center">1.375663</td>
-<td align="center">2.649938</td>
-<td align="center">160.2052</td>
-</tr>
-<tr class="even">
-<td align="center">1.236829</td>
-<td align="center">3.621202</td>
-<td align="center">141.5427</td>
-</tr>
-<tr class="odd">
-<td align="center">1.318572</td>
-<td align="center">2.541340</td>
-<td align="center">129.3427</td>
-</tr>
-<tr class="even">
-<td align="center">1.255885</td>
-<td align="center">3.236722</td>
-<td align="center">146.9361</td>
-</tr>
-<tr class="odd">
-<td align="center">1.326279</td>
-<td align="center">3.387357</td>
-<td align="center">167.8579</td>
-</tr>
-<tr class="even">
-<td align="center">1.240926</td>
-<td align="center">4.254830</td>
-<td align="center">145.7207</td>
-</tr>
-<tr class="odd">
-<td align="center">1.191865</td>
-<td align="center">1.853877</td>
-<td align="center">87.7240</td>
-</tr>
-<tr class="even">
-<td align="center">1.315273</td>
-<td align="center">4.144667</td>
-<td align="center">90.5485</td>
-</tr>
-</tbody>
-</table>
-<p>Let’s see if we were able to produce the desired relationships between the variables:</p>
-<pre class="r"><code># Fit synthetic data
-ellip_ln_fit &lt;- tidy(fitdistr(correlated_ln_draws_tbl$ellip, &quot;log-normal&quot;)) %&gt;% mutate(
-  var = &quot;ellipticity&quot;,
-  dataset = &quot;sim_draws&quot;
-)
-curv_ln_fit &lt;- tidy(fitdistr(correlated_ln_draws_tbl$curv, &quot;log-normal&quot;)) %&gt;% mutate(
-  var = &quot;curvature&quot;,
-  dataset = &quot;sim_draws&quot;
-)
-pressure_ln_fit &lt;- tidy(fitdistr(correlated_ln_draws_tbl$pressure, &quot;log-normal&quot;)) %&gt;% mutate(
-  var = &quot;pressure&quot;,
-  dataset = &quot;sim_draws&quot;
-)
-recovered_params_tbl &lt;- bind_rows(ellip_ln_fit, curv_ln_fit, pressure_ln_fit)
-
-# Show target values
-target_tbl &lt;- tibble(
-  term = rep(c(&quot;meanlog&quot;, &quot;sdlog&quot;), 3),
-  estimate = c(.20, .067, 1.15, .3, 4.80, .20),
-  var = c(&quot;ellipticity&quot;, &quot;ellipticity&quot;, &quot;curvature&quot;, &quot;curvature&quot;, &quot;pressure&quot;, &quot;pressure&quot;),
-  dataset = &quot;target values&quot;
-)
-
-# Compare simulated values to target values
-bind_rows(recovered_params_tbl, target_tbl) %&gt;%
-  select(-std.error) %&gt;%
-  pivot_wider(id_cols = everything(), names_from = dataset, values_from = estimate) %&gt;%
-  mutate_if(is.numeric, round, 2) %&gt;%
-  kable(align = rep(&quot;c&quot;))</code></pre>
-<table>
-<thead>
-<tr class="header">
-<th align="center">term</th>
-<th align="center">var</th>
-<th align="center">sim_draws</th>
-<th align="center">target values</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="center">meanlog</td>
-<td align="center">ellipticity</td>
-<td align="center">0.20</td>
-<td align="center">0.20</td>
-</tr>
-<tr class="even">
-<td align="center">sdlog</td>
-<td align="center">ellipticity</td>
-<td align="center">0.07</td>
-<td align="center">0.07</td>
-</tr>
-<tr class="odd">
-<td align="center">meanlog</td>
-<td align="center">curvature</td>
-<td align="center">1.15</td>
-<td align="center">1.15</td>
-</tr>
-<tr class="even">
-<td align="center">sdlog</td>
-<td align="center">curvature</td>
-<td align="center">0.30</td>
-<td align="center">0.30</td>
-</tr>
-<tr class="odd">
-<td align="center">meanlog</td>
-<td align="center">pressure</td>
-<td align="center">4.80</td>
-<td align="center">4.80</td>
-</tr>
-<tr class="even">
-<td align="center">sdlog</td>
-<td align="center">pressure</td>
-<td align="center">0.20</td>
-<td align="center">0.20</td>
-</tr>
-</tbody>
-</table>
-<p>Excellent agreement. Now check to see if the correlations were preserved:</p>
-<pre class="r"><code># Check correlations
-correlated_ln_draws_tbl %&gt;% ggcorr(
-  high = &quot;#20a486ff&quot;,
-  low = &quot;#fde725ff&quot;,
-  label = TRUE,
-  hjust = .75,
-  size = 3,
-  label_size = 3,
-  label_round = 3,
-  nbreaks = 3
-) +
-  labs(
-    title = &quot;Correlation Matrix&quot;,
-    subtitle = &quot;Pearson Method Using Pairwise Observations&quot;
-  )</code></pre>
-<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-27-1.png" width="100%" height="500px" /></p>
-<p>Again, perfect agreement to 2 decimal places. Thank you AnySim!</p>
-<p>Now that I’ve shown 2 ways to preserve the correlation structure in a simulation, we can return to the original question: what are the worst-case (or most common) values of this (simulated) population?<a href="#fn4" class="footnote-ref" id="fnref4"><sup>4</sup></a></p>
-</div>
-<div id="using-the-simulated-population-to-define-desired-test-conditions-and-groups-of-interest" class="section level1">
-<h1>Using the Simulated Population to Define Desired Test Conditions and Groups of Interest</h1>
-<p>The simulated population is useful because its density properties provide a means to determine how extreme any values of interest are. The trick is that we have to define the boundary of interest based on the question we are trying to answer. Two common questions we have pertain to finding the most common set of patients, or the most extreme patients relative to some point or region of interest. I discuss both below.</p>
-<div id="identify-a-percentage-of-worst-case-patients-relative-to-some-value-of-interest" class="section level2">
-<h2>Identify a percentage of worst-case patients relative to some value of interest</h2>
-<p>Consider a 2d test case where we are interested in the joint distribution of 2 variables: curvature and pressure. These would be appropriate for something like a migration test, where the pressure wants to pull the implant out of place a curved configuration is worse than straight (like a pipe elbow).</p>
-<p>If we know that the worst-case conditions that are physiologically relevant occur when the curvature is 1 mm (radius-of-curvature) and the pressure is 300 mm Hg (extremely high). How could we identify the worst-case 5% of patients using our simulated population data from above? In this case we don’t need an algorithm, just a bit of geometry.</p>
-<p>We can leverage the standard geometric formula for distance between two points:</p>
-<p><span class="math display">\[ {\displaystyle d(p,q)={\sqrt {(p_{1}-q_{1})^{2}+(p_{2}-q_{2})^{2}}}} \]</span></p>
-<p>Here’s how to calculate this number for each value in the joint distribution for curvature and pressure:</p>
-<pre class="r"><code># specify theoretical worst-case point in space
-theoretical_worst_curv &lt;- 1
-theoretical_worst_pressure &lt;- 300
-
-# calculated each point&#39;s distance from the theoretical worst-case
-d_data &lt;- log_norm %&gt;%
-  rowwise() %&gt;%
-  mutate(d = ((theoretical_worst_curv - curv_sim)^2 + (theoretical_worst_pressure - pressure_sim)^2)^.5) %&gt;%
-  arrange(desc(d)) %&gt;%
-  ungroup()
-
-# make ecdf to map points to percentiles of empirical distribution
-d_ECDF_fcn &lt;- ecdf(d_data$d)
-
-# map the ecdf over all the calculated distances to convert them to percentiles
-d_pct_data &lt;- d_data %&gt;%
-  mutate(d_pct = map_dbl(d, d_ECDF_fcn)) %&gt;%
-  mutate(in_out = case_when(
-    d_pct &lt;= .05 ~ &quot;5% Worst-Case Points&quot;,
-    TRUE ~ &quot;95% Less Severe Population&quot;
-  )) %&gt;%
-  mutate(in_out = as_factor(in_out))
-
-wc_tbl &lt;- tibble(x = 1, y = 300)</code></pre>
-<p>Now visualize.</p>
-<pre class="r"><code># visualize
-d_plt &lt;- d_pct_data %&gt;%
-  ggplot(aes(x = curv_sim, y = pressure_sim, color = in_out)) +
-  geom_point(alpha = .5, size = 1) +
-  geom_point(aes(x = 1, y = 300), color = &quot;firebrick&quot;) +
-  geom_label_repel(
-    data = wc_tbl, aes(x, y),
-    label = &quot;Worst-Case Combination of \n vessel curvature and pressure&quot;,
-    fill = &quot;firebrick&quot;,
-    color = &quot;white&quot;,
-    segment.color = &quot;black&quot;,
-    segment.size = 1,
-    #                   min.segment.length = unit(1, &quot;lines&quot;),
-    nudge_y = 50,
-    nudge_x = 2
-  ) +
-  labs(
-    title = &quot;Joint Distribution of Curvature and Pressure&quot;,
-    subtitle = &quot;5% of points nearest to worst-case are identified&quot;,
-    x = &quot;Radius of Curvature (mm)&quot;,
-    y = &quot;Blood Presure (mm Hg)&quot;
-  ) +
-  theme_classic() +
-  ylim(c(0, 300)) +
-  theme(
-    legend.position = &quot;bottom&quot;,
-    legend.title = element_blank()
-  ) +
-  scale_color_viridis_d(option = &quot;D&quot;, end = .7)
-
-d_plt</code></pre>
-<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-29-1.png" width="100%" height="500px" /></p>
-<p>It’s a bit of an illusion since the axes aren’t scaled 1:1. Here’s a look at a scaled version showing the teal points closest to the point of interest.</p>
-<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-30-1.png" width="100%" height="500px" /></p>
-<p>Neat! We just split the data into the most severe 5% and least severe 95% based on a known point we want to avoid. You could imagine a similar calculation if we had a line that defined a worst-case boundary like we use for the failure threshold in a Goodman Diagram.<a href="#fn5" class="footnote-ref" id="fnref5"><sup>5</sup></a></p>
-<p>In other cases we just want to know the most common values (values in the region of highest probability) based on the multi-dimensional density calculation. In other words, we want to identify contours based on how close the points are to each other, not some arbitrary point in space or line. A kernel density estimate is going to be our tool of choice in all but the most basic cases. The KDE is non-parametric and can accommodate very complex joint distributions and density shapes.<a href="#fn6" class="footnote-ref" id="fnref6"><sup>6</sup></a></p>
-<p>Typically, the default contours on a density plot show an output called “level” but they can be converted to denote upper percentages of highest density regions. This is the method I show below.<a href="#fn7" class="footnote-ref" id="fnref7"><sup>7</sup></a></p>
-</div>
-<div id="identify-probability-contours-using-ks-package-and-kernel-density-estimation" class="section level2">
-<h2>Identify probability contours using ks package and kernel density estimation</h2>
-<p>This first chunk converts the data and generated the KDE. The bandwidth parameters controls the “smoothness” or granularity of the estimate and can be hard to specify in multiple dimensions. Hscv() provides a method of determining a reasonable bandwidth through cross-validation; see documentation in footnotes for more information if interested.</p>
-<pre class="r"><code># convert simulated data tibble to matrix
-d3m &lt;- correlated_ln_draws_tbl %&gt;%
-  as.matrix()
-
-# cross-validated bandwidth for kd (takes a while to calculate)
-# hscv1 &lt;- Hscv(correlated_ln_draws_tbl)
-# hscv1 %&gt;% write_rds(here::here(&quot;hscv1.rds&quot;))
-
-hscv1 &lt;- read_rds(here::here(&quot;hscv1.rds&quot;))
-
-# generate kernel density estimate from simulated population
-kd_d3m &lt;- ks::kde(d3m, H = hscv1, compute.cont = TRUE)</code></pre>
-</div>
-<div id="density-percentiles-from-kde-estimate" class="section level2">
-<h2>Density percentiles from kde estimate</h2>
-<p>The KDE estimate provides density percentiles that can be used to generate the contours the define the density regions in multiple dimensions.</p>
-<pre class="r"><code># see the kde&#39;s calculated density thresholds for specified proportions
-cont_vals_tbl &lt;- tidy(kd_d3m$cont) %&gt;%
-  mutate(n_row = row_number()) %&gt;%
-  mutate(probs = 100 - n_row) %&gt;%
-  select(probs, x)
-
-reference_grid_probs_tbl &lt;- cont_vals_tbl %&gt;%
-  rename(estimate = x)
-
-reference_grid_probs_tbl %&gt;%
-  head(10) %&gt;%
-  kable(align = rep(&quot;c&quot;))</code></pre>
-<table>
-<thead>
-<tr class="header">
-<th align="center">probs</th>
-<th align="center">estimate</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="center">99</td>
-<td align="center">0.0332949</td>
-</tr>
-<tr class="even">
-<td align="center">98</td>
-<td align="center">0.0321061</td>
-</tr>
-<tr class="odd">
-<td align="center">97</td>
-<td align="center">0.0310773</td>
-</tr>
-<tr class="even">
-<td align="center">96</td>
-<td align="center">0.0303446</td>
-</tr>
-<tr class="odd">
-<td align="center">95</td>
-<td align="center">0.0295937</td>
-</tr>
-<tr class="even">
-<td align="center">94</td>
-<td align="center">0.0288550</td>
-</tr>
-<tr class="odd">
-<td align="center">93</td>
-<td align="center">0.0282270</td>
-</tr>
-<tr class="even">
-<td align="center">92</td>
-<td align="center">0.0276995</td>
-</tr>
-<tr class="odd">
-<td align="center">91</td>
-<td align="center">0.0271418</td>
-</tr>
-<tr class="even">
-<td align="center">90</td>
-<td align="center">0.0266409</td>
-</tr>
-</tbody>
-</table>
-<pre class="r"><code>reference_grid_probs_tbl %&gt;%
-  tail(10) %&gt;%
-  kable(align = rep(&quot;c&quot;))</code></pre>
-<table>
-<thead>
-<tr class="header">
-<th align="center">probs</th>
-<th align="center">estimate</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="center">10</td>
-<td align="center">0.0018141</td>
-</tr>
-<tr class="even">
-<td align="center">9</td>
-<td align="center">0.0016195</td>
-</tr>
-<tr class="odd">
-<td align="center">8</td>
-<td align="center">0.0014430</td>
-</tr>
-<tr class="even">
-<td align="center">7</td>
-<td align="center">0.0012654</td>
-</tr>
-<tr class="odd">
-<td align="center">6</td>
-<td align="center">0.0010786</td>
-</tr>
-<tr class="even">
-<td align="center">5</td>
-<td align="center">0.0008795</td>
-</tr>
-<tr class="odd">
-<td align="center">4</td>
-<td align="center">0.0007005</td>
-</tr>
-<tr class="even">
-<td align="center">3</td>
-<td align="center">0.0005288</td>
-</tr>
-<tr class="odd">
-<td align="center">2</td>
-<td align="center">0.0003976</td>
-</tr>
-<tr class="even">
-<td align="center">1</td>
-<td align="center">0.0002657</td>
-</tr>
-</tbody>
-</table>
-</div>
-<div id="kde-estimates-in-the-range-of-the-variables" class="section level2">
-<h2>KDE estimates in the range of the variables</h2>
-<p>By default the KDE provides density estimates for a grid of points that covers the space of the variables.</p>
-<pre class="r"><code>kd_grid_estimates &lt;- kd_d3m</code></pre>
-<p>If we want to know the value at each point in the simulated population we use the eval.points argument.</p>
-<pre class="r"><code>mc_estimates &lt;- ks::kde(
-  x = d3m, H = hscv1,
-  compute.cont = TRUE,
-  eval.points = correlated_ln_draws_tbl %&gt;% as.matrix()
-)</code></pre>
-<p>Here are a couple different ways to convert the kde object features into a tibble:</p>
-<pre class="r"><code>mc_est_tbl_10000 &lt;- tibble(estimate = mc_estimates$estimate) %&gt;%
-  bind_cols(correlated_ln_draws_tbl)</code></pre>
-<pre class="r"><code>kd_grid_est_tbl_29k &lt;- broom:::tidy.kde(kd_grid_estimates) %&gt;%
-  pivot_wider(names_from = variable, values_from = value) %&gt;%
-  rename(ellip = x1, curv = x2, pressure = x3) %&gt;%
-  select(-obs)</code></pre>
-<pre class="r"><code>mc_est_tbl_10000 %&gt;%
-  head(10) %&gt;%
-  kable(align = &quot;c&quot;)</code></pre>
-<table>
-<thead>
-<tr class="header">
-<th align="center">estimate</th>
-<th align="center">ellip</th>
-<th align="center">curv</th>
-<th align="center">pressure</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="center">0.0140082</td>
-<td align="center">1.267618</td>
-<td align="center">2.158739</td>
-<td align="center">133.3040</td>
-</tr>
-<tr class="even">
-<td align="center">0.0118702</td>
-<td align="center">1.198681</td>
-<td align="center">4.437176</td>
-<td align="center">127.1982</td>
-</tr>
-<tr class="odd">
-<td align="center">0.0026530</td>
-<td align="center">1.375663</td>
-<td align="center">2.649938</td>
-<td align="center">160.2052</td>
-</tr>
-<tr class="even">
-<td align="center">0.0194232</td>
-<td align="center">1.236829</td>
-<td align="center">3.621202</td>
-<td align="center">141.5427</td>
-</tr>
-<tr class="odd">
-<td align="center">0.0122134</td>
-<td align="center">1.318572</td>
-<td align="center">2.541340</td>
-<td align="center">129.3427</td>
-</tr>
-<tr class="even">
-<td align="center">0.0167723</td>
-<td align="center">1.255885</td>
-<td align="center">3.236722</td>
-<td align="center">146.9361</td>
-</tr>
-<tr class="odd">
-<td align="center">0.0055484</td>
-<td align="center">1.326279</td>
-<td align="center">3.387357</td>
-<td align="center">167.8579</td>
-</tr>
-<tr class="even">
-<td align="center">0.0112270</td>
-<td align="center">1.240926</td>
-<td align="center">4.254830</td>
-<td align="center">145.7207</td>
-</tr>
-<tr class="odd">
-<td align="center">0.0082627</td>
-<td align="center">1.191865</td>
-<td align="center">1.853877</td>
-<td align="center">87.7240</td>
-</tr>
-<tr class="even">
-<td align="center">0.0019651</td>
-<td align="center">1.315273</td>
-<td align="center">4.144667</td>
-<td align="center">90.5485</td>
-</tr>
-</tbody>
-</table>
-<pre class="r"><code>kd_grid_est_tbl_29k %&gt;%
-  head(10) %&gt;%
-  kable(align = &quot;c&quot;)</code></pre>
-<table>
-<thead>
-<tr class="header">
-<th align="center">estimate</th>
-<th align="center">ellip</th>
-<th align="center">curv</th>
-<th align="center">pressure</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="center">0</td>
-<td align="center">0.8880910</td>
-<td align="center">0.1331512</td>
-<td align="center">31.02793</td>
-</tr>
-<tr class="even">
-<td align="center">0</td>
-<td align="center">0.9131427</td>
-<td align="center">0.1331512</td>
-<td align="center">31.02793</td>
-</tr>
-<tr class="odd">
-<td align="center">0</td>
-<td align="center">0.9381944</td>
-<td align="center">0.1331512</td>
-<td align="center">31.02793</td>
-</tr>
-<tr class="even">
-<td align="center">0</td>
-<td align="center">0.9632461</td>
-<td align="center">0.1331512</td>
-<td align="center">31.02793</td>
-</tr>
-<tr class="odd">
-<td align="center">0</td>
-<td align="center">0.9882978</td>
-<td align="center">0.1331512</td>
-<td align="center">31.02793</td>
-</tr>
-<tr class="even">
-<td align="center">0</td>
-<td align="center">1.0133495</td>
-<td align="center">0.1331512</td>
-<td align="center">31.02793</td>
-</tr>
-<tr class="odd">
-<td align="center">0</td>
-<td align="center">1.0384012</td>
-<td align="center">0.1331512</td>
-<td align="center">31.02793</td>
-</tr>
-<tr class="even">
-<td align="center">0</td>
-<td align="center">1.0634528</td>
-<td align="center">0.1331512</td>
-<td align="center">31.02793</td>
-</tr>
-<tr class="odd">
-<td align="center">0</td>
-<td align="center">1.0885045</td>
-<td align="center">0.1331512</td>
-<td align="center">31.02793</td>
-</tr>
-<tr class="even">
-<td align="center">0</td>
-<td align="center">1.1135562</td>
-<td align="center">0.1331512</td>
-<td align="center">31.02793</td>
-</tr>
-</tbody>
-</table>
-<p>Identify the 5% threshold value:</p>
-<pre class="r"><code># 5% contour line from kd grid based on 10k MC data
-percentile_5 &lt;- kd_d3m[[&quot;cont&quot;]][&quot;5%&quot;]</code></pre>
-<p>Verify that 5% (500/10,000) values fall below the threshold:</p>
-<pre class="r"><code>mc_est_tbl_10000 %&gt;% filter(estimate &lt;= percentile_5)</code></pre>
-<pre><code>## # A tibble: 500 x 4
-##     estimate ellip  curv pressure
-##        &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;    &lt;dbl&gt;
-##  1 0.000243   1.19  6.67    166. 
-##  2 0.000371   1.37  2.29     81.7
-##  3 0.000356   1.22  2.73    200. 
-##  4 0.000134   1.27  7.91    114. 
-##  5 0.000560   1.47  3.89    163. 
-##  6 0.0000732  1.47  4.67    282. 
-##  7 0.000527   1.29  6.13    185. 
-##  8 0.000254   1.48  2.44    136. 
-##  9 0.000644   1.19  6.63    135. 
-## 10 0.000856   1.43  4.98    156. 
-## # ... with 490 more rows</code></pre>
-<p>If we wanted to know the nearest probability contour line for every point we could make a function to do so.</p>
-<pre class="r"><code>get_probs_fcn &lt;- function(value) {
-  t &lt;- reference_grid_probs_tbl %&gt;%
-    mutate(value = value) %&gt;%
-    mutate(dif = abs(estimate - value)) %&gt;%
-    filter(dif == min(dif))
-
-  t[[1, 1]]
-}</code></pre>
-<p>Map the function over each value in the dataset.</p>
-<pre class="r"><code># mc_1_to_99_tbl &lt;- mc_est_tbl_10000 %&gt;%
-#   mutate(nearest_prob = map_dbl(estimate, get_probs_fcn))
-
-# mc_1_to_99_tbl %&gt;% write_rds(here::here(&quot;mc_1_to_99_tbl.rds&quot;))
-mc_1_to_99_tbl &lt;- read_rds(here::here(&quot;mc_1_to_99_tbl.rds&quot;))
-
-mc_1_to_99_tbl</code></pre>
-<pre><code>## # A tibble: 10,000 x 5
-##    estimate ellip  curv pressure nearest_prob
-##       &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;    &lt;dbl&gt;        &lt;dbl&gt;
-##  1  0.0140   1.27  2.16    133.            59
-##  2  0.0119   1.20  4.44    127.            52
-##  3  0.00265  1.38  2.65    160.            14
-##  4  0.0194   1.24  3.62    142.            75
-##  5  0.0122   1.32  2.54    129.            53
-##  6  0.0168   1.26  3.24    147.            68
-##  7  0.00555  1.33  3.39    168.            28
-##  8  0.0112   1.24  4.25    146.            50
-##  9  0.00826  1.19  1.85     87.7           39
-## 10  0.00197  1.32  4.14     90.5           11
-## # ... with 9,990 more rows</code></pre>
-<p>Let’s see what this actually did by comparing the probability contours estimated from the function above vs. the reference contours produced during generation of the kde object:</p>
-<pre class="r"><code>n &lt;- mc_1_to_99_tbl %&gt;%
-  select(nearest_prob, estimate) %&gt;%
-  mutate(set = as_factor(&quot;manual_fit_10k&quot;))
-
-p &lt;- cont_vals_tbl %&gt;%
-  mutate(set = as_factor(&quot;kde_output&quot;)) %&gt;%
-  rename(estimate = x, nearest_prob = probs)
-
-bind_rows(n, p) %&gt;%
-  filter(estimate &lt; .005 &amp; estimate &gt; 0) %&gt;%
-  ggplot(aes(x = estimate, y = nearest_prob)) +
-  geom_point(aes(color = set)) +
-  geom_vline(xintercept = percentile_5)</code></pre>
-<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-42-1.png" width="100%" height="500px" /></p>
-<p>So it appropriately rounded each value in the simulated population to the nearest whole percentile, as desired.</p>
-</div>
-<div id="density-plot-with-probability-contours-in-2d" class="section level2">
-<h2>Density Plot with Probability Contours in 2d</h2>
-<p>Now the fun part - Visualization. Here’s how I’d go about creating a 2d density plots. If you don’t care about specific probability contours, you can use the built in ggplot method. All you need is the raw data points, not the kde object or estimates. ggplot can do that for you.</p>
-<p>Here’s ellipticity vs. curvature:</p>
+## density function
+kd &lt;- ks::kde(d, compute.cont = TRUE, h = 0.05)</code></pre>
+<p>Here’s ellipticity vs. curvature (these lines are not probability region boundaries, but they are related)</p>
 <pre class="r"><code>cp_plt &lt;- correlated_ln_draws_tbl %&gt;%
   ggplot(aes(x = ellip, y = curv)) +
   geom_point(alpha = .3, size = .5) +
@@ -1685,13 +2270,7 @@ bind_rows(n, p) %&gt;%
   )
 
 cp_plt</code></pre>
-<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-43-1.png" width="100%" height="500px" /></p>
-<p>This is pretty good. But for specifying specific contours and specifically we’ll need a bit more. Here’s a solution that I adapted from one I found on Cross Validated.</p>
-<p>First, select the 2 variables of interest.</p>
-<pre class="r"><code>d &lt;- correlated_ln_draws_tbl %&gt;% select(ellip, curv)
-
-## density function
-kd &lt;- ks::kde(d, compute.cont = TRUE, h = 0.05)</code></pre>
+<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-65-1.png" width="100%" height="500px" /></p>
 <p>Now a a function to extract the points of the contour line from the kde:</p>
 <pre class="r"><code>get_contour &lt;- function(kd_out = kd, prob = &quot;5%&quot;) {
   contour_95 &lt;- with(kd_out, contourLines(
@@ -1722,72 +2301,72 @@ dat_out %&gt;%
 </thead>
 <tbody>
 <tr class="odd">
-<td align="center">0.1050379</td>
-<td align="center">1.024919</td>
-<td align="center">2.053556</td>
+<td align="center">0.1144314</td>
+<td align="center">1.027589</td>
+<td align="center">2.246533</td>
 <td align="center">5%</td>
 <td align="center">1</td>
 </tr>
 <tr class="even">
-<td align="center">0.1050379</td>
-<td align="center">1.023034</td>
-<td align="center">2.112579</td>
+<td align="center">0.1144314</td>
+<td align="center">1.027172</td>
+<td align="center">2.265195</td>
 <td align="center">5%</td>
 <td align="center">2</td>
 </tr>
 <tr class="odd">
-<td align="center">0.1050379</td>
-<td align="center">1.022015</td>
-<td align="center">2.176684</td>
+<td align="center">0.1144314</td>
+<td align="center">1.025855</td>
+<td align="center">2.335547</td>
 <td align="center">5%</td>
 <td align="center">3</td>
 </tr>
 <tr class="even">
-<td align="center">0.1050379</td>
-<td align="center">1.021665</td>
-<td align="center">2.240789</td>
+<td align="center">0.1144314</td>
+<td align="center">1.025083</td>
+<td align="center">2.405899</td>
 <td align="center">5%</td>
 <td align="center">4</td>
 </tr>
 <tr class="odd">
-<td align="center">0.1050379</td>
-<td align="center">1.021762</td>
-<td align="center">2.304894</td>
+<td align="center">0.1144314</td>
+<td align="center">1.025079</td>
+<td align="center">2.476250</td>
 <td align="center">5%</td>
 <td align="center">5</td>
 </tr>
 <tr class="even">
-<td align="center">0.1050379</td>
-<td align="center">1.022205</td>
-<td align="center">2.368999</td>
+<td align="center">0.1144314</td>
+<td align="center">1.025998</td>
+<td align="center">2.546603</td>
 <td align="center">5%</td>
 <td align="center">6</td>
 </tr>
 <tr class="odd">
-<td align="center">0.1050379</td>
-<td align="center">1.022956</td>
-<td align="center">2.433104</td>
+<td align="center">0.1144314</td>
+<td align="center">1.027589</td>
+<td align="center">2.606175</td>
 <td align="center">5%</td>
 <td align="center">7</td>
 </tr>
 <tr class="even">
-<td align="center">0.1050379</td>
-<td align="center">1.024009</td>
-<td align="center">2.497208</td>
+<td align="center">0.1144314</td>
+<td align="center">1.027847</td>
+<td align="center">2.616954</td>
 <td align="center">5%</td>
 <td align="center">8</td>
 </tr>
 <tr class="odd">
-<td align="center">0.1050379</td>
-<td align="center">1.024919</td>
-<td align="center">2.540507</td>
+<td align="center">0.1144314</td>
+<td align="center">1.030135</td>
+<td align="center">2.687306</td>
 <td align="center">5%</td>
 <td align="center">9</td>
 </tr>
 <tr class="even">
-<td align="center">0.1050379</td>
-<td align="center">1.025311</td>
-<td align="center">2.561313</td>
+<td align="center">0.1144314</td>
+<td align="center">1.032082</td>
+<td align="center">2.738850</td>
 <td align="center">5%</td>
 <td align="center">10</td>
 </tr>
@@ -1836,50 +2415,16 @@ ellip_curv_2plt &lt;- ggplot(data = kd_df, aes(x, y)) +
   theme(legend.position = &quot;none&quot;) +
   labs(x = &quot;Ellipticity (unitless)&quot;, y = &quot;Radius of Curvature (mm)&quot;)</code></pre>
 <pre class="r"><code>ggExtra::ggMarginal(ellip_curv_2plt, type = &quot;density&quot;, fill = &quot;#403891ff&quot;, alpha = .7)</code></pre>
-<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-49-1.png" width="100%" height="500px" /></p>
-<p>Nice! Now we have a clear delineation of the most common patients and most extreme patients and we can group them as desired. Almost done - the last thing to do is to see how to extend into 3d.</p>
-</div>
-<div id="density-plot-with-probability-contours-in-3d" class="section level2">
-<h2>Density Plot with Probability Contours in 3d</h2>
-<p>Honestly, this part is pretty easy thanks to a built in plot.kde method. Just use the cont argument to specify with probability contours you want.</p>
-<pre class="r"><code>plot(x = kd_d3m, cont = c(45, 70, 95), drawpoints = FALSE, col.pt = 1)</code></pre>
-<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/3d_cont_1.png" style="width:100.0%;height:100.0%" /></p>
-<p>Add points using the points3d function. In this case I add 2 sets, 1 for the 5% most extreme and 1 for the 95% most common.</p>
-<pre class="r"><code># plot(x = kd_d3m, cont = c(95) ,drawpoints = FALSE, col.pt = 1)
-mc_lowest_5_tbl &lt;- mc_1_to_99_tbl %&gt;% filter(estimate &lt; percentile_5)
-mc_6_to_100_tbl &lt;- mc_1_to_99_tbl %&gt;% filter(estimate &gt;= percentile_5)
-
-# points3d(x = mc_lowest_5_tbl$ellip, y = mc_lowest_5_tbl$curv, z = mc_lowest_5_tbl$pressure, color = &quot;dodgerblue&quot;,  size = 3, alpha = 1)
-
-# points3d(x = mc_6_to_100_tbl$ellip, y = mc_6_to_100_tbl$curv, z = mc_6_to_100_tbl$pressure, color = &quot;black&quot;,  size = 3, alpha = 1)</code></pre>
-<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/3dd1.png" style="width:100.0%;height:100.0%" /></p>
-<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/3dd2.png" style="width:100.0%;height:100.0%" /></p>
-<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/3dd3.png" style="width:100.0%;height:100.0%" /></p>
-<p>And there we have it! A 3d joint distribution with 95% probability density contour and groups separated by color and confirmed to cover 95/5% of the population.</p>
-<p>If you’ve made it this far, I thank you. Here is a brief summary of what I tried to capture in this post:</p>
-<blockquote>
-<ul>
-<li><strong>Manual method to simulate a population from a sample with known correlation structure using mvrnorm()</strong></li>
-<li><strong>Simplified / Efficient way to do the same using AnySim package</strong></li>
-<li><strong>Method for identifying worst-case 5% of patients when there is a known target point to stay away from</strong></li>
-<li><strong>Method for identifying most common 95% of patients with respect the their density</strong></li>
-<li><strong>Simple way to plot 2d density with ggplot, showing “levels”</strong></li>
-<li><strong>Generate 2d density plots with specified probability density contours and labels</strong></li>
-<li><strong>Method for creating 3d plots with specified probability density contours and in/out groups</strong></li>
-</ul>
-</blockquote>
+<p><img src="/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-70-1.png" width="100%" height="500px" /></p>
 </div>
 </div>
 <div class="footnotes">
 <hr />
 <ol>
 <li id="fn1"><p>Hamdan et. al. Journal of the American College of Cardiology, Volume 59, Issue 2, 2012, Pages 119-127<a href="#fnref1" class="footnote-back">↩︎</a></p></li>
-<li id="fn2"><p>The units of measure aren’t really important for the analysis but just for calibration the ellipticity is generally unitless (it is a ratio of the long axis over the short axis); curvature is usually in mm and represents the radius of curvature on the inner curve of the vessel; pressure is usually in mm Hg and can be assumed to be the systolic blood pressure.<a href="#fnref2" class="footnote-back">↩︎</a></p></li>
+<li id="fn2"><p>This method would be analogous to creating prediction intervals and are conditional on the model in the sense that the only parameters considered are the maximum likelihood estimates. Alternate, more conservative ways to simulate the population could involve tolerance intervals or bayesian methods with a simulated posterior distribution to push out predictions.<a href="#fnref2" class="footnote-back">↩︎</a></p></li>
 <li id="fn3"><p>see Water 2020, 12, 1645; <a href="doi:10.3390/w12061645" class="uri">doi:10.3390/w12061645</a><a href="#fnref3" class="footnote-back">↩︎</a></p></li>
-<li id="fn4"><p>simulated population conditional on the model - no sampling error is considered here. For population inference that takes into account sampling error, see tolerance intervals and the tolerance package in R<a href="#fnref4" class="footnote-back">↩︎</a></p></li>
-<li id="fn5"><p><a href="https://en.wikipedia.org/wiki/Goodman_relation" class="uri">https://en.wikipedia.org/wiki/Goodman_relation</a><a href="#fnref5" class="footnote-back">↩︎</a></p></li>
-<li id="fn6"><p><a href="https://bookdown.org/egarpor/NP-UC3M/#welcome" class="uri">https://bookdown.org/egarpor/NP-UC3M/#welcome</a><a href="#fnref6" class="footnote-back">↩︎</a></p></li>
-<li id="fn7"><p>Adapted from this Stack Overflow response: <a href="https://stackoverflow.com/questions/23437000/how-to-plot-a-contour-line-showing-where-95-of-values-fall-within-in-r-and-in" class="uri">https://stackoverflow.com/questions/23437000/how-to-plot-a-contour-line-showing-where-95-of-values-fall-within-in-r-and-in</a><a href="#fnref7" class="footnote-back">↩︎</a></p></li>
+<li id="fn4"><p>Adapted from this Stack Overflow response: <a href="https://stackoverflow.com/questions/23437000/how-to-plot-a-contour-line-showing-where-95-of-values-fall-within-in-r-and-in" class="uri">https://stackoverflow.com/questions/23437000/how-to-plot-a-contour-line-showing-where-95-of-values-fall-within-in-r-and-in</a><a href="#fnref4" class="footnote-back">↩︎</a></p></li>
 </ol>
 </div>
 
