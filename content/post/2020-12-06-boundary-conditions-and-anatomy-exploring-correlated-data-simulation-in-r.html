@@ -1,5 +1,5 @@
 ---
-title: Boundary Conditions and Anatomy - Exploring Correlated Data Simulation in R
+title: Boundary Conditions and Anatomy - Correlated Data and Kernel Density Estimation in R
 author: Riley
 date: '2020-12-17'
 categories:
@@ -76,8 +76,8 @@ library(plotly)</code></pre>
 <li><a href="#transform-data-and-kde-contour-to-original-scale">Transform data and kde contour to original scale</a></li>
 <li><a href="#plot-back-transformed-data-with-plotly">Plot Back-Transformed Data with Plotly</a></li>
 </ul></li>
-<li><a href="#filter-extreme-points-and-assess-points-on-95/5-contour">Filter extreme points and assess points on 95/5 contour</a></li>
-<li><a href="#appendix-a---simulating-a-multivariate-distribution-with-mass::mvnorm()">Appendix A - simulating a multivariate distribution with mass::mvnorm()</a>
+<li><a href="#filter-extreme-points-and-assess-points-on-95-5-contour">Filter extreme points and assess points on 95-5 contour</a></li>
+<li><a href="#appendix-a---simulating-a-multivariate-distribution-with-mass-mvnorm">Appendix A - simulating a multivariate distribution with mass mvnorm</a>
 <ul>
 <li><a href="#step-1---fit-distributions-to-each-variable">Step 1 - Fit Distributions to Each Variable</a></li>
 <li><a href="#step-2---transform-all-variables-to-normal">Step 2 - Transform all variables to normal</a></li>
@@ -808,7 +808,7 @@ mc_1_to_99_tbl</code></pre>
 ##  9  0.00826  1.19  1.85     87.7           39
 ## 10  0.00197  1.32  4.14     90.5           11
 ## # ... with 9,990 more rows</code></pre>
-<p>Now the data, kde estimate, and nearest probability contour region boundary are stored in one tibble. From here we can set up a 3d plot that shows probability contours of inter</p>
+<p>Now the data, kde estimate, and nearest probability contour region boundary are stored in one tibble.</p>
 </div>
 <div id="density-plot-with-probability-contours-in-3d" class="section level2">
 <h2>Density Plot with Probability Contours in 3d</h2>
@@ -1260,8 +1260,8 @@ fig &lt;- fig %&gt;%
 <p>The new image (shown on right) looks different near the boundary. Because we transformed everything from normal, no portion of the contour goes beyond the point cloud. This is what we want!</p>
 </div>
 </div>
-<div id="filter-extreme-points-and-assess-points-on-955-contour" class="section level1">
-<h1>Filter extreme points and assess points on 95/5 contour</h1>
+<div id="filter-extreme-points-and-assess-points-on-95-5-contour" class="section level1">
+<h1>Filter extreme points and assess points on 95-5 contour</h1>
 <p>Now that our kde contour is set up to properly segregate the extreme points relative to the mode, we can filter them away and assess the remaining points which lie on the contour. We do this by pulling the grid points that make up the 95/5 surface and evaluating them as percentiles.</p>
 <p>First, the ecdfs to get the percentiles from each variable</p>
 <pre class="r"><code>e1f &lt;- ecdf(full_mc_bt_tbl$ellip_bt)
@@ -1402,8 +1402,8 @@ fig &lt;- fig %&gt;% add_trace(x = top_10$ellip_bt, y = top_10$curv_bt, z = top_
 <p>And there we have it! 10 candidate points representing credible points on the edge of the 5% probability region for 3 correlated lognormal variables with proper treatment of the boundary.</p>
 <p>If you’ve made it this far, I thank you. Here are a couple appendices as a reward!</p>
 </div>
-<div id="appendix-a---simulating-a-multivariate-distribution-with-massmvnorm" class="section level1">
-<h1>Appendix A - simulating a multivariate distribution with mass::mvnorm()</h1>
+<div id="appendix-a---simulating-a-multivariate-distribution-with-mass-mvnorm" class="section level1">
+<h1>Appendix A - simulating a multivariate distribution with mass mvnorm</h1>
 <p>Workflow:</p>
 <div id="htmlwidget-2" style="width:100%;height:500px;" class="grViz html-widget"></div>
 <script type="application/json" data-for="htmlwidget-2">{"x":{"diagram":"digraph flowchart {\n      # node definitions with substituted label text\n      node [fontname = Helvetica, shape = rectangle, fillcolor = yellow]        \n      tab1 [label = \"Step 1: Fit distributions to each variable in the original dataset.\n Note parameters, correlations, covariances in original data\"]\n      tab2 [label = \"Step 2: Transform all variables to normal\"]\n      tab3 [label = \"Step 3: Fit normal distributions to each transformed variablet.\n Note parameters, correlations, covariances in transformed data\"]\n      tab4 [label = \"Step 4: Draw joint distribution using MASS::mvrnorm() or equivalent function.\n Use parameters and covariance matrix from normal, transformed data\"]\n      tab5 [label = \"Step 5: Back-transform simulated data to original distribution\"]\n      tab6 [label = \"Step 6: Evaluate parameters and marginal distributions of the back-transfomed data.\n Compare to raw, original data to see if marginals and correlations were recreated in the sim\"]\n      # edge definitions with the node IDs\n      tab1 -> tab2 -> tab3 -> tab4 -> tab5 -> tab6;\n      }\n      ","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>

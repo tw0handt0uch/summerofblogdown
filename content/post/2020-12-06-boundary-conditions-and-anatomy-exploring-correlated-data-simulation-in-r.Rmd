@@ -1,5 +1,5 @@
 ---
-title: Boundary Conditions and Anatomy - Exploring Correlated Data Simulation in R
+title: Boundary Conditions and Anatomy - Correlated Data and Kernel Density Estimation in R
 author: Riley
 date: '2020-12-17'
 categories:
@@ -583,7 +583,7 @@ mc_1_to_99_tbl <- read_rds(here::here("mc_1_to_99_tbl.rds"))
 mc_1_to_99_tbl
 ```
 
-Now the data, kde estimate, and nearest probability contour region boundary are stored in one tibble.  From here we can set up a 3d plot that shows probability contours of inter
+Now the data, kde estimate, and nearest probability contour region boundary are stored in one tibble.  
 
 
 ## Density Plot with Probability Contours in 3d
@@ -842,7 +842,7 @@ fig <- fig %>%
 
 The new image (shown on right) looks different near the boundary.  Because we transformed everything from normal, no portion of the contour goes beyond the point cloud. This is what we want!
 
-# Filter extreme points and assess points on 95/5 contour
+# Filter extreme points and assess points on 95-5 contour
 
 Now that our kde contour is set up to properly segregate the extreme points relative to the mode, we can filter them away and assess the remaining points which lie on the contour.  We do this by pulling the grid points that make up the 95/5 surface and evaluating them as percentiles.  
 
@@ -894,7 +894,7 @@ And there we have it! 10 candidate points representing credible points on the ed
 
 If you've made it this far, I thank you.  Here are a couple appendices as a reward!
 
-# Appendix A - simulating a multivariate distribution with mass::mvnorm()
+# Appendix A - simulating a multivariate distribution with mass mvnorm
 
 Workflow:
 

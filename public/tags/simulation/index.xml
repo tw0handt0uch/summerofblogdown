@@ -12,7 +12,7 @@
     
     
     <item>
-      <title>Boundary Conditions and Anatomy - Exploring Correlated Data Simulation in R</title>
+      <title>Boundary Conditions and Anatomy - Correlated Data and Kernel Density Estimation in R</title>
       <link>/post/boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r/</link>
       <pubDate>Thu, 17 Dec 2020 00:00:00 +0000</pubDate>
       
@@ -81,8 +81,8 @@ library(plotly)&lt;/code&gt;&lt;/pre&gt;
 &lt;li&gt;&lt;a href=&#34;#transform-data-and-kde-contour-to-original-scale&#34;&gt;Transform data and kde contour to original scale&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href=&#34;#plot-back-transformed-data-with-plotly&#34;&gt;Plot Back-Transformed Data with Plotly&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href=&#34;#filter-extreme-points-and-assess-points-on-95/5-contour&#34;&gt;Filter extreme points and assess points on 95/5 contour&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a href=&#34;#appendix-a---simulating-a-multivariate-distribution-with-mass::mvnorm()&#34;&gt;Appendix A - simulating a multivariate distribution with mass::mvnorm()&lt;/a&gt;
+&lt;li&gt;&lt;a href=&#34;#filter-extreme-points-and-assess-points-on-95-5-contour&#34;&gt;Filter extreme points and assess points on 95-5 contour&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#appendix-a---simulating-a-multivariate-distribution-with-mass-mvnorm&#34;&gt;Appendix A - simulating a multivariate distribution with mass mvnorm&lt;/a&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href=&#34;#step-1---fit-distributions-to-each-variable&#34;&gt;Step 1 - Fit Distributions to Each Variable&lt;/a&gt;&lt;/li&gt;
 &lt;li&gt;&lt;a href=&#34;#step-2---transform-all-variables-to-normal&#34;&gt;Step 2 - Transform all variables to normal&lt;/a&gt;&lt;/li&gt;
@@ -813,7 +813,7 @@ mc_1_to_99_tbl&lt;/code&gt;&lt;/pre&gt;
 ##  9  0.00826  1.19  1.85     87.7           39
 ## 10  0.00197  1.32  4.14     90.5           11
 ## # ... with 9,990 more rows&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;Now the data, kde estimate, and nearest probability contour region boundary are stored in one tibble. From here we can set up a 3d plot that shows probability contours of inter&lt;/p&gt;
+&lt;p&gt;Now the data, kde estimate, and nearest probability contour region boundary are stored in one tibble.&lt;/p&gt;
 &lt;/div&gt;
 &lt;div id=&#34;density-plot-with-probability-contours-in-3d&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;Density Plot with Probability Contours in 3d&lt;/h2&gt;
@@ -1265,8 +1265,8 @@ fig &amp;lt;- fig %&amp;gt;%
 &lt;p&gt;The new image (shown on right) looks different near the boundary. Because we transformed everything from normal, no portion of the contour goes beyond the point cloud. This is what we want!&lt;/p&gt;
 &lt;/div&gt;
 &lt;/div&gt;
-&lt;div id=&#34;filter-extreme-points-and-assess-points-on-955-contour&#34; class=&#34;section level1&#34;&gt;
-&lt;h1&gt;Filter extreme points and assess points on 95/5 contour&lt;/h1&gt;
+&lt;div id=&#34;filter-extreme-points-and-assess-points-on-95-5-contour&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Filter extreme points and assess points on 95-5 contour&lt;/h1&gt;
 &lt;p&gt;Now that our kde contour is set up to properly segregate the extreme points relative to the mode, we can filter them away and assess the remaining points which lie on the contour. We do this by pulling the grid points that make up the 95/5 surface and evaluating them as percentiles.&lt;/p&gt;
 &lt;p&gt;First, the ecdfs to get the percentiles from each variable&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;e1f &amp;lt;- ecdf(full_mc_bt_tbl$ellip_bt)
@@ -1407,8 +1407,8 @@ fig &amp;lt;- fig %&amp;gt;% add_trace(x = top_10$ellip_bt, y = top_10$curv_bt, 
 &lt;p&gt;And there we have it! 10 candidate points representing credible points on the edge of the 5% probability region for 3 correlated lognormal variables with proper treatment of the boundary.&lt;/p&gt;
 &lt;p&gt;If you’ve made it this far, I thank you. Here are a couple appendices as a reward!&lt;/p&gt;
 &lt;/div&gt;
-&lt;div id=&#34;appendix-a---simulating-a-multivariate-distribution-with-massmvnorm&#34; class=&#34;section level1&#34;&gt;
-&lt;h1&gt;Appendix A - simulating a multivariate distribution with mass::mvnorm()&lt;/h1&gt;
+&lt;div id=&#34;appendix-a---simulating-a-multivariate-distribution-with-mass-mvnorm&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Appendix A - simulating a multivariate distribution with mass mvnorm&lt;/h1&gt;
 &lt;p&gt;Workflow:&lt;/p&gt;
 &lt;div id=&#34;htmlwidget-2&#34; style=&#34;width:100%;height:500px;&#34; class=&#34;grViz html-widget&#34;&gt;&lt;/div&gt;
 &lt;script type=&#34;application/json&#34; data-for=&#34;htmlwidget-2&#34;&gt;{&#34;x&#34;:{&#34;diagram&#34;:&#34;digraph flowchart {\n      # node definitions with substituted label text\n      node [fontname = Helvetica, shape = rectangle, fillcolor = yellow]        \n      tab1 [label = \&#34;Step 1: Fit distributions to each variable in the original dataset.\n Note parameters, correlations, covariances in original data\&#34;]\n      tab2 [label = \&#34;Step 2: Transform all variables to normal\&#34;]\n      tab3 [label = \&#34;Step 3: Fit normal distributions to each transformed variablet.\n Note parameters, correlations, covariances in transformed data\&#34;]\n      tab4 [label = \&#34;Step 4: Draw joint distribution using MASS::mvrnorm() or equivalent function.\n Use parameters and covariance matrix from normal, transformed data\&#34;]\n      tab5 [label = \&#34;Step 5: Back-transform simulated data to original distribution\&#34;]\n      tab6 [label = \&#34;Step 6: Evaluate parameters and marginal distributions of the back-transfomed data.\n Compare to raw, original data to see if marginals and correlations were recreated in the sim\&#34;]\n      # edge definitions with the node IDs\n      tab1 -&gt; tab2 -&gt; tab3 -&gt; tab4 -&gt; tab5 -&gt; tab6;\n      }\n      &#34;,&#34;config&#34;:{&#34;engine&#34;:&#34;dot&#34;,&#34;options&#34;:null}},&#34;evals&#34;:[],&#34;jsHooks&#34;:[]}&lt;/script&gt;
