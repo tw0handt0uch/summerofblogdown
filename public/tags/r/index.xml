@@ -2015,7 +2015,10 @@ compare_tbl %&amp;gt;%
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;#Appendix B - 2d kde plot with probability traces&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;appendix-b---2d-kde-plot-with-probability-traces&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Appendix B - 2d kde plot with probability traces&lt;/h1&gt;
 &lt;p&gt;First, select the 2 variables of interest.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;d &amp;lt;- correlated_ln_draws_tbl %&amp;gt;% select(ellip, curv)
 
@@ -2183,7 +2186,6 @@ ellip_curv_2plt &amp;lt;- ggplot(data = kd_df, aes(x, y)) +
   labs(x = &amp;quot;Ellipticity (unitless)&amp;quot;, y = &amp;quot;Radius of Curvature (mm)&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;ggExtra::ggMarginal(ellip_curv_2plt, type = &amp;quot;density&amp;quot;, fill = &amp;quot;#403891ff&amp;quot;, alpha = .7)&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;&lt;img src=&#34;/post/2020-12-06-boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r_files/figure-html/unnamed-chunk-70-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
-&lt;/div&gt;
 &lt;/div&gt;
 &lt;div class=&#34;footnotes&#34;&gt;
 &lt;hr /&gt;
