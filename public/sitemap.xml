@@ -3,14 +3,43 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
   <url>
-    <loc>/post/boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r/</loc>
-    <lastmod>2020-12-17T00:00:00+00:00</lastmod>
+    <loc>/post/</loc>
+    <lastmod>2021-04-01T00:00:00+00:00</lastmod>
+    <priority>0</priority>
   </url>
   
   <url>
-    <loc>/post/</loc>
-    <lastmod>2020-12-17T00:00:00+00:00</lastmod>
+    <loc>/tags/solidworks/</loc>
+    <lastmod>2021-04-01T00:00:00+00:00</lastmod>
     <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>/tags/</loc>
+    <lastmod>2021-04-01T00:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>/post/tutorial-design-study-in-solidworks-with-data-analysis-in-r/</loc>
+    <lastmod>2021-04-01T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/</loc>
+    <lastmod>2021-04-01T00:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>/tags/tutorial/</loc>
+    <lastmod>2021-04-01T00:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>/post/boundary-conditions-and-anatomy-exploring-correlated-data-simulation-in-r/</loc>
+    <lastmod>2020-12-17T00:00:00+00:00</lastmod>
   </url>
   
   <url>
@@ -27,18 +56,6 @@
   
   <url>
     <loc>/tags/stats/</loc>
-    <lastmod>2020-12-17T00:00:00+00:00</lastmod>
-    <priority>0</priority>
-  </url>
-  
-  <url>
-    <loc>/tags/</loc>
-    <lastmod>2020-12-17T00:00:00+00:00</lastmod>
-    <priority>0</priority>
-  </url>
-  
-  <url>
-    <loc>/</loc>
     <lastmod>2020-12-17T00:00:00+00:00</lastmod>
     <priority>0</priority>
   </url>

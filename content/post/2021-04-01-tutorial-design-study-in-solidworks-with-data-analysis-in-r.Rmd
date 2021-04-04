@@ -1,0 +1,386 @@
+---
+title: Tutorial - Design Study in Solidworks with Data Analysis in R
+author: Riley
+date: '2021-04-01'
+categories:
+  - R
+tags:
+  - Solidworks
+  - tutorial
+slug: tutorial-design-study-in-solidworks-with-data-analysis-in-r
+draft: no
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  out.width = "100%",
+  out.height = "500px",
+  fig.pos = "center",
+  dpi = 300
+)
+```
+
+I decided to do something a little bit different with this post and show how R can be used in tandem with a traditional engineering CAD program.  Together they comprise a streamlined and repeatable workflow that I've tried to leverage on my job when it makes sense to do so. 
+
+Solidworks is a 3d CAD program that is used commonly in industry.  One powerful feature that I don't see used that much is the Design Study module.  This module allows the user to quickly vary the parameters of a solid model over a grid of specified values and measure one or more outputs of interest.  Advanced users can quickly iterate geometries and perform FEA or optimize for mass or thermal properties.  In this use case, we want to measure a geometrical feature of interest: the perimeter at a specific angle and location in a mock vessel.  
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/0_cut_planes.png){width=100%}
+Motivation: Real arteries can take very abrupt turns that span a large angulation with a small radius of curvature. Some implantable devices cannot follow the curve perfectly and may therefore stabilize in a configuration that is not perfectly coaxial with the vessel.  If the implant has important design features at specific positions (i.e. anchoring barbs, sealing rings, fixation zones, etc) then the device may not perform as intended.  It is therefore important to understand the perimeter of the vessel on the cross sectional plane at which the implant may lie, not just orthogonal to the centerline.  This perimeter can be very difficult to calculate analytically but a Solidworks Design Study can provide measurement data across a range of input values and the output function can be mapped similar to a Monte Carlo study (or more appropriately, a grid approximation method).  The measurement of interest is shown below in green for 2 different angulations (45, 60 degrees) and two different inner radii of curvature (5 and 19 mm).  The measurement plane is set to 15 degrees off orthogonal which assumes our implantable device can bend a little bit (15 deg) but not fully conform.  We see that for these two scenarios, the perimeter (green trace) changes from 62.9 mm to 67.8 mm which is enough to be relevant with respect to implant sizing and performance.
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/01_param_model.png){width=100%}
+
+If you have no interest in the Solidworks portion then please skip down to the R portion, and visa versa.
+
+# Libraries
+```{r}
+library(tidyverse)
+library(readxl)
+library(here)
+library(gt)
+library(rayshader)
+library(knitr)
+library(av)
+```
+
+```{r, echo=FALSE}
+# copied function to render table of contents anywhere in the doc
+render_toc <- function(
+                       filename,
+                       toc_header_name = "Table of Contents",
+                       base_level = NULL,
+                       toc_depth = 3) {
+  x <- readLines(filename, warn = FALSE)
+  x <- paste(x, collapse = "\n")
+  x <- paste0("\n", x, "\n")
+  for (i in 5:3) {
+    regex_code_fence <- paste0("\n[`]{", i, "}.+?[`]{", i, "}\n")
+    x <- gsub(regex_code_fence, "", x)
+  }
+  x <- strsplit(x, "\n")[[1]]
+  x <- x[grepl("^#+", x)]
+  if (!is.null(toc_header_name)) {
+    x <- x[!grepl(paste0("^#+ ", toc_header_name), x)]
+  }
+  if (is.null(base_level)) {
+    base_level <- min(sapply(gsub("(#+).+", "\\1", x), nchar))
+  }
+  start_at_base_level <- FALSE
+  x <- sapply(x, function(h) {
+    level <- nchar(gsub("(#+).+", "\\1", h)) - base_level
+    if (level < 0) {
+      stop(
+        "Cannot have negative header levels. Problematic header \"", h, '" ',
+        "was considered level ", level, ". Please adjust `base_level`."
+      )
+    }
+    if (level > toc_depth - 1) {
+      return("")
+    }
+    if (!start_at_base_level && level == 0) start_at_base_level <<- TRUE
+    if (!start_at_base_level) {
+      return("")
+    }
+    if (grepl("\\{#.+\\}(\\s+)?$", h)) {
+      # has special header slug
+      header_text <- gsub("#+ (.+)\\s+?\\{.+$", "\\1", h)
+      header_slug <- gsub(".+\\{\\s?#([-_.a-zA-Z]+).+", "\\1", h)
+    } else {
+      header_text <- gsub("#+\\s+?", "", h)
+      header_text <- gsub("\\s+?\\{.+\\}\\s*$", "", header_text) # strip { .tabset ... }
+      header_text <- gsub("^[^[:alpha:]]*\\s*", "", header_text) # remove up to first alpha char
+      header_slug <- paste(strsplit(header_text, " ")[[1]], collapse = "-")
+      header_slug <- tolower(header_slug)
+    }
+    paste0(strrep(" ", level * 4), "- [", header_text, "](#", header_slug, ")")
+  })
+  x <- x[x != ""]
+  knitr::asis_output(paste(x, collapse = "\n"))
+}
+```
+
+
+```{r toc, echo=FALSE} 
+render_toc("2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r.Rmd")
+```
+
+
+# Solidworks Design Study
+
+## Creating the Solid Model
+
+### Sketch the Sweep Path that will Define Vessel Shape
+
+The first order of business is setting up a parameterized sketch.  This allows us to change variables of interest without the whole structure breaking down.  A convenient way to form a mock vessel is to sweep a profile (cross section) along a path.  In this first sketch the sweep path is defined on the front plane and global variables are established that allow us to vary the angulation and the inner radius of curvature.  Global variables are set up from the Tools -> Equations tabs. The controlling geometry should be on the inner curve, with the vessel centerline and greater curve constrained using offsets to the inner curve.
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/1_sweep_path_sketch.png){width=100%}
+
+### Sketch the Sweep Profile that will Define Vessel Diameter
+
+On the top plane, sketch a circle and offset it about 1 mm. The center of the circle should be the point the represents the centerline of the sweep path from the front view.  The circle should be coincident with the point that represents the inner curve of the sweep path.
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/22_sweep_profile_top.png){width=100%}
+
+### Sweep the Circular Profile along the Path From Sketch 1
+
+Create a sweep feature using the sketch profile and path previously defined.  Check the box for "merge tangent faces".
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/3_sweep_feature.png){width=100%}
+
+### Add Reference Geometry Planes
+
+Insert two planes using the "Reference Geometry" tab. Place the first on the same plane as we drew the sketch profile (this is just for convenience, you can use the face of the sketch profile if preferred).  Place the second at the desired cutting measurement distance relative to the bend takeoff (in our case, 10 mm after the start of the bend).  Assigning a variable to the vertical straight section and using an equation to position the reference plane 10 mm below that would be a good technique.
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/4_reference_planes.png){width=100%}
+
+### Add Reference Axis for Cutting Plane
+
+Sketch a line on the 2nd reference plane orthogonal to the plane of the curves vessel centerline.  This line will serve as an axis for the tilted cutting plane which will "slice" the vessel at 15 degrees relative to the reference planes.
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/5_reference_axis.png){width=100%}
+
+### Add Angled Cutting Plane
+
+Create the cutting plane using the "Reference Geometry" tab.  Define the plane using a first reference of the offset plane from 2 steps ago with a 15 degree designated angle.  For the 2nd reference, use the the reference axis created in the previous step. 
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/6_angled_cutting_plane.png){width=100%}
+
+### Sketch Cutting Circle on Angled Cutting Plane
+
+Open a new sketch on the cutting plane. Sketch a large circle of arbitrary diameter - it just has to be sufficiently large to cut through any angulated vessel geometry below it when used as an extruded cut feature.
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/7_angled_cutting_plane.png){width=100%}
+
+### Extuded Cut from Angled Plane
+
+Use the circle sketch from the previous step to create an extruded cut feature and specify "through all" as the end condition so it removes all geometry below it regardless of angulation.
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/8_cut_from_angled_plane.png){width=100%}
+
+### Set Up Design Study by Adding Variables
+
+Create a new Design Study by going to Insert -> Design Study -> Add.  A new tab will open in the lower left with a Design Study interface and 3 sub-tabs with different views of the study.  In Variable View tab, add new variables by clicking the drop down shown in Arrow 1.  Enter names for the variables of interest  as shown in Arrow 2 and specify that the variables are global variables (Arrow 3). Select the appropriate pre-existing variable at Arrow 4.  
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/99_variable_setup.png){width=100%}
+
+### Set Ranges for Variables of Interest
+
+Back in the Variable View tab, use the dropdown to select "Range with Steps" and then specify the desired range and step increment (I did 10 to 18 degrees of angulation by 5 and 5 to 30 mm vessel inner radius of curvature in steps of 1).
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/10_set_variable_ranges.png){width=100%}
+
+### Add Measurement Sensor
+
+In the "Constraints" section of the Variable View tab, add a sensor using the dropdown.  Choose "Measurement" as the sensor type and select the inner perimeter of the mock vessel at the cut section as the edge to measure.  After selecting the edge, be sure to click on the icon that looks like a line plot called "Add Sensor" in the "Measure" pop-up.  Back in the Variable View Tab, use the drop down to select the newly created sensor (it will be called "Measurement1" or similar) and specify that the sensor will be used to monitor only.
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/11_add_measurement_sensor.png){width=100%}
+
+### Design Study at Work
+
+On the Table View tab, click "Run".  You will get a warning about many iterations and then the study will start, with new realizations of the model displayed for each permutation in the table.  Verify that the Measurement1 sensor field is being populated as the study progresses.  When complete, click the disk icon to save the output as a .csv on your path of choice.
+
+Congrats!  This concludes the Solidworks portion of this vignette.
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/design_study.gif){width=100%}
+
+
+# R Analyis and Visualization
+
+## CSV Output from Design Study
+
+Take a look at how the Design Study sent the data to the .csv.  It looks very similar to what was displayed in the Solidworks Design Study field with each Scenario as a column and the variables as rows. This is the exact opposite of what we want for a tidy data format. There are also some columns that won't be useful (Format, Unit) and a couple of header lines that will need to be removed during the file import to R.
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/12_csv_output.png){width=100%}
+
+## Load Data
+
+Bring the data into R using read_csv with skip = 2 to omit those top rows that don't contain useful information.
+
+```{r}
+data_raw_tbl <- read_csv(here("tilt_vessel_output_02apr2021.csv"), skip = 2)
+
+data_raw_tbl %>%
+  gt_preview()
+```
+
+# Clean Data
+
+Now a series of initial cleaning steps:
+
+> * clean_names() to convert the column names to snake_case and remove any other weirdness
+> * remove the format and unit columns using select
+> * drop_na() to remove the useless row containing just "calculated"
+> * rename the first column header to something shorter "param" 
+> * recode the value "Measurement7" as just "measurement" in a way that would work for other numeric suffixes
+> * convert the param column to be a factor
+
+## Reformat and clean in wide format
+```{r}
+study_1_wide_tbl <- data_raw_tbl %>%
+  janitor::clean_names() %>%
+  select(-c(format, unit)) %>%
+  drop_na() %>%
+  rename(param = parameter_constraint_or_goal) %>%
+  mutate(across(contains(match = "_"), as.double)) %>%
+  mutate(param = case_when(
+    str_detect(param, "Measurement") ~ "measurement",
+    TRUE ~ param
+  )) %>%
+  mutate(param = param %>% as_factor())
+
+study_1_wide_tbl %>%
+  gt_preview()
+```
+
+# Reshape Data
+
+## Convert to long format in preparation for visualization
+
+We've done some good cleaning but need to pivot from wide format to long so that each column can be a variable and each row a value. To accomplish this, use a pipe that does the following:
+
+
+> * pivot_longer() on all columns except param to bring the data into 3 total columns: "param", "name", and "value"
+> * use the underscore character within the "scenario_x" values to separate the "name" column into 2 columns ("delete" and "scenario")  
+> * remove the first row that wasn't part of the design study (was just the initial state of the model)
+> * convert "scenario" column to type double
+> * remove the "delete" column
+> * reorder the columns using select()
+> * pivot_wider() to push all the variables contained as values in "param" into columns of their own
+> * format the measurement column
+
+
+```{r}
+study_1_long_tbl <- study_1_wide_tbl %>%
+  pivot_longer(cols = -param) %>%
+  separate(col = name, into = c("delete", "scenario"), sep = "_") %>%
+  filter(scenario != "value") %>%
+  mutate(scenario = scenario %>% as.double()) %>%
+  select(-delete) %>%
+  select(scenario, param, value) %>%
+  pivot_wider(id_cols = c(param, scenario), names_from = param) %>%
+  mutate(measurement = measurement %>% round(digits = 2))
+
+study_1_long_tbl %>%
+  gt_preview()
+```
+
+# Visualize
+
+## ggplot
+
+Create a raster plot with Radius of Curvature plotted against Vessel Angulation.  
+
+```{r}
+surface_plt <- study_1_long_tbl %>%
+  ggplot(aes(x = vessel_roc, y = vessel_angulation)) +
+  geom_raster(aes(fill = measurement), interpolate = TRUE) +
+  scale_fill_viridis_c(option = "A") +
+  labs(
+    x = "Vessel Inner Radius of Curvature (mm)",
+    y = "Vessel Centerline Angulation (degrees)",
+    title = "Vessel Perimeter as a Function of Angulation and Radius of Curvature",
+    subtitle = "Measured at 10 mm below onset of angulation, Vessel ID = 20 mm",
+    fill = "Perimeter (mm)"
+  )
+
+
+surface_plt
+```
+
+There's not a lot of action after about 15 on the x-axis so filter away those points and replot.  Normally you would just rescale the axis limits but this way you don't have to fiddle with the margins.   
+```{r}
+
+surface_plt_2 <- study_1_long_tbl %>%
+  filter(vessel_roc < 15) %>%
+  ggplot(aes(x = vessel_roc, y = vessel_angulation)) +
+  geom_raster(aes(fill = measurement), interpolate = TRUE) +
+  scale_fill_viridis_c(option = "A") +
+  labs(
+    x = "Vessel Inner Radius of Curvature (mm)",
+    y = "Vessel Centerline Angulation (degrees)",
+    title = "Vessel Perimeter as a Function of Angulation and Radius of Curvature",
+    subtitle = "Measured at 10 mm below onset of angulation, Vessel ID = 20 mm",
+    fill = "Perimeter (mm)"
+  )
+
+surface_plt_2
+```
+
+## rayshader
+
+Push the plot into 3d using rayshader for some better perspective
+```{r}
+
+# plot_gg(surface_plt_2, width=7, height = 5, multicore = TRUE, windowsize = c(1400,866), sunangle=225,
+#         zoom = 0.60, phi = 30, theta = 45)
+```
+
+Static
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/13_static.png){width=100%}
+
+```{r echo = FALSE}
+
+# Set up the camera position and angle
+#  phivechalf = 30 + 60 * 1/(1 + exp(seq(-7, 20, length.out = 180)/2))
+#  phivecfull = c(phivechalf, rev(phivechalf))
+#  thetavec = 0 + 60 * sin(seq(0,359,length.out = 360) * pi/180)
+#  zoomvec = 0.45 + 0.2 * 1/(1 + exp(seq(-5, 20, length.out = 180)))
+#  zoomvecfull = c(zoomvec, rev(zoomvec))
+#
+# #Actually render the video.
+#  render_movie(filename = "surface_plt_2", type = "custom",
+#              frames = 360,  phi = phivecfull, zoom = zoomvecfull, theta = thetavec)
+```
+
+Dynamic
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/sp2_small_2.gif){width=100%}
+
+# Takeaways and Conclusions
+
+The figure tells an interesting story:  as long as the vessel angulation is less than about 20 degrees and the radius of curvature less than about 15 mm then the perimeter at the plane of interest is relatively low.  But if the radius of curvature is less than 15 mm and the angulation greater than 20 degree, the perimeter will increase relative to baseline with the largest increases occurring at higher values of angulation and lower values of radius of curvature.  Let's look at a couple of cases as a gut-check, using this little helper tibble to plot lines in some regions of interest.
+
+Case 1:
+
+*  Radius of Curvature = 5, Angulation = 20, 70:  we can see that when both variables are on the low end of their range, the cut plane is actually below the angulation and the perimeter will be relatively low. As the Angulation goes up to 70, the perimeter is affected and will be larger. 
+
+```{r}
+vlines_tbl <- tibble(
+  vessel_roc = c(5, 5, 13, 13),
+  vessel_angulation = c(20, 70, 20, 70),
+  plot = c(1, 1, 2, 2)
+)
+
+surface_plt_2 +
+  geom_line(data = vlines_tbl %>% filter(plot == 1), color = "white", linetype = "dashed") +
+  geom_point(data = vlines_tbl %>% filter(plot == 1), color = "white", size = 2)
+```
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/14_20_5_case.png){width=100%}
+
+Case 2:
+
+*  Radius of Curvature = 13, Angulation = 20, 70:  when the radius of curvature is sufficiently large, the perimeter measurement at the cutting plane is relatively insensitive the angulation.
+
+```{r}
+surface_plt_2 +
+  geom_line(data = vlines_tbl %>% filter(plot == 2), color = "white", linetype = "dashed") +
+  geom_point(data = vlines_tbl %>% filter(plot == 2), color = "white", size = 2)
+```
+
+![](/post/2021-04-01-tutorial-design-study-in-solidworks-with-data-analysis-in-r_files/14_20_5_case2.png){width=100%}
+
+# Final Thought
+
+This provides our hypothetical clinical imaging team with some important insight about patient screening that will hopefully improve outcomes. 
+If you've made it this far, I thank you for your attention and hope this walkthrough was useful!
+
+# sessionInfo
+
+```{r}
+sessionInfo()
+```
+
