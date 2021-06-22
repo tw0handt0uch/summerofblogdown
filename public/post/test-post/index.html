@@ -7,7 +7,7 @@
   <meta name="description" content="">
   <meta name="generator" content="Hugo 0.56.1" />
 
-  <title>test post &middot; [R]eliability</title>
+  <title>test_post &middot; [R]eliability</title>
 
     
 
@@ -216,7 +216,7 @@
 
 
 <div class="header">
-  <h1>test post</h1>
+  <h1>test_post</h1>
   <h2></h2>
 </div>
 <div class="content">
@@ -225,7 +225,7 @@
 
   <div>
     <i class="fa fa-calendar fa-fw"></i>
-    <time>18 Dec 2019</time>
+    <time>22 Jun 2021</time>
   </div>
 
   
@@ -241,11 +241,7 @@
   <div>
     <i class="fa fa-tags fa-fw"></i>
     
-      <a class="post-taxonomy-tag" href="/tags/machine-learning">Machine-Learning</a>&nbsp;&#47;
-    
-      <a class="post-taxonomy-tag" href="/tags/simulation">Simulation</a>&nbsp;&#47;
-    
-      <a class="post-taxonomy-tag" href="/tags/stats">Stats</a>
+      <a class="post-taxonomy-tag" href="/tags/dag">DAG</a>
     
   </div>
   
@@ -254,505 +250,396 @@
 </div>
 
   
-<script src="/rmarkdown-libs/htmlwidgets/htmlwidgets.js"></script>
-<script src="/rmarkdown-libs/viz/viz.js"></script>
-<link href="/rmarkdown-libs/DiagrammeR-styles/styles.css" rel="stylesheet" />
-<script src="/rmarkdown-libs/grViz-binding/grViz.js"></script>
+<script src="/rmarkdown-libs/header-attrs/header-attrs.js"></script>
+<link href="/rmarkdown-libs/anchor-sections/anchor-sections.css" rel="stylesheet" />
+<script src="/rmarkdown-libs/anchor-sections/anchor-sections.js"></script>
 
 
-<p>This post is my good-faith effort to create a simple linear model using the Bayesian framework and workflow described by Richard McElreath in his Statistical Rethinking book.<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> As always - please view this post through the lens of the eager student and not the learned master - this stuff is hard. I did my best to check my work, but it’s entirely possible that something was missed. Please let me know - I won’t take it personally. As McElreath notes in his lectures - “if you’re confused, it’s because you’re paying attention and I thank you for your attention”. And sometimes I get confused. Disclaimer over - let’s get to it.</p>
-<p>I’m playing around with a bunch of fun libraries in the one.</p>
-<pre class="r"><code>library(tidyverse)
-library(styler)
-library(ggExtra)
-library(knitr)
-library(brms)
-library(cowplot)
-library(gridExtra)
-#library(skimr)
-library(DiagrammeR)
-library(rayshader)
-library(av)
-library(rgl)</code></pre>
-<p>I made up this data set. It represents hypothetical values of ablation time and tissue impedance as measured by sensors embedded in a RF ablation catheter. This type of device is designed to apply RF or thermal energy to the vessel wall. The result is a lesion that can aid in improve arythmia, reduce hypertension, or provide some other desired outcome.</p>
-<p>In RF ablations, the tissue heats up over the course of the RF cycle, resulting in a drop in impedance that varies over time. As described above, the goal will be to see how much of the variation in impedance is described by time (over some limited range) and then communicate the uncertainty in the predictions visually. This is what an ablation catheter system looks like:<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a></p>
-<p><img src="/./img/rf_cath.jpg" width="100%" height="100%" style="display: block; margin: auto;" /></p>
-<p>To get things started, load the data and give it a look with skim(). There are no missing values.</p>
-<pre class="r"><code>ablation_dta_tbl &lt;- read.csv(file = &quot;abl_data_2.csv&quot;)
-ablation_dta_tbl &lt;- ablation_dta_tbl %&gt;% select(temp, time)
-#ablation_dta_tbl %&gt;% skim()</code></pre>
-<p>Let’s start with a simple visualization. The code below builds out a scatterplot with marginal histograms which I think is a nice, clean way to evaluate scatter data.<a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a> These data seem plausible since the impedance will typically drop as the tissue heats up during the procedure. In reality the impedence asymptotes we’ll work over a limited range of time where the behavior might reasonably be linear.</p>
-<pre class="r"><code>scatter_1_fig &lt;- ablation_dta_tbl %&gt;% ggplot(aes(x = time, y = temp)) +
-  geom_point(
-    colour = &quot;#2c3e50&quot;,
-    fill = &quot;#2c3e50&quot;,
-    size = 2,
-    alpha = 0.4
-  ) +
-  labs(
-    x = &quot;Ablation Time (seconds)&quot;,
-    y = &quot;Tissue Temperature (deg C)&quot;,
-    title = &quot;Ablation Time vs. Tissue Temperature&quot;,
-    subtitle = &quot;Simulated Catheter RF Ablation&quot;
-  )
+<pre class="r"><code>library(gt)
+library(dplyr)</code></pre>
+<pre><code>## 
+## Attaching package: &#39;dplyr&#39;</code></pre>
+<pre><code>## The following objects are masked from &#39;package:stats&#39;:
+## 
+##     filter, lag</code></pre>
+<pre><code>## The following objects are masked from &#39;package:base&#39;:
+## 
+##     intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code>tibble(x = rnorm(10),
+       y = rnorm(10)) %&gt;%
+  gt_preview()</code></pre>
+<div id="jeimctykse" style="overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>html {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
+}
 
-scatter_hist_1_fig &lt;- ggMarginal(scatter_1_fig,
-  type = &quot;histogram&quot;,
-  color = &quot;white&quot;,
-  alpha = 0.7,
-  fill = &quot;#2c3e50&quot;,
-  xparams = list(binwidth = 1),
-  yparams = list(binwidth = 2.5)
-)</code></pre>
-<pre class="r"><code># ggExtra needs these explit calls to display in Markdown docs *shrug*
-grid::grid.newpage()
-grid::grid.draw(scatter_hist_1_fig)</code></pre>
-<p><img src="/post/2019-12-18-test-post_files/figure-html/unnamed-chunk-5-1.png" width="100%" height="500px" /></p>
-<p>It always helps to state clearly what the objective of this analysis even is. As best I can distill it…</p>
-<pre class="r"><code>grViz(&quot;digraph flowchart {
-      # node definitions with substituted label text
-      node [fontname = Helvetica, shape = rectangle, fillcolor = yellow]        
-      tab1 [label = &#39;Step 1: Propose a distribution for the response variable \n Choose a maximum entropy distribution given the constraints you understand&#39;]
-      tab2 [label = &#39;Step 2: Parameterize the mean \n The mean of the response distribution will vary linearly across the range of predictor values&#39;]
-      tab3 [label = &#39;Step 3: Set priors \n Simulate what the model knows before seeing the data.  Use domain knowledge as constraints.&#39;]
-      tab4 [label = &#39;Step 4: Define the model \n Create the model using the observed data, the likelihood function, and the priors&#39;]
-      tab5 [label = &#39;Step 5: Draw from the posterior \n Plot plausible lines using parameters visited by the Markov chains&#39;]
-      tab6 [label = &#39;Step 6: Push it back through the model \n Simulate real data from plausible combinations of mean and sigma&#39;]
-      # edge definitions with the node IDs
-      tab1 -&gt; tab2 -&gt; tab3 -&gt; tab4 -&gt; tab5 -&gt; tab6;
-      }
-      &quot;)</code></pre>
-<div id="htmlwidget-1" style="width:100%;height:500px;" class="grViz html-widget"></div>
-<script type="application/json" data-for="htmlwidget-1">{"x":{"diagram":"digraph flowchart {\n      # node definitions with substituted label text\n      node [fontname = Helvetica, shape = rectangle, fillcolor = yellow]        \n      tab1 [label = \"Step 1: Propose a distribution for the response variable \n Choose a maximum entropy distribution given the constraints you understand\"]\n      tab2 [label = \"Step 2: Parameterize the mean \n The mean of the response distribution will vary linearly across the range of predictor values\"]\n      tab3 [label = \"Step 3: Set priors \n Simulate what the model knows before seeing the data.  Use domain knowledge as constraints.\"]\n      tab4 [label = \"Step 4: Define the model \n Create the model using the observed data, the likelihood function, and the priors\"]\n      tab5 [label = \"Step 5: Draw from the posterior \n Plot plausible lines using parameters visited by the Markov chains\"]\n      tab6 [label = \"Step 6: Push it back through the model \n Simulate real data from plausible combinations of mean and sigma\"]\n      # edge definitions with the node IDs\n      tab1 -> tab2 -> tab3 -> tab4 -> tab5 -> tab6;\n      }\n      ","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>
-<div id="step-1-propose-a-distribution-for-the-response-variable" class="section level1">
-<h1>Step 1: Propose a distribution for the response variable</h1>
-<p>A Gaussian model is reasonable for the outcome variable <em>temperature</em> as we know it is a measured from the thermocouples on the distal end of the catheter. According to McElreath (pg 75):</p>
-<blockquote>
-<p><strong><em>Measurement errors, variations in growth, and the velocities of molecules all tend towards Gaussian distributions. These processes do this because at their heart, these processes add together fluctuations. And repeatedly adding finite fluctuations results in a distribution of sums that have shed all information about the underlying process, aside from mean and spread.</em></strong></p>
-</blockquote>
-<p>Here’s us formally asserting Temperature as a normal distritbution with mean and standard deviation . These two parameters are all that is needed to completely describe the distribution and also pin down the likelihood function.</p>
-<p><span class="math inline">\(T_i \sim \text{Normal}(\mu_i, \sigma)\)</span></p>
-</div>
-<div id="step-2-parameterize-the-mean" class="section level1">
-<h1>Step 2: Parameterize the mean</h1>
-<p>If we further parameterize , we can do some neat things like move the mean around with the predictor variable. This is a pretty key concept - <em>you move the mean of the outcome variable around by parameterizing it. If we make it a line then it will move linearly with the predictor variable.</em> The real data will still have a spread once the terms is folded back in, but we can thing of the whole distirbution shifting up and down based on the properties of the line.</p>
-<p>Here’s us asserting we want mu to move linearly with changes in the predictor variable (time).</p>
-<blockquote>
-<p><span class="math inline">\(\mu_i = \alpha + \beta (x_i - \bar{x})\)</span></p>
-</blockquote>
-</div>
-<div id="step-3-set-priors" class="section level1">
-<h1>Step 3: Set priors</h1>
-<p>We know some things about these data. Temperature is a continuous variable so we want a continuous distribution. We also know from the nature of the treatment that there isn’t really any physical mechanism within the device that would be expected to cool down the tissue below normal body temperature. Since only heating is expected, the slope should be positive or zero.</p>
-<p>McElreath emphasizes simulating from the priors to “see what the model knows before it sees the data”. Here are some priors to consider. Let’s evaluate visually.</p>
-<pre class="r"><code># Set seed for repeatability
-set.seed(1999)
+#jeimctykse .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
 
-# number of sims
-n &lt;- 150
+#jeimctykse .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
 
-# random draws from the specified prior distributions
-a &lt;- rnorm(n, 75, 15)
-a_ &lt;- rnorm(n, 0, 2)
-b &lt;- rnorm(n, 0, 1)
-b_ &lt;- rlnorm(n, 0, 0.8)
+#jeimctykse .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
 
-# calc mean of time and temp for later use
-mean_temp &lt;- mean(ablation_dta_tbl$temp)
-mean_time &lt;- mean(ablation_dta_tbl$time)
+#jeimctykse .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
 
-# dummy tibble to feed ggplot()
-empty_tbl &lt;- tibble(x = 0)
+#jeimctykse .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
 
-# y = b(x - mean(var_1)) + a is equivalent to:
-# y = bx + (a - b * mean(var_1))
+#jeimctykse .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
 
-# in this fig we use the uninformed prior that generates some unrealistic values
-prior_fig_1 &lt;- empty_tbl %&gt;% ggplot() +
-  geom_abline(
-    intercept = a - b * mean_time,
-    slope = b,
-    color = &quot;#2c3e50&quot;,
-    alpha = 0.3,
-    size = 1
-  ) +
-  ylim(c(0, 150)) +
-  xlim(c(0, 150)) +
-  labs(
-    x = &quot;time (sec)&quot;,
-    y = &quot;Temp (C)&quot;,
-    title = &quot;Prior Predictive Simulations&quot;,
-    subtitle = &quot;Uninformed Informed&quot;
-  )
+#jeimctykse .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
 
-# in this fig we confine the slopes to broad ranges informed by what we know about the domain
-prior_fig_2 &lt;- empty_tbl %&gt;% ggplot() +
-  geom_abline(
-    intercept = a - b_ * mean_time,
-    slope = b_,
-    color = &quot;#2c3e50&quot;,
-    alpha = 0.3,
-    size = 1
-  ) +
-  ylim(c(0, 150)) +
-  xlim(c(0, 150)) +
-  labs(
-    x = &quot;time (sec)&quot;,
-    y = &quot;Temp (C)&quot;,
-    title = &quot;Prior Predictive Simulations&quot;,
-    subtitle = &quot;Mildly Informed Prior&quot;
-  )
+#jeimctykse .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
 
-plot_grid(prior_fig_1, prior_fig_2)</code></pre>
-<p><img src="/post/2019-12-18-test-post_files/figure-html/unnamed-chunk-7-1.png" width="100%" height="500px" /></p>
-<p>The plots above show what the model thinks before seeing the data for two different sets of priors. In both cases, I have centered the data by subtracting the mean of the time from each individual value of time. This means the intercept has the meaning of the expected temperature at the mean of time. The family of lines on the right seem a lot more realistic despite having some slopes that predict strange values out of sample (blood coagulates at ~90C). Choosing a lognormal distribution for time ensures positives slopes. You could probably go even tighter on these priors but for this exercise I’m feeling good about proceeding.</p>
-<p>Looking only at the time window of the original observations and the Temp window bounded by body temperature (lower bound) and water boiling (upper bound).</p>
-<pre class="r"><code>empty_tbl %&gt;% ggplot() +
-  geom_abline(
-    intercept = a - b_ * mean_time,
-    slope = b_,
-    color = &quot;#2c3e50&quot;,
-    alpha = 0.3,
-    size = 1
-  ) +
-  ylim(c(37, 100)) +
-  xlim(c(15, 40)) +
-  labs(
-    x = &quot;time (sec)&quot;,
-    y = &quot;Temp (C)&quot;,
-    title = &quot;Prior Predictive Simulations&quot;,
-    subtitle = &quot;Mildly Informed Prior, Original Data Range&quot;
-  )</code></pre>
-<p><img src="/post/2019-12-18-test-post_files/figure-html/unnamed-chunk-8-1.png" width="100%" height="500px" /></p>
-<p>Here are the prior distributions selected to go forward.</p>
-<p><span class="math inline">\(\alpha \sim \text{Normal}(75, 15)\)</span>: <code>prior(normal(75, 15), class = Intercept</code></p>
-<p><span class="math inline">\(\beta \sim \text{LogNormal}(0, .6)\)</span>: <code>prior(lognormal(0, .6), class = b)</code></p>
-<p><span class="math inline">\(\sigma \sim \text{Uniform}(0, 1)\)</span>: <code>prior(uniform(0, 30), class = sigma)</code></p>
-</div>
-<div id="step-4-define-the-model" class="section level1">
-<h1>Step 4: Define the model</h1>
-<p>Here I model up what I’m creatively calling “model_1”. This one uses the un-centered data for time. I’m using a lot of warmup cycles because I’ve heard chains for the uniform priors on sigma can take a long time to converge.</p>
-<pre class="r"><code>#model_1 &lt;-
-#  brm(
-#    data = ablation_dta_tbl, family = gaussian,
-#    temp ~ 1 + time,
-#    prior = c(
-#      prior(normal(75, 15), class = Intercept),
-#      prior(lognormal(0, .8), class = b),
-#      prior(uniform(0, 30), class = sigma)
-#    ),
-#    iter = 41000, warmup = 40000, chains = 4, cores = 4,
-#    seed = 4
-#  )</code></pre>
-<pre class="r"><code>#saveRDS(model_1, file = &quot;blr_rethinking_model_1.rds&quot;)
-model_1 &lt;- readRDS(file = &quot;blr_rethinking_model_1.rds&quot;)</code></pre>
-</div>
-<div id="step-5-draw-from-the-posterior" class="section level1">
-<h1>Step 5: Draw from the posterior</h1>
-<p>The fruits of all my labor! The posterior holds credible combinations for sigma and the slope and intercept (which together describe the mean of the outcome variable we care about). Let’s take a look.</p>
-<pre class="r"><code>post_samplesM1_tbl &lt;-
-  posterior_samples(model_1) %&gt;%
-  select(-lp__) %&gt;%
-  round(digits = 3)
+#jeimctykse .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
 
-post_samplesM1_tbl %&gt;%
-  head(10) %&gt;%
-  kable(align = rep(&quot;c&quot;, 3))</code></pre>
-<table>
-<thead>
-<tr class="header">
-<th align="center">b_Intercept</th>
-<th align="center">b_time</th>
-<th align="center">sigma</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="center">58.509</td>
-<td align="center">0.841</td>
-<td align="center">2.682</td>
-</tr>
-<tr class="even">
-<td align="center">55.983</td>
-<td align="center">0.949</td>
-<td align="center">2.648</td>
-</tr>
-<tr class="odd">
-<td align="center">56.195</td>
-<td align="center">0.937</td>
-<td align="center">2.540</td>
-</tr>
-<tr class="even">
-<td align="center">56.661</td>
-<td align="center">0.919</td>
-<td align="center">2.474</td>
-</tr>
-<tr class="odd">
-<td align="center">55.143</td>
-<td align="center">0.978</td>
-<td align="center">2.593</td>
-</tr>
-<tr class="even">
-<td align="center">55.170</td>
-<td align="center">0.977</td>
-<td align="center">2.667</td>
-</tr>
-<tr class="odd">
-<td align="center">54.908</td>
-<td align="center">0.996</td>
-<td align="center">2.621</td>
-</tr>
-<tr class="even">
-<td align="center">58.453</td>
-<td align="center">0.836</td>
-<td align="center">2.534</td>
-</tr>
-<tr class="odd">
-<td align="center">54.134</td>
-<td align="center">1.031</td>
-<td align="center">2.647</td>
-</tr>
-<tr class="even">
-<td align="center">58.713</td>
-<td align="center">0.828</td>
-<td align="center">2.707</td>
-</tr>
-</tbody>
+#jeimctykse .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#jeimctykse .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#jeimctykse .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#jeimctykse .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#jeimctykse .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#jeimctykse .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#jeimctykse .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#jeimctykse .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#jeimctykse .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#jeimctykse .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#jeimctykse .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#jeimctykse .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#jeimctykse .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#jeimctykse .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#jeimctykse .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#jeimctykse .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#jeimctykse .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#jeimctykse .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#jeimctykse .gt_left {
+  text-align: left;
+}
+
+#jeimctykse .gt_center {
+  text-align: center;
+}
+
+#jeimctykse .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#jeimctykse .gt_font_normal {
+  font-weight: normal;
+}
+
+#jeimctykse .gt_font_bold {
+  font-weight: bold;
+}
+
+#jeimctykse .gt_font_italic {
+  font-style: italic;
+}
+
+#jeimctykse .gt_super {
+  font-size: 65%;
+}
+
+#jeimctykse .gt_footnote_marks {
+  font-style: italic;
+  font-size: 65%;
+}
+</style>
+<table class="gt_table">
+  
+  <thead class="gt_col_headings">
+    <tr>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1"></th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1">x</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1">y</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">1</td>
+<td class="gt_row gt_right">-0.11375059</td>
+<td class="gt_row gt_right">0.7719169</td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">2</td>
+<td class="gt_row gt_right">-0.18864000</td>
+<td class="gt_row gt_right">-0.5320155</td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">3</td>
+<td class="gt_row gt_right">-0.21883971</td>
+<td class="gt_row gt_right">1.7948713</td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">4</td>
+<td class="gt_row gt_right">0.41703244</td>
+<td class="gt_row gt_right">0.7410122</td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">5</td>
+<td class="gt_row gt_right">0.29652848</td>
+<td class="gt_row gt_right">0.5999457</td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier; font-size: x-small; background-color: #E4E4E4;">6..9</td>
+<td class="gt_row gt_right" style="background-color: #E4E4E4;"></td>
+<td class="gt_row gt_right" style="background-color: #E4E4E4;"></td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">10</td>
+<td class="gt_row gt_right">0.02881221</td>
+<td class="gt_row gt_right">1.3118679</td></tr>
+  </tbody>
+  
+  
 </table>
-<p>Posterior_summary() can grab the model results in table form.</p>
-<pre class="r"><code>mod_1_summary_tbl &lt;-
-  posterior_summary(model_1) %&gt;%
-  as.data.frame() %&gt;%
-  rownames_to_column() %&gt;%
-  as_tibble() %&gt;%
-  mutate_if(is.numeric, funs(as.character(signif(., 2)))) %&gt;%
-  mutate_at(.vars = c(2:5), funs(as.numeric(.)))
-
-mod_1_summary_tbl %&gt;%
-  kable(align = rep(&quot;c&quot;, 5))</code></pre>
-<table>
-<thead>
-<tr class="header">
-<th align="center">rowname</th>
-<th align="center">Estimate</th>
-<th align="center">Est.Error</th>
-<th align="center">Q2.5</th>
-<th align="center">Q97.5</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="center">b_Intercept</td>
-<td align="center">57.00</td>
-<td align="center">1.000</td>
-<td align="center">55.00</td>
-<td align="center">59.0</td>
-</tr>
-<tr class="even">
-<td align="center">b_time</td>
-<td align="center">0.91</td>
-<td align="center">0.045</td>
-<td align="center">0.83</td>
-<td align="center">1.0</td>
-</tr>
-<tr class="odd">
-<td align="center">sigma</td>
-<td align="center">2.60</td>
-<td align="center">0.100</td>
-<td align="center">2.40</td>
-<td align="center">2.8</td>
-</tr>
-<tr class="even">
-<td align="center">lp__</td>
-<td align="center">-790.00</td>
-<td align="center">1.300</td>
-<td align="center">-790.00</td>
-<td align="center">-790.0</td>
-</tr>
-</tbody>
-</table>
-<p>Now let’s see what changes if the time data is centered. Everything is the same here in model_2 except the time_c data which is the normal time data minus the mean.</p>
-<pre class="r"><code>ablation_dta_tbl &lt;- ablation_dta_tbl %&gt;% mutate(time_c = time - mean(time))</code></pre>
-<pre class="r"><code>#model_2 &lt;-
-#  brm(
-#    data = ablation_dta_tbl, family = gaussian,
-#    temp ~ 1 + time_c,
-#    prior = c(
-#      prior(normal(75, 15), class = Intercept),
-#      prior(lognormal(0, .8), class = b),
-#      prior(uniform(0, 30), class = sigma)
-#    ),
-#    iter = 41000, warmup = 40000, chains = 4, cores = 4,
-#    seed = 4
-#  )</code></pre>
-<pre class="r"><code>#33saveRDS(model_2, file = &quot;blr_rethinking_model_2.rds&quot;)
-model_2 &lt;- readRDS(file = &quot;blr_rethinking_model_2.rds&quot;)</code></pre>
-<p>The slope B and sigma are very similar. The intercept is the only difference with model_1 ranging from low to high 50’s. Model 2 is tight around 77. We should visualize the lines proposed by the parameters in the poseriors of our models to understand the uncertainty associated with the mean and also understand why the intercepts are different between models. First, store the posterior samples as a tibble in anticipation for ggplot.</p>
-<pre class="r"><code>post_samplesM2_tbl &lt;-
-  posterior_samples(model_2) %&gt;%
-  select(-lp__) %&gt;%
-  round(digits = 3)
-
-post_samplesM2_tbl %&gt;%
-  head(10) %&gt;%
-  kable(align = rep(&quot;c&quot;, 3))</code></pre>
-<table>
-<thead>
-<tr class="header">
-<th align="center">b_Intercept</th>
-<th align="center">b_time_c</th>
-<th align="center">sigma</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="center">77.323</td>
-<td align="center">0.894</td>
-<td align="center">2.350</td>
-</tr>
-<tr class="even">
-<td align="center">77.430</td>
-<td align="center">0.881</td>
-<td align="center">2.516</td>
-</tr>
-<tr class="odd">
-<td align="center">77.335</td>
-<td align="center">0.957</td>
-<td align="center">2.571</td>
-</tr>
-<tr class="even">
-<td align="center">77.011</td>
-<td align="center">0.947</td>
-<td align="center">2.776</td>
-</tr>
-<tr class="odd">
-<td align="center">77.209</td>
-<td align="center">1.013</td>
-<td align="center">2.691</td>
-</tr>
-<tr class="even">
-<td align="center">77.517</td>
-<td align="center">0.820</td>
-<td align="center">2.488</td>
-</tr>
-<tr class="odd">
-<td align="center">77.335</td>
-<td align="center">0.881</td>
-<td align="center">2.682</td>
-</tr>
-<tr class="even">
-<td align="center">77.313</td>
-<td align="center">0.857</td>
-<td align="center">2.538</td>
-</tr>
-<tr class="odd">
-<td align="center">77.423</td>
-<td align="center">0.873</td>
-<td align="center">2.569</td>
-</tr>
-<tr class="even">
-<td align="center">77.302</td>
-<td align="center">0.926</td>
-<td align="center">2.340</td>
-</tr>
-</tbody>
-</table>
-<p>Visualize the original data (centered and un-centered versions) along with plausible values for regression line of the mean:</p>
-<pre class="r"><code>mean_regressionM1_fig &lt;-
-  ablation_dta_tbl %&gt;%
-  ggplot(aes(x = time, y = temp)) +
-  geom_point(
-    colour = &quot;#481567FF&quot;,
-    size = 2,
-    alpha = 0.6
-  ) +
-  geom_abline(aes(intercept = b_Intercept, slope = b_time),
-    data = post_samplesM1_tbl,
-    alpha = 0.1, color = &quot;gray50&quot;
-  ) +
-  geom_abline(
-    slope = mean(post_samplesM1_tbl$b_time),
-    intercept = mean(post_samplesM1_tbl$b_Intercept),
-    color = &quot;blue&quot;, size = 1
-  ) +
-  labs(
-    title = &quot;Regression Line Representing Mean of Slope&quot;,
-    subtitle = &quot;Data is As-Observed (No Centering of Predictor)&quot;,
-    x = &quot;Time (s)&quot;,
-    y = &quot;Temperature (C)&quot;
-  )
-
-mean_regressionM2_fig &lt;-
-  ablation_dta_tbl %&gt;%
-  ggplot(aes(x = time_c, y = temp)) +
-  geom_point(
-    color = &quot;#55C667FF&quot;,
-    size = 2,
-    alpha = 0.6
-  ) +
-  geom_abline(aes(intercept = b_Intercept, slope = b_time_c),
-    data = post_samplesM2_tbl,
-    alpha = 0.1, color = &quot;gray50&quot;
-  ) +
-  geom_abline(
-    slope = mean(post_samplesM2_tbl$b_time_c),
-    intercept = mean(post_samplesM2_tbl$b_Intercept),
-    color = &quot;blue&quot;, size = 1
-  ) +
-  labs(
-    title = &quot;Regression Line Representing Mean of Slope&quot;,
-    subtitle = &quot;Predictor Data (Time) is Centered&quot;,
-    x = &quot;Time (Difference from Mean Time in seconds)&quot;,
-    y = &quot;Temperature (C)&quot;
-  )
-
-
-combined_mean_fig &lt;-
-  ablation_dta_tbl %&gt;%
-  ggplot(aes(x = time, y = temp)) +
-  geom_point(
-    colour = &quot;#481567FF&quot;,
-    size = 2,
-    alpha = 0.6
-  ) +
-  geom_point(
-    data = ablation_dta_tbl, aes(x = time_c, y = temp),
-    colour = &quot;#55C667FF&quot;,
-    size = 2,
-    alpha = 0.6
-  ) +
-  geom_abline(aes(intercept = b_Intercept, slope = b_time),
-    data = post_samplesM1_tbl,
-    alpha = 0.1, color = &quot;gray50&quot;
-  ) +
-  geom_abline(
-    slope = mean(post_samplesM1_tbl$b_time),
-    intercept = mean(post_samplesM1_tbl$b_Intercept),
-    color = &quot;blue&quot;, size = 1
-  ) +
-  geom_abline(aes(intercept = b_Intercept, slope = b_time_c),
-    data = post_samplesM2_tbl,
-    alpha = 0.1, color = &quot;gray50&quot;
-  ) +
-  geom_abline(
-    slope = mean(post_samplesM2_tbl$b_time_c),
-    intercept = mean(post_samplesM2_tbl$b_Intercept),
-    color = &quot;blue&quot;, size = 1
-  ) +
-  labs(
-    title = &quot;Regression Line Representing Mean of Slope&quot;,
-    subtitle = &quot;Centered and Un-Centered Predictor Data&quot;,
-    x = &quot;Time (s)&quot;,
-    y = &quot;Temperature (C)&quot;
-  )</code></pre>
-</div>
-<div class="footnotes">
-<hr />
-<ol>
-<li id="fn1"><p>Statistical Rethinking, <a href="https://github.com/rmcelreath/statrethinking_winter2019" class="uri">https://github.com/rmcelreath/statrethinking_winter2019</a><a href="#fnref1">↩</a></p></li>
-<li id="fn2"><p><a href="https://www.sciencedirect.com/science/article/abs/pii/S1547527116001806" class="uri">https://www.sciencedirect.com/science/article/abs/pii/S1547527116001806</a><a href="#fnref2">↩</a></p></li>
-<li id="fn3"><p>There’s a funky bug in ggExtra which makes you break this code into 2 chunks when working in Markdown, <a href="https://cran.r-project.org/web/packages/ggExtra/vignettes/ggExtra.html" class="uri">https://cran.r-project.org/web/packages/ggExtra/vignettes/ggExtra.html</a><a href="#fnref3">↩</a></p></li>
-</ol>
 </div>
 
   
@@ -761,13 +648,13 @@ combined_mean_fig &lt;-
 <div class="prev-next-post pure-g">
   <div class="pure-u-1-24" style="text-align: left;">
     
-    <a href="/post/confounders-and-colliders-modeling-spurious-correlations-in-r/"><i class="fa fa-chevron-left"></i></a>
+    <a href="/post/tutorial-design-study-in-solidworks-with-data-analysis-in-r/"><i class="fa fa-chevron-left"></i></a>
     
   </div>
   <div class="pure-u-10-24">
     
     <nav class="prev">
-      <a href="/post/confounders-and-colliders-modeling-spurious-correlations-in-r/">Confounders and Colliders - Modeling Spurious Correlations in R</a>
+      <a href="/post/tutorial-design-study-in-solidworks-with-data-analysis-in-r/">Tutorial - Design Study in Solidworks with Data Analysis in R</a>
     </nav>
     
   </div>
@@ -776,8 +663,14 @@ combined_mean_fig &lt;-
   </div>
   <div class="pure-u-10-24">
     
+    <nav class="next">
+      <a href="/post/exploring-frequentist-and-bayesian-tolerance-intervals/">Exploring Frequentist and Bayesian Tolerance Intervals</a>
+    </nav>
+    
   </div>
   <div class="pure-u-1-24" style="text-align: right;">
+    
+    <a href="/post/exploring-frequentist-and-bayesian-tolerance-intervals/"><i class="fa fa-chevron-right"></i></a>
     
   </div>
 </div>
@@ -810,9 +703,6 @@ combined_mean_fig &lt;-
 
 
 
-<script src="/js/math-code.js"></script>
-  <script async src="//cdn.bootcss.com/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML"></script>
-  
 
 
 </body>
