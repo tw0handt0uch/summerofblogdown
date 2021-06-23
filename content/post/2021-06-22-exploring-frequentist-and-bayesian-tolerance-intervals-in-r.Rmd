@@ -288,7 +288,7 @@ So the Bayesian version of a tolerance interval for those relatively vague prior
 
 The frequentist version for the same data is calculated as follows with the tolerance package (assuming normality of the experimental data):
 
-# Frequentist 2-sided Tolerance Interval
+## Frequentist 2-sided Tolerance Interval
 
 ```{r}
 
@@ -303,7 +303,7 @@ fr_tbl <- tidy(normtol.int(w_tbl$w, alpha = .05, P = .9, side = 2, method = "EXA
   select(method, everything())
 ```
 
-Combining and comparing to the Bayesian version:
+## Combining and comparing to the Bayesian version:
 
 ```{r}
 fr_tbl %>% 
@@ -344,6 +344,7 @@ w_post_tbl %>%
   theme(legend.title = element_blank(),
         legend.position = "bottom") 
 ```
+
 But the upper and lower bounds come in pairs.  Plotting the pairs 
 
 ```{r}
@@ -372,7 +373,7 @@ Now we can calculate the number of tolerance bounds that are both:
 *  Above (within) the lower 95% tolerance bound for 90% coverage
 *  Below (within) the upper 95% tolerance bound for 90% coverage
 
-This number should be less than 500 for a 5% or less false positive rate, since this is a subset of 10,000 draws from the full posterior (which wouldn't display well).
+This number should be less than 500 if the coverage interval is doing its job of capturing >= 95% of the credible range, since this is a subset of 10,000 draws from the full posterior (which wouldn't display well).
 
 ```{r}
 set.seed(2345)

@@ -2841,9 +2841,8 @@ bt_tbl %&gt;%
 <p>The frequentist version for the same data is calculated as follows with the tolerance package (assuming normality of the experimental data):</p>
 </div>
 </div>
-</div>
-<div id="frequentist-2-sided-tolerance-interval" class="section level1">
-<h1>Frequentist 2-sided Tolerance Interval</h1>
+<div id="frequentist-2-sided-tolerance-interval" class="section level2">
+<h2>Frequentist 2-sided Tolerance Interval</h2>
 <pre class="r"><code>fr_tbl &lt;- tidy(normtol.int(w_tbl$w, alpha = .05, P = .9, side = 2, method = &quot;EXACT&quot;)) %&gt;%
   select(column, mean) %&gt;%
   pivot_wider(names_from = &quot;column&quot;,
@@ -2853,7 +2852,9 @@ bt_tbl %&gt;%
   rename(lower_coverage_limit = &#39;2-sided.lower&#39;,
          upper_coverage_limit = &#39;2-sided.upper&#39;) %&gt;%
   select(method, everything())</code></pre>
-<p>Combining and comparing to the Bayesian version:</p>
+</div>
+<div id="combining-and-comparing-to-the-bayesian-version" class="section level2">
+<h2>Combining and comparing to the Bayesian version:</h2>
 <pre class="r"><code>fr_tbl %&gt;% 
   bind_rows(bt_tbl) %&gt;%
   mutate_if(is.numeric, round, digits = 2) %&gt;%
@@ -3248,8 +3249,8 @@ These are quite close! The Bayesian version does remain bit wider. Perhaps with 
     ) +
   theme(legend.title = element_blank(),
         legend.position = &quot;bottom&quot;) </code></pre>
-<p><img src="/post/2021-06-22-exploring-frequentist-and-bayesian-tolerance-intervals-in-r_files/figure-html/unnamed-chunk-15-1.png" width="100%" height="500px" />
-But the upper and lower bounds come in pairs. Plotting the pairs</p>
+<p><img src="/post/2021-06-22-exploring-frequentist-and-bayesian-tolerance-intervals-in-r_files/figure-html/unnamed-chunk-15-1.png" width="100%" height="500px" /></p>
+<p>But the upper and lower bounds come in pairs. Plotting the pairs</p>
 <pre class="r"><code>set.seed(2345)
 
 w_post_tbl %&gt;%
@@ -3274,7 +3275,7 @@ w_post_tbl %&gt;%
 <li>Above (within) the lower 95% tolerance bound for 90% coverage</li>
 <li>Below (within) the upper 95% tolerance bound for 90% coverage</li>
 </ul>
-<p>This number should be less than 500 for a 5% or less false positive rate, since this is a subset of 10,000 draws from the full posterior (which wouldn’t display well).</p>
+<p>This number should be less than 500 if the coverage interval is doing its job of capturing &gt;= 95% of the credible range, since this is a subset of 10,000 draws from the full posterior (which wouldn’t display well).</p>
 <pre class="r"><code>set.seed(2345)
 
 w_post_tbl %&gt;%
@@ -3675,6 +3676,7 @@ w_post_tbl %&gt;%
 </div>
 9,542 rows means 458 false positives - this is acceptable coverage for the Bayesian interval.</p>
 <p>If you’ve made it this far, thank you for your attention.</p>
+</div>
 </div>
 <div class="footnotes">
 <hr />
