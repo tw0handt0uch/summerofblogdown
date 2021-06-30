@@ -389,3 +389,10 @@ w_post_tbl %>%
 9,542 rows means 458 of the least probable values excluded from this interval - this is acceptable coverage for the Bayesian interval.  
 
 If you've made it this far, thank you for your attention.
+
+## Session Info
+
+```{r}
+sessionInfo()
+```
+
