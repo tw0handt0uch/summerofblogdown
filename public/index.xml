@@ -3442,7 +3442,7 @@ w_post_tbl %&amp;gt;%
   
 &lt;/table&gt;
 &lt;/div&gt;
-9,542 rows means 458 false positives - this is acceptable coverage for the Bayesian interval.&lt;/p&gt;
+9,542 rows means 458 of the least probable values excluded from this interval - this is acceptable coverage for the Bayesian interval.&lt;/p&gt;
 &lt;p&gt;If you’ve made it this far, thank you for your attention.&lt;/p&gt;
 &lt;/div&gt;
 &lt;/div&gt;
