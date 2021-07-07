@@ -1374,11 +1374,11 @@ coverage_summary_tbl %&amp;gt;%
 &lt;/table&gt;
 &lt;/div&gt;
 &lt;p&gt;Because .0958 is less than .1 (10%) we can say that the tolerance interval procedure is capturing the desired population proportion (95%) with an acceptable false positive rate (&amp;lt;= 10%). Neat!&lt;/p&gt;
-&lt;p&gt;Now let’s look at the Bayesian approach. Note that this is completely differnt example from above, not a continuation. The desired coverage for this case is a little bit different - 95%, and we’ll aim for a 90% confidence level (for the frequentist version that comes later) and we’ll try to capture the 90% most credible estimates for the Bayesian version.&lt;/p&gt;
 &lt;/div&gt;
 &lt;/div&gt;
 &lt;div id=&#34;bayesian-2-sided-tolerance-interval&#34; class=&#34;section level1&#34;&gt;
 &lt;h1&gt;Bayesian 2-sided Tolerance Interval&lt;/h1&gt;
+&lt;p&gt;Now let’s look at the Bayesian approach. Note that this is completely different example from above, not a continuation. The desired coverage for this case is a little bit different - 95%, and we’ll aim for a 90% confidence level (for the frequentist version that comes later) and we’ll try to capture the 90% most credible estimates for the Bayesian version.&lt;/p&gt;
 &lt;div id=&#34;load-the-data&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;Load the Data&lt;/h2&gt;
 &lt;p&gt;The dataset and example used for this section is adapted from &lt;a href=&#34;https://nvlpubs.nist.gov/nistpubs/jres/126/jres.126.004.pdf&#34;&gt;this excellent paper on coverage intervals&lt;/a&gt;.&lt;a href=&#34;#fn1&#34; class=&#34;footnote-ref&#34; id=&#34;fnref1&#34;&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt; The values represent measurements of mass fraction of iron made by the National Institute of Standards and Technology (NIST). Units of measurement are percentages, or cg/g.&lt;/p&gt;
