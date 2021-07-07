@@ -44,7 +44,7 @@ library(gt)
 ```
 
 
-As with any frequentist simulation looking at coverage of a p-value, we can start with the population parameters known.  From there we simulate many draws from that population and calculate the desired statistic (in this case the tolerance interval limits).  By comparing each calculated tolerance interval to the true population coverage, we can determine the fraction of simulations to do not meet the specified coverage.  If that number, as a fraction of the total number of sims, is less than or equal to the p-value, then the tolerance interval procedure is working as intended and provided the specified coverage, on average, over many simulated experiments.
+As with any frequentist simulation looking at coverage of a p-value, we can start with the population parameters known.  From there we simulate many draws from that population and calculate the desired statistic (in this case the tolerance interval limits).  By comparing each calculated tolerance interval to the true population coverage, we can determine the number of simulations that do not meet the specified coverage.  If that number, as a fraction of the total number of sims, is less than or equal to the p-value, then the tolerance interval procedure is working as intended and provided the specified coverage, on average, over many simulated experiments.
 
 This block sets up the parameters and identifies the specified quantiles of the true population.
 
@@ -101,9 +101,10 @@ sim_summary_tbl <- tibble(sim_id = seq(from = 1, to = n_sims, by = 1)) %>%
 sim_summary_tbl %>%
   gt_preview()
 ```
+
 ## Visualize
 
-Plot the resulting upper and lower bounds of the 95/90 tolerance interval. The red lines are the true population quantiles.
+Plot the resulting upper and lower bounds of the 90/95 tolerance interval. The red lines are the true population quantiles.
 
 ```{r}
 sim_summary_tbl %>% 
@@ -131,6 +132,7 @@ sim_summary_tbl %>%
 
 
 ```
+
 To see if the tolerance interval procedure is providing the desired coverage, we have to look at each set of lower and upper limits from each simulation.   The code below converts the calculated tolerance bounds from each sim into quantiles of the true population, then calculates the difference to determine the true population coverage of the simulated experiment.  If the coverage is less than intended, a flag of 1 is assigned in the "unacceptable_coverage" col, else 0.
 
 ## Evaluate True Coverage of Each Simulated Experiment
@@ -174,7 +176,7 @@ coverage_summary_tbl %>%
 
 Because .0958 is less than .1 (10%) we can say that the tolerance interval procedure is capturing the desired population proportion (95%) with an acceptable false positive rate (<= 10%).  Neat!
 
-Now let's look at the Bayesian analogue.
+Now let's look at the Bayesian approach.  Note that this is completely differnt example from above, not a continuation.  The desired coverage for this case is a little bit different - 95%, and we'll aim for a 90% confidence level (for the frequentist version that comes later) and we'll try to capture the 90% most credible estimates for the Bayesian version.
 
 # Bayesian 2-sided Tolerance Interval
 
@@ -268,7 +270,7 @@ w_post_tbl %>%
 
 ### Calculate 2-Sided Bayesian Tolerance Interval from the Posterior - Non-Informative Priors
 
-We'll calculate the 95/90 tolerance limit just like before.  The Bayesian analogue involves doing a row-wise calculation for each posterior draw where the equivalent of a tolerance interval is calculated using the standard formula: x +/- ks, where x is mu and s is sigma.  The k factor is taken as the .95 quantile of a unit normal distribution (thus excluding the top and bottom 5% for 90% coverage).  Doing this for every row in the posterior produces a distribution of upper and lower tolerance bounds - 1 observation for each credible set of mu and sigma.  The 5% "confidence" analogue is done by excluding the 2.5% most extreme values from the low end of the lower bound distribution and the 2.5% most extreme values from the high end of the upper bound distribution.
+Our goal is to calculate the 95/90 tolerance limit.  The Bayesian analogue involves doing a row-wise calculation for each posterior draw where the equivalent of a tolerance interval is calculated using the standard formula: x +/- ks, where x is mu and s is sigma.  The k factor is taken as the .95 quantile of a unit normal distribution (thus excluding the top and bottom 5% for 90% coverage).  Doing this for every row in the posterior produces a distribution of upper and lower tolerance bounds - 1 observation for each credible set of mu and sigma.  The 95% "confidence" analogue is done by excluding the 2.5% most extreme values from the low end of the lower bound distribution and the 2.5% most extreme values from the high end of the upper bound distribution.
 
 ```{r}
 
