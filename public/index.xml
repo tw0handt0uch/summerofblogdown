@@ -36,7 +36,7 @@ library(tolerance)
 library(wesanderson)
 library(patchwork)
 library(gt)&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;As with any frequentist simulation looking at coverage of a p-value, we can start with the population parameters known. From there we simulate many draws from that population and calculate the desired statistic (in this case the tolerance interval limits). By comparing each calculated tolerance interval to the true population coverage, we can determine the fraction of simulations to do not meet the specified coverage. If that number, as a fraction of the total number of sims, is less than or equal to the p-value, then the tolerance interval procedure is working as intended and provided the specified coverage, on average, over many simulated experiments.&lt;/p&gt;
+&lt;p&gt;As with any frequentist simulation looking at coverage of a p-value, we can start with the population parameters known. From there we simulate many draws from that population and calculate the desired statistic (in this case the tolerance interval limits). By comparing each calculated tolerance interval to the true population coverage, we can determine the number of simulations that do not meet the specified coverage. If that number, as a fraction of the total number of sims, is less than or equal to the p-value, then the tolerance interval procedure is working as intended and provided the specified coverage, on average, over many simulated experiments.&lt;/p&gt;
 &lt;p&gt;This block sets up the parameters and identifies the specified quantiles of the true population.&lt;/p&gt;
 &lt;/div&gt;
 &lt;div id=&#34;simulated-experiments&#34; class=&#34;section level1&#34;&gt;
@@ -48,8 +48,8 @@ library(gt)&lt;/code&gt;&lt;/pre&gt;
 n_sims &amp;lt;- 10000
 true_population_mean &amp;lt;- 40
 true_population_sd &amp;lt;- 4
-alpha = 0.1
-p = .95
+alpha &amp;lt;- 0.1
+p &amp;lt;- .95
 
 upper_97.5 &amp;lt;- qnorm(p = .975, mean = true_population_mean, sd = true_population_sd)
 lower_02.5 &amp;lt;- qnorm(p = .025, mean = true_population_mean, sd = true_population_sd)&lt;/code&gt;&lt;/pre&gt;
@@ -65,7 +65,7 @@ lower_02.5 &amp;lt;- qnorm(p = .025, mean = true_population_mean, sd = true_popu
   ) %&amp;gt;%
   summarize(
     sim_id = sim_id,
-#   sim_test_data = sim_test_data,
+    #   sim_test_data = sim_test_data,
     norm_tol = list(normtol.int(sim_test_data, alpha = alpha, P = p, side = 2)),
     sample_sd = sd(sim_test_data)
   ) %&amp;gt;%
@@ -85,7 +85,7 @@ lower_02.5 &amp;lt;- qnorm(p = .025, mean = true_population_mean, sd = true_popu
 
 sim_summary_tbl %&amp;gt;%
   gt_preview()&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;div id=&#34;moscublyzf&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;div id=&#34;moscublyzf&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
 &lt;style&gt;html {
   font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
 }
@@ -514,9 +514,11 @@ sim_summary_tbl %&amp;gt;%
   
 &lt;/table&gt;
 &lt;/div&gt;
-## Visualize&lt;/p&gt;
-&lt;p&gt;Plot the resulting upper and lower bounds of the 95/90 tolerance interval. The red lines are the true population quantiles.&lt;/p&gt;
-&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;sim_summary_tbl %&amp;gt;% 
+&lt;/div&gt;
+&lt;div id=&#34;visualize&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Visualize&lt;/h2&gt;
+&lt;p&gt;Plot the resulting upper and lower bounds of the 90/95 tolerance interval. The red lines are the true population quantiles.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;sim_summary_tbl %&amp;gt;%
   pivot_longer(cols = everything(), names_to = &amp;quot;param&amp;quot;, values_to = &amp;quot;value&amp;quot;) %&amp;gt;%
   filter(param == &amp;quot;lower_bound_ltl&amp;quot; | param == &amp;quot;upper_bound_utl&amp;quot;) %&amp;gt;%
   mutate(param = as_factor(param)) %&amp;gt;%
@@ -527,29 +529,35 @@ sim_summary_tbl %&amp;gt;%
   geom_vline(xintercept = mean(sim_summary_tbl$true_upper_97.5), color = &amp;quot;firebrick&amp;quot;, linetype = 2) +
   scale_color_manual(values = wes_palette(&amp;quot;Moonrise2&amp;quot;)) +
   scale_fill_manual(values = wes_palette(&amp;quot;Moonrise2&amp;quot;)) +
-#  scale_color_manual(values = c(&amp;quot;purple&amp;quot;, &amp;quot;limegreen&amp;quot;)) +
-#  scale_fill_manual(values = c(&amp;quot;purple&amp;quot;, &amp;quot;limegreen&amp;quot;)) +
+  #  scale_color_manual(values = c(&amp;quot;purple&amp;quot;, &amp;quot;limegreen&amp;quot;)) +
+  #  scale_fill_manual(values = c(&amp;quot;purple&amp;quot;, &amp;quot;limegreen&amp;quot;)) +
   labs(
-      x = &amp;quot;&amp;quot;,
-      y = &amp;quot;&amp;quot;,
-      title = &amp;quot;Distribution of Calculated Upper and Lower Tolerance Limits&amp;quot;,
-      subtitle = &amp;quot;10,000 Simulations of n=15 parts with 2-sided normal Tolerance Intervals&amp;quot;,
-      caption = &amp;quot;pink vertical lines represent true population quantiles, .025 and .975&amp;quot;
-    ) +
-  theme(legend.title = element_blank(),
-        legend.position = &amp;quot;bottom&amp;quot;) &lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2021-06-22-exploring-frequentist-and-bayesian-tolerance-intervals-in-r_files/figure-html/unnamed-chunk-4-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;
-To see if the tolerance interval procedure is providing the desired coverage, we have to look at each set of lower and upper limits from each simulation. The code below converts the calculated tolerance bounds from each sim into quantiles of the true population, then calculates the difference to determine the true population coverage of the simulated experiment. If the coverage is less than intended, a flag of 1 is assigned in the “unacceptable_coverage” col, else 0.&lt;/p&gt;
+    x = &amp;quot;&amp;quot;,
+    y = &amp;quot;&amp;quot;,
+    title = &amp;quot;Distribution of Calculated Upper and Lower Tolerance Limits&amp;quot;,
+    subtitle = &amp;quot;10,000 Simulations of n=15 parts with 2-sided normal Tolerance Intervals&amp;quot;,
+    caption = &amp;quot;pink vertical lines represent true population quantiles, .025 and .975&amp;quot;
+  ) +
+  theme(
+    legend.title = element_blank(),
+    legend.position = &amp;quot;bottom&amp;quot;
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-06-22-exploring-frequentist-and-bayesian-tolerance-intervals-in-r_files/figure-html/unnamed-chunk-4-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;To see if the tolerance interval procedure is providing the desired coverage, we have to look at each set of lower and upper limits from each simulation. The code below converts the calculated tolerance bounds from each sim into quantiles of the true population, then calculates the difference to determine the true population coverage of the simulated experiment. If the coverage is less than intended, a flag of 1 is assigned in the “unacceptable_coverage” col, else 0.&lt;/p&gt;
 &lt;/div&gt;
 &lt;div id=&#34;evaluate-true-coverage-of-each-simulated-experiment&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;Evaluate True Coverage of Each Simulated Experiment&lt;/h2&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;coverage_summary_tbl &amp;lt;- sim_summary_tbl %&amp;gt;%
-  mutate(ltl_coverage_true = map_dbl(lower_bound_ltl, pnorm, true_population_mean, true_population_sd),
-         utl_coverage_true = map_dbl(upper_bound_utl, pnorm, true_population_mean, true_population_sd)) %&amp;gt;%
+  mutate(
+    ltl_coverage_true = map_dbl(lower_bound_ltl, pnorm, true_population_mean, true_population_sd),
+    utl_coverage_true = map_dbl(upper_bound_utl, pnorm, true_population_mean, true_population_sd)
+  ) %&amp;gt;%
   mutate(total_tl_coverage_true = utl_coverage_true - ltl_coverage_true) %&amp;gt;%
-  mutate(unacceptable_coverage = case_when(total_tl_coverage_true &amp;gt;= p ~ 0,
-                                         TRUE ~ 1)) %&amp;gt;%
-  select(-c(alpha, p, true_lower_2.5, true_upper_97.5)) 
+  mutate(unacceptable_coverage = case_when(
+    total_tl_coverage_true &amp;gt;= p ~ 0,
+    TRUE ~ 1
+  )) %&amp;gt;%
+  select(-c(alpha, p, true_lower_2.5, true_upper_97.5))
 
 coverage_summary_tbl %&amp;gt;%
   gt_preview()&lt;/code&gt;&lt;/pre&gt;
@@ -998,7 +1006,8 @@ coverage_summary_tbl %&amp;gt;%
     &amp;quot;tol_limit_procedure_working?&amp;quot; = case_when(
       false_positives &amp;lt; false_positive_limit ~ &amp;quot;heck_yes&amp;quot;,
       TRUE ~ &amp;quot;boo&amp;quot;
-    )) %&amp;gt;%
+    )
+  ) %&amp;gt;%
   select(total_trials, alpha_level, false_positive_limit, everything()) %&amp;gt;%
   gt_preview()&lt;/code&gt;&lt;/pre&gt;
 &lt;div id=&#34;hblnhaayca&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
@@ -1365,7 +1374,7 @@ coverage_summary_tbl %&amp;gt;%
 &lt;/table&gt;
 &lt;/div&gt;
 &lt;p&gt;Because .0958 is less than .1 (10%) we can say that the tolerance interval procedure is capturing the desired population proportion (95%) with an acceptable false positive rate (&amp;lt;= 10%). Neat!&lt;/p&gt;
-&lt;p&gt;Now let’s look at the Bayesian analogue.&lt;/p&gt;
+&lt;p&gt;Now let’s look at the Bayesian approach. Note that this is completely differnt example from above, not a continuation. The desired coverage for this case is a little bit different - 95%, and we’ll aim for a 90% confidence level (for the frequentist version that comes later) and we’ll try to capture the 90% most credible estimates for the Bayesian version.&lt;/p&gt;
 &lt;/div&gt;
 &lt;/div&gt;
 &lt;div id=&#34;bayesian-2-sided-tolerance-interval&#34; class=&#34;section level1&#34;&gt;
@@ -1373,22 +1382,27 @@ coverage_summary_tbl %&amp;gt;%
 &lt;div id=&#34;load-the-data&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;Load the Data&lt;/h2&gt;
 &lt;p&gt;The dataset and example used for this section is adapted from &lt;a href=&#34;https://nvlpubs.nist.gov/nistpubs/jres/126/jres.126.004.pdf&#34;&gt;this excellent paper on coverage intervals&lt;/a&gt;.&lt;a href=&#34;#fn1&#34; class=&#34;footnote-ref&#34; id=&#34;fnref1&#34;&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt; The values represent measurements of mass fraction of iron made by the National Institute of Standards and Technology (NIST). Units of measurement are percentages, or cg/g.&lt;/p&gt;
-&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;w_tbl &amp;lt;- tibble(w = c(67.43, 66.97, 67.65, 66.84, 67.05, 66.57, 67.16, 68.3,
-67.01, 67.07, 67.23, 66.51, 66.46, 67.54, 67.09, 66.77)) %&amp;gt;%
-  mutate(w_pct = w/100)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;w_tbl &amp;lt;- tibble(w = c(
+  67.43, 66.97, 67.65, 66.84, 67.05, 66.57, 67.16, 68.3,
+  67.01, 67.07, 67.23, 66.51, 66.46, 67.54, 67.09, 66.77
+)) %&amp;gt;%
+  mutate(w_pct = w / 100)&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;In preparation for the Bayesian tolerance interval calculations we should run some prior predictive checks. I know Beta(1,1) is a flat prior on mu, but I am not experienced enough with the cauchy to mentally visualize what its parameters mean with respect to the outcome variable. I adjusted the scale parameter for sigma manually and did this visual check each time until I saw a nice cloud of curves of varying but reasonable widths at scale = .025. Bonus - it is so satisfying to make the code for these curves using map2 and dplyr in the prep and then ggplot for the vis - incredibly smooth, readable, and efficient. I remain grateful for these core packages, especially as I start to mess around with other languages.&lt;/p&gt;
 &lt;/div&gt;
 &lt;div id=&#34;prior-predictive-simulations&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;Prior Predictive Simulations&lt;/h2&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(2005)
 
-prior_pred_tbl &amp;lt;- tibble(mu = rbeta(300, 1, 1),
-       sig = rcauchy(300, 0, 0.025) %&amp;gt;% abs()) %&amp;gt;%
+prior_pred_tbl &amp;lt;- tibble(
+  mu = rbeta(300, 1, 1),
+  sig = rcauchy(300, 0, 0.025) %&amp;gt;% abs()
+) %&amp;gt;%
   mutate(row_id = row_number()) %&amp;gt;%
   select(row_id, everything()) %&amp;gt;%
-  mutate(plotted_y_data = map2(mu, sig, ~tibble(
+  mutate(plotted_y_data = map2(mu, sig, ~ tibble(
     x = seq(0, 1, length.out = 100),
-    y = dnorm(x, .x, .y)))) %&amp;gt;%
+    y = dnorm(x, .x, .y)
+  ))) %&amp;gt;%
   unnest() %&amp;gt;%
   mutate(model = &amp;quot;mu ~ beta(1,1), sigma ~ cauchy(0,0.025)&amp;quot;)
 
@@ -1807,15 +1821,16 @@ prior_pred_tbl %&amp;gt;%
     y = &amp;quot;dnorm(x)&amp;quot;
   ) +
   ylim(c(0, 10)) +
-  theme_minimal() 
+  theme_minimal()
 
 k &amp;lt;- j +
-  ylim(c(0, 50)) 
+  ylim(c(0, 50))
 
 (k + j) + plot_annotation(
-  title = &amp;#39;Prior Predictions: n=300 Possible Distibutions According to Priors:&amp;#39;,
-  subtitle = &amp;#39;mu ~ Beta(1,1), sigma ~ cauchy(0, .025)&amp;#39;,
-  caption = &amp;quot;same data, 2 different y-axis scales&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+  title = &amp;quot;Prior Predictions: n=300 Possible Distibutions According to Priors:&amp;quot;,
+  subtitle = &amp;quot;mu ~ Beta(1,1), sigma ~ cauchy(0, .025)&amp;quot;,
+  caption = &amp;quot;same data, 2 different y-axis scales&amp;quot;
+)&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;&lt;img src=&#34;/post/2021-06-22-exploring-frequentist-and-bayesian-tolerance-intervals-in-r_files/figure-html/unnamed-chunk-9-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
 &lt;/div&gt;
 &lt;div id=&#34;fit-the-model-with-brms&#34; class=&#34;section level2&#34;&gt;
@@ -1827,12 +1842,13 @@ k &amp;lt;- j +
   brm(
     data = w_tbl, family = gaussian(),
     w_pct ~ 1,
-   prior = c(
-     prior(beta(1, 1), class = Intercept),
-     prior(cauchy(0, .025), class = sigma)),
-   iter = 400000, warmup = 50000, chains = 4, cores = 2,
-   seed = 10
- )
+    prior = c(
+      prior(beta(1, 1), class = Intercept),
+      prior(cauchy(0, .025), class = sigma)
+    ),
+    iter = 400000, warmup = 50000, chains = 4, cores = 2,
+    seed = 10
+  )
 
 
 w_mod %&amp;gt;% summary()&lt;/code&gt;&lt;/pre&gt;
@@ -1858,7 +1874,7 @@ w_mod %&amp;gt;% summary()&lt;/code&gt;&lt;/pre&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;w_post_tbl &amp;lt;-
   posterior_samples(w_mod) %&amp;gt;%
   select(-lp__) %&amp;gt;%
-  rename(&amp;quot;mu&amp;quot; = b_Intercept) 
+  rename(&amp;quot;mu&amp;quot; = b_Intercept)
 
 w_post_tbl %&amp;gt;%
   gt_preview()&lt;/code&gt;&lt;/pre&gt;
@@ -2238,13 +2254,15 @@ w_post_tbl %&amp;gt;%
 &lt;/div&gt;
 &lt;div id=&#34;calculate-2-sided-bayesian-tolerance-interval-from-the-posterior---non-informative-priors&#34; class=&#34;section level3&#34;&gt;
 &lt;h3&gt;Calculate 2-Sided Bayesian Tolerance Interval from the Posterior - Non-Informative Priors&lt;/h3&gt;
-&lt;p&gt;We’ll calculate the 95/90 tolerance limit just like before. The Bayesian analogue involves doing a row-wise calculation for each posterior draw where the equivalent of a tolerance interval is calculated using the standard formula: x +/- ks, where x is mu and s is sigma. The k factor is taken as the .95 quantile of a unit normal distribution (thus excluding the top and bottom 5% for 90% coverage). Doing this for every row in the posterior produces a distribution of upper and lower tolerance bounds - 1 observation for each credible set of mu and sigma. The 5% “confidence” analogue is done by excluding the 2.5% most extreme values from the low end of the lower bound distribution and the 2.5% most extreme values from the high end of the upper bound distribution.&lt;/p&gt;
+&lt;p&gt;Our goal is to calculate the 95/90 tolerance limit. The Bayesian analogue involves doing a row-wise calculation for each posterior draw where the equivalent of a tolerance interval is calculated using the standard formula: x +/- ks, where x is mu and s is sigma. The k factor is taken as the .95 quantile of a unit normal distribution (thus excluding the top and bottom 5% for 90% coverage). Doing this for every row in the posterior produces a distribution of upper and lower tolerance bounds - 1 observation for each credible set of mu and sigma. The 95% “confidence” analogue is done by excluding the 2.5% most extreme values from the low end of the lower bound distribution and the 2.5% most extreme values from the high end of the upper bound distribution.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;bt_lower &amp;lt;- quantile(w_post_tbl$mu - qnorm(0.95) * w_post_tbl$sigma, 0.025)
-bt_upper &amp;lt;-  quantile(w_post_tbl$mu + qnorm(0.95) * w_post_tbl$sigma, 0.975)
+bt_upper &amp;lt;- quantile(w_post_tbl$mu + qnorm(0.95) * w_post_tbl$sigma, 0.975)
 
-bt_tbl &amp;lt;- tibble(lower_coverage_limit = bt_lower * 100 %&amp;gt;% round(4),
-       upper_coverage_limit = bt_upper * 100 %&amp;gt;% round(4),
-       method = as_factor(&amp;quot;Bayesian&amp;quot;)) 
+bt_tbl &amp;lt;- tibble(
+  lower_coverage_limit = bt_lower * 100 %&amp;gt;% round(4),
+  upper_coverage_limit = bt_upper * 100 %&amp;gt;% round(4),
+  method = as_factor(&amp;quot;Bayesian&amp;quot;)
+)
 
 bt_tbl %&amp;gt;%
   gt_preview()&lt;/code&gt;&lt;/pre&gt;
@@ -2613,17 +2631,21 @@ bt_tbl %&amp;gt;%
 &lt;h2&gt;Frequentist 2-sided Tolerance Interval&lt;/h2&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;fr_tbl &amp;lt;- tidy(normtol.int(w_tbl$w, alpha = .05, P = .9, side = 2, method = &amp;quot;EXACT&amp;quot;)) %&amp;gt;%
   select(column, mean) %&amp;gt;%
-  pivot_wider(names_from = &amp;quot;column&amp;quot;,
-              values_from = &amp;quot;mean&amp;quot;) %&amp;gt;%
-  select(&amp;#39;2-sided.lower&amp;#39;, &amp;#39;2-sided.upper&amp;#39;) %&amp;gt;%
+  pivot_wider(
+    names_from = &amp;quot;column&amp;quot;,
+    values_from = &amp;quot;mean&amp;quot;
+  ) %&amp;gt;%
+  select(&amp;quot;2-sided.lower&amp;quot;, &amp;quot;2-sided.upper&amp;quot;) %&amp;gt;%
   mutate(method = as_factor(&amp;quot;Frequentist&amp;quot;)) %&amp;gt;%
-  rename(lower_coverage_limit = &amp;#39;2-sided.lower&amp;#39;,
-         upper_coverage_limit = &amp;#39;2-sided.upper&amp;#39;) %&amp;gt;%
+  rename(
+    lower_coverage_limit = &amp;quot;2-sided.lower&amp;quot;,
+    upper_coverage_limit = &amp;quot;2-sided.upper&amp;quot;
+  ) %&amp;gt;%
   select(method, everything())&lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 &lt;div id=&#34;combining-and-comparing-to-the-bayesian-version&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;Combining and comparing to the Bayesian version:&lt;/h2&gt;
-&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;fr_tbl %&amp;gt;% 
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;fr_tbl %&amp;gt;%
   bind_rows(bt_tbl) %&amp;gt;%
   mutate_if(is.numeric, round, digits = 2) %&amp;gt;%
   mutate(priors = c(&amp;quot;non_informative (implied)&amp;quot;, &amp;quot;non-informative&amp;quot;)) %&amp;gt;%
@@ -2995,35 +3017,41 @@ bt_tbl %&amp;gt;%
 These are quite close! The Bayesian version does remain bit wider. Perhaps with more iterations of MCMC or with slightly less vague priors, the Bayesian version would creep tighter until they converge.&lt;/p&gt;
 &lt;p&gt;Plotting the upper and lower tolerance limits from the Bayesian version we see that the distribution (upper and lower bounds) are not normal.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;w_post_tbl %&amp;gt;%
-  mutate(upper_95 = qnorm(p = .95, mean = mu, sd = sigma), 
-         lower_95 = qnorm(p = .05, mean = mu, sd = sigma),
-         id = as_factor(&amp;quot;posterior&amp;quot;)) %&amp;gt;%
+  mutate(
+    upper_95 = qnorm(p = .95, mean = mu, sd = sigma),
+    lower_95 = qnorm(p = .05, mean = mu, sd = sigma),
+    id = as_factor(&amp;quot;posterior&amp;quot;)
+  ) %&amp;gt;%
   sample_n(size = 10000) %&amp;gt;%
   pivot_longer(cols = c(upper_95, lower_95), names_to = &amp;quot;quantile&amp;quot;, values_to = &amp;quot;value&amp;quot;) %&amp;gt;%
   mutate(quantile = as_factor(quantile)) %&amp;gt;%
   ggplot(aes(x = value, y = id)) +
   geom_jitter(aes(color = quantile), width = .001, height = .1, size = .3, alpha = .05) +
-  stat_halfeye(aes(fill = quantile),  alpha = .7, position = position_nudge(y = .2)) +
+  stat_halfeye(aes(fill = quantile), alpha = .7, position = position_nudge(y = .2)) +
   scale_color_manual(values = wes_palette(&amp;quot;Moonrise2&amp;quot;)) +
   scale_fill_manual(values = wes_palette(&amp;quot;Moonrise2&amp;quot;)) +
-#  scale_color_manual(values = c(&amp;quot;purple&amp;quot;, &amp;quot;limegreen&amp;quot;)) +
-#  scale_fill_manual(values = c(&amp;quot;purple&amp;quot;, &amp;quot;limegreen&amp;quot;)) +
+  #  scale_color_manual(values = c(&amp;quot;purple&amp;quot;, &amp;quot;limegreen&amp;quot;)) +
+  #  scale_fill_manual(values = c(&amp;quot;purple&amp;quot;, &amp;quot;limegreen&amp;quot;)) +
   labs(
-      x = &amp;quot;&amp;quot;,
-      y = &amp;quot;&amp;quot;,
-      title = &amp;quot;Distribution of Calculated Upper and Lower Tolerance Limits&amp;quot;,
-      subtitle = &amp;quot;Calculated using Bayesian Method&amp;quot;,
-      caption = &amp;quot;10,000 Predictions Sampled from Posterior (400,000 total)&amp;quot;
-    ) +
-  theme(legend.title = element_blank(),
-        legend.position = &amp;quot;bottom&amp;quot;) &lt;/code&gt;&lt;/pre&gt;
+    x = &amp;quot;&amp;quot;,
+    y = &amp;quot;&amp;quot;,
+    title = &amp;quot;Distribution of Calculated Upper and Lower Tolerance Limits&amp;quot;,
+    subtitle = &amp;quot;Calculated using Bayesian Method&amp;quot;,
+    caption = &amp;quot;10,000 Predictions Sampled from Posterior (400,000 total)&amp;quot;
+  ) +
+  theme(
+    legend.title = element_blank(),
+    legend.position = &amp;quot;bottom&amp;quot;
+  )&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;&lt;img src=&#34;/post/2021-06-22-exploring-frequentist-and-bayesian-tolerance-intervals-in-r_files/figure-html/unnamed-chunk-15-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;But the upper and lower bounds come in pairs. Plotting the pairs&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(2345)
 
 w_post_tbl %&amp;gt;%
-  mutate(upper_95 = qnorm(p = .95, mean = mu, sd = sigma), 
-         lower_95 = qnorm(p = .05, mean = mu, sd = sigma)) %&amp;gt;%
+  mutate(
+    upper_95 = qnorm(p = .95, mean = mu, sd = sigma),
+    lower_95 = qnorm(p = .05, mean = mu, sd = sigma)
+  ) %&amp;gt;%
   sample_n(10000) %&amp;gt;%
   ggplot(aes(y = lower_95, x = upper_95)) +
   geom_point(alpha = .1, color = &amp;quot;#2c3e50&amp;quot;) +
@@ -3031,12 +3059,12 @@ w_post_tbl %&amp;gt;%
   geom_vline(xintercept = bt_upper, linetype = 2) +
   theme_minimal() %&amp;gt;%
   labs(
-      x = &amp;quot;Predicted upper tolerance bound&amp;quot;,
-      y = &amp;quot;Predicted lower tolerance bound&amp;quot;,
-      title = &amp;quot;Credible Values for Upper and Lower 95% Bounds&amp;quot;,
-      subtitle = &amp;quot;Based on Credible Posterior Draws&amp;quot;,
-      caption = &amp;quot;10,000 Predictions Sampled from Posterior (400,000 total)&amp;quot;
-    ) &lt;/code&gt;&lt;/pre&gt;
+    x = &amp;quot;Predicted upper tolerance bound&amp;quot;,
+    y = &amp;quot;Predicted lower tolerance bound&amp;quot;,
+    title = &amp;quot;Credible Values for Upper and Lower 95% Bounds&amp;quot;,
+    subtitle = &amp;quot;Based on Credible Posterior Draws&amp;quot;,
+    caption = &amp;quot;10,000 Predictions Sampled from Posterior (400,000 total)&amp;quot;
+  )&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;&lt;img src=&#34;/post/2021-06-22-exploring-frequentist-and-bayesian-tolerance-intervals-in-r_files/figure-html/unnamed-chunk-16-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;Now we can calculate the number of tolerance bounds that are both:&lt;/p&gt;
 &lt;ul&gt;
@@ -3047,11 +3075,15 @@ w_post_tbl %&amp;gt;%
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(2345)
 
 w_post_tbl %&amp;gt;%
-  mutate(upper_95 = qnorm(p = .95, mean = mu, sd = sigma), 
-         lower_95 = qnorm(p = .05, mean = mu, sd = sigma)) %&amp;gt;%
-  sample_n(10000) %&amp;gt;% 
-  filter(lower_95 &amp;gt; bt_lower,
-         upper_95 &amp;lt; bt_upper) %&amp;gt;%
+  mutate(
+    upper_95 = qnorm(p = .95, mean = mu, sd = sigma),
+    lower_95 = qnorm(p = .05, mean = mu, sd = sigma)
+  ) %&amp;gt;%
+  sample_n(10000) %&amp;gt;%
+  filter(
+    lower_95 &amp;gt; bt_lower,
+    upper_95 &amp;lt; bt_upper
+  ) %&amp;gt;%
   gt_preview()&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;&lt;div id=&#34;mrrkjpguhd&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
 &lt;style&gt;html {
