@@ -310,9 +310,10 @@ h2o.varimp_plot(metalearner_model)
 
 ## Importance of Features in the Original Dataset
 
+Now let's dig into the best individual model a bit to understand the parameters and feature importance of the original dataset. The top individual model is extracted and the variable importance can be displayed just like we did for the ensemble components.
+
 ```{r}
 top_individual_model <- h2o.getModel(metalearner_model@model$names[1])
-
 metalearner_model@model$names[1]
 
 h2o.varimp(top_individual_model) %>%
@@ -325,11 +326,20 @@ h2o.varimp(top_individual_model) %>%
 h2o.varimp_plot(top_individual_model)
 ```
 
+If we were interested in the hyperparameters of this individual GB model, we could look at them like this:
+
+```{r}
+top_individual_model@parameters
+```
+
+
+# Final Thoughts
+
 My takeaway is that h2o autoML is really quite powerful for purely predictive tasks and is even feasible for a timed competition like Sliced.  I look forward to the upcoming playoffs and will be interested to try h2o on some new datasets to see if we just got lucky here, or if it's really that good.
 
 ## TLDR
 
-__TLDR: AutoML wouldn't have won this competition (at least with the minimal feature engineering I did), but it sure got way closer than I expected!__
+__AutoML wouldn't have won this competition (at least with the minimal feature engineering I did), but it sure got way closer than I expected!__
 
 Thank you for your attention!
 
