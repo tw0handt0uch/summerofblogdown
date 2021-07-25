@@ -1,0 +1,348 @@
+---
+title: Could AutoML win in the 'Sliced' Data Science Competition?  The answer may shock you!
+author: Riley
+date: '2021-07-24'
+slug: could-automl-win-in-the-sliced-data-science-competition
+categories:
+  - R
+tags: []
+description: ''
+topics: []
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  out.width = "100%",
+  out.height = "500px",
+  fig.pos = "center",
+  dpi = 300
+)
+```
+
+In this post I'll be taking a break from my normal explorations in the medical device domain to talk about [Sliced](https://www.notion.so/SLICED-Show-c7bd26356e3a42279e2dfbafb0480073).  Sliced is a 2-hour data science competition streamed on Twitch and hosted by Meg Risdal and Nick Wan. Four competitors tackle a prediction problem in real time using whatever coding language or tools they prefer, grabbing bonus points along the way for Data Visualization and/or stumbling onto Golden Features (hint: always calculate the air density when training on weather data).  Viewers can simply kick back on watch the contestants apply their trade or they can actively participate by submitting their own solutions and seeing how they stack up on the competition leaderboard!
+
+![](/post/2021-07-24-could-automl-win-in-the-sliced-data-science-competition_files/sliced.png){width=100%}
+
+Here are my observations after watching a few episodes:
+
+> __* Participants do not typically implement more than 2 different model types, preferring to spend their time on Feature Engineering and tuning the hyperparameters of their preferred model__
+
+> __* Gradient boosting (XGBoost, Catboost, etc) is the dominant technique for tabular data__
+
+To clarify the first point above - the tuning is not totally manual; grid search functions are typically employed to identify the best hyperparameters from a superset of options.  But the time pressure of the competition means that players can't set up massive grids that lock up compute resources for too long.  So it's generally an iterative process over small grids that are expanded and contracted as needed based on intermediate results of the model predicting on a test set.  
+
+All this led me to wonder: given the somewhat manual process of hyperparameter optimization and the restricted number of model types... how would AutoML fare in Sliced?  The rest of this post will attempt to answer that question, at least for an arbitrary Sliced episode.
+
+```{r, echo=FALSE}
+# copied function to render table of contents anywhere in the doc
+render_toc <- function(
+                       filename,
+                       toc_header_name = "Table of Contents",
+                       base_level = NULL,
+                       toc_depth = 3) {
+  x <- readLines(filename, warn = FALSE)
+  x <- paste(x, collapse = "\n")
+  x <- paste0("\n", x, "\n")
+  for (i in 5:3) {
+    regex_code_fence <- paste0("\n[`]{", i, "}.+?[`]{", i, "}\n")
+    x <- gsub(regex_code_fence, "", x)
+  }
+  x <- strsplit(x, "\n")[[1]]
+  x <- x[grepl("^#+", x)]
+  if (!is.null(toc_header_name)) {
+    x <- x[!grepl(paste0("^#+ ", toc_header_name), x)]
+  }
+  if (is.null(base_level)) {
+    base_level <- min(sapply(gsub("(#+).+", "\\1", x), nchar))
+  }
+  start_at_base_level <- FALSE
+  x <- sapply(x, function(h) {
+    level <- nchar(gsub("(#+).+", "\\1", h)) - base_level
+    if (level < 0) {
+      stop(
+        "Cannot have negative header levels. Problematic header \"", h, '" ',
+        "was considered level ", level, ". Please adjust `base_level`."
+      )
+    }
+    if (level > toc_depth - 1) {
+      return("")
+    }
+    if (!start_at_base_level && level == 0) start_at_base_level <<- TRUE
+    if (!start_at_base_level) {
+      return("")
+    }
+    if (grepl("\\{#.+\\}(\\s+)?$", h)) {
+      # has special header slug
+      header_text <- gsub("#+ (.+)\\s+?\\{.+$", "\\1", h)
+      header_slug <- gsub(".+\\{\\s?#([-_.a-zA-Z]+).+", "\\1", h)
+    } else {
+      header_text <- gsub("#+\\s+?", "", h)
+      header_text <- gsub("\\s+?\\{.+\\}\\s*$", "", header_text) # strip { .tabset ... }
+      header_text <- gsub("^[^[:alpha:]]*\\s*", "", header_text) # remove up to first alpha char
+      header_slug <- paste(strsplit(header_text, " ")[[1]], collapse = "-")
+      header_slug <- tolower(header_slug)
+    }
+    paste0(strrep(" ", level * 4), "- [", header_text, "](#", header_slug, ")")
+  })
+  x <- x[x != ""]
+  knitr::asis_output(paste(x, collapse = "\n"))
+}
+```
+
+```{r toc, echo=FALSE} 
+render_toc("2021-07-24-could-automl-win-in-the-sliced-data-science-competition.Rmd")
+```
+
+# Setup
+
+For this exercise we'll use the dataset and metrics from [Episode 7](https://www.kaggle.com/c/sliced-s01e07-HmPsw2) in which we are asked to predict whether or not a bank customer churned.  The scoring metric is LogLoss.  I'll be using the free version of the h2o.ai framework and take the following approach to feature engineering and variable selection:
+
+> *  All variables will be used (churn explained by everything) and no feature engineering except imputing means for missing values, converting nominal predictors to dummy variables, and removing ID column.  This should give a fair look at how h2o will do given the bare minimum of attention to pre-processing and no attention to model selection or hyperparameter range.
+
+Let's get to it.
+
+
+## Load libraries
+
+```{r}
+library(tidymodels)
+library(tidyverse)
+library(h2o)
+library(here)
+library(gt)
+```
+
+## Load dataset
+
+Read the data in as a csv and rename the attrition column 
+```{r}
+dataset <- read_csv(here("ep7/train.csv")) %>%
+  mutate(churned = case_when(
+    attrition_flag == 1 ~ "yes",
+    TRUE ~ "no"
+  ) %>% as_factor()) %>%
+  select(-attrition_flag)
+
+holdout <- read_csv(here("ep7/test.csv"))
+
+dataset %>%
+  gt_preview() %>% 
+  cols_align("center")
+```
+
+## Set Up Basic Recipe 
+
+This recipe starts with the model structure, imputes the mean for numeric predictors, and converts nominal variables to dummy.  Id is also removed.  Note that churned is described by . which means "all variables".
+
+```{r}
+basic_rec <- recipe(churned ~ .,
+  data = dataset
+) %>%
+  step_impute_mean(all_numeric_predictors()) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_rm(id)
+```
+
+## Prep and Bake the Dataset
+
+Prepping and baking functions will apply the recipe to the supplied dataset and make it usable in tibble format for passing to h2o.
+
+```{r}
+baked_dataset_tbl <- basic_rec %>%
+  prep() %>%
+  bake(dataset)
+
+baked_dataset_tbl %>%
+  gt_preview() %>% 
+  cols_align("center")
+```
+
+## Working in h2o
+
+### Convert Dataset to h2o
+
+h2o must first be initialized and then the data can be coerced to h2o type.  Using the h2o.describe() function shows a nice summary of the dataset and verifies that it was imported correctly.
+
+```{r}
+h2o.init()
+
+train_h2_tbl <- as.h2o(baked_dataset_tbl)
+h2o.describe(train_h2_tbl) %>% 
+  gt() %>% 
+  cols_align("center")
+```
+
+### Specify the Response and Predictors
+
+In h2o we must identify the response column and the predictors which we do here.  Unfortunately we can't tidyselect here I don't think.
+
+```{r}
+y <- "churned"
+x <- setdiff(names(train_h2_tbl), y)
+```
+
+### autoML Search and Optimization
+
+Now we start the autoML session.  You can specify the stopping rule by either total number of model or total duration in seconds.  Since we're simulating a timed Sliced competition, we'll use max time.  The longest I observed competitors training for was about 20 minutes, so we'll use that here and then grab a coffee while it chugs.  Notice that in this API we are not specifying any particular type of model or any hyperparameter range to optimize over.
+
+```{r}
+# aml <- h2o.automl(
+#   y = y,
+#   x = x,
+#   training_frame = train_h2_tbl,
+#   project_name = "sliced_ep7_refactored_25bjuly2021",
+#   max_runtime_secs = 1200,
+#   seed = 07252021
+# )
+```
+
+### Leaderboard of Best Model
+
+Not to be confused with the competition leaderboard, h2o will produce a "leaderboard" of models that it evaluated and ranked as part of its session.  Here we access and observe the leaderboard and its best models.  
+
+```{r}
+# leaderboard_tbl <- aml@leaderboard %>% as_tibble()
+# a <- leaderboard_tbl %>% gt_preview()
+# a
+```
+
+```{r echo=FALSE}
+# a %>% write_rds(path = here::here("/GitHub/summerofblogdown/content/post/a.rds"))
+lb <- read_rds(file = here::here("/GitHub/summerofblogdown/content/post/a.rds"))
+
+lb
+```
+
+
+### Extract Top Model 
+
+As expected, the top slot is an ensemble (in my limited experience it usually is).  This is the one we'll use to predict churn on the holdout set and submit to kaggle for our competition results.  The ensemble model is extracted and stored as follows:
+
+```{r echo=FALSE}
+# model_names <- leaderboard_tbl$model_id
+# top_model <- h2o.getModel(model_names[1])
+```
+
+```{r echo=FALSE}
+# h2o.saveModel(top_model, path = here::here("top_model"))
+top_model <- h2o.loadModel(path = here::here("/GitHub/summerofblogdown/top_model/StackedEnsemble_AllModels_AutoML_20210725_011103"))
+```
+
+To prepare the holdout data predictions, we apply the basic recipe and convert to h2o, just as before with the training data.
+
+### Pre-Process the Holdout Set
+
+We want the basic recipe applied to the holdout set so the model sees the same type of predictor variables when it goes to make predictions.
+
+```{r}
+holdout_h2o_tbl <- basic_rec %>%
+  prep() %>%
+  bake(holdout) %>%
+  as.h2o()
+```
+
+### Make Predictions
+
+Predictions are made using h2o.predict().  
+
+```{r}
+top_model_basic_preds <- h2o.predict(top_model, newdata = holdout_h2o_tbl) %>%
+  as_tibble() %>%
+  bind_cols(holdout) %>%
+  select(id, attrition_flag = yes)
+
+top_model_basic_preds %>%
+  gt_preview() 
+```
+
+Nice!  A list of predictions for each id in the holdout set.  Let's write it to file and submit.
+
+### Export Results
+
+```{r}
+top_model_basic_preds %>%
+  write_csv(here("run1_basic_ep7.csv"))
+```
+
+### Scoring the Submission
+
+To submit the file for assessment, simply upload the csv to the interface on kaggle by browsing and selecting or dragging.  In a few seconds our LogLoss on holdout set is revealed. The one we care about is the private score. 
+
+![](/post/2021-07-24-could-automl-win-in-the-sliced-data-science-competition_files/score_and_board.png){width=100%}
+
+__A private score of 0.06921!__  This is honestly way better than I expected for such minimal processing.  __This submission would have slotted me into 3rd place out of 31 entries, just behind eventual Episode 7 winner Ethan Douglas.__  And remember, I didn't need to specify any modeling engine or range of hyperparameters to tune!
+
+# Understanding the Ensemble
+
+Just so we aren't totally naive, let's dig into this model a bit and see what h2o built.  For an ensemble, we want to interrogate the "metalearner" which can be thought of as the model that is made up of many models.  These are S4 objects which require the @ operator to dig into the different slots / items (I just learned this about 90 seconds ago).
+
+## Extract the Ensemble Metalearner Model
+
+```{r}
+metalearner_model <- h2o.getModel(top_model@model$metalearner$name)
+
+metalearner_model@model$model_summary %>% 
+  as_tibble() %>%
+  gt_preview() %>% 
+  cols_align("center")
+
+```
+
+Looks like we have 36 different models combined in a GLM, using Elastic Net regularization.  The component models are either GBM or Deep Learning and it looks like they each have different hyperparameter grids that were searched across.  I'll put the full model output in the Appendix. Here are a list of the models that compose the ensemble and their relative importance to the ensemble.  The top performing models take a greater weight. 
+
+## Importance of Each Contributing Model in the Ensemble
+
+```{r}
+h2o.varimp(metalearner_model) %>%
+  as_tibble() %>%
+  gt_preview() %>%
+  cols_align("center")
+```
+
+We could also visualize the data above for scaled importance of each model within the ensemble:
+
+```{r}
+h2o.varimp_plot(metalearner_model)
+```
+
+## Importance of Features in the Original Dataset
+
+```{r}
+top_individual_model <- h2o.getModel(metalearner_model@model$names[1])
+
+metalearner_model@model$names[1]
+
+h2o.varimp(top_individual_model) %>%
+  as_tibble() %>%
+  gt() %>% 
+  cols_align("center")
+```
+
+```{r}
+h2o.varimp_plot(top_individual_model)
+```
+
+My takeaway is that h2o autoML is really quite powerful for purely predictive tasks and is even feasible for a timed competition like Sliced.  I look forward to the upcoming playoffs and will be interested to try h2o on some new datasets to see if we just got lucky here, or if it's really that good.
+
+## TLDR
+
+__TLDR: AutoML wouldn't have won this competition (at least with the minimal feature engineering I did), but it sure got way closer than I expected!__
+
+Thank you for your attention!
+
+# Session Info
+
+```{r}
+sessionInfo()
+```
+
+
+# Appendix - Full Details of the Ensemble Model
+
+```{r}
+str(metalearner_model@model)
+```
+

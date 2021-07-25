@@ -6,10 +6,4524 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>&amp;copy; 2019. All rights reserved.</copyright>
-    <lastBuildDate>Tue, 22 Jun 2021 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Sat, 24 Jul 2021 00:00:00 +0000</lastBuildDate>
     
         <atom:link href="/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>Could AutoML win in the &#39;Sliced&#39; Data Science Competition?  The answer may shock you!</title>
+      <link>/post/could-automl-win-in-the-sliced-data-science-competition/</link>
+      <pubDate>Sat, 24 Jul 2021 00:00:00 +0000</pubDate>
+      
+      <guid>/post/could-automl-win-in-the-sliced-data-science-competition/</guid>
+      <description>
+&lt;script src=&#34;/rmarkdown-libs/header-attrs/header-attrs.js&#34;&gt;&lt;/script&gt;
+&lt;link href=&#34;/rmarkdown-libs/anchor-sections/anchor-sections.css&#34; rel=&#34;stylesheet&#34; /&gt;
+&lt;script src=&#34;/rmarkdown-libs/anchor-sections/anchor-sections.js&#34;&gt;&lt;/script&gt;
+
+
+&lt;p&gt;In this post I’ll be taking a break from my normal explorations in the medical device domain to talk about &lt;a href=&#34;https://www.notion.so/SLICED-Show-c7bd26356e3a42279e2dfbafb0480073&#34;&gt;Sliced&lt;/a&gt;. Sliced is a 2-hour data science competition streamed on Twitch and hosted by Meg Risdal and Nick Wan. Four competitors tackle a prediction problem in real time using whatever coding language or tools they prefer, grabbing bonus points along the way for Data Visualization and/or stumbling onto Golden Features (hint: always calculate the air density when training on weather data). Viewers can simply kick back on watch the contestants apply their trade or they can actively participate by submitting their own solutions and seeing how they stack up on the competition leaderboard!&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-07-24-could-automl-win-in-the-sliced-data-science-competition_files/sliced.png&#34; style=&#34;width:100.0%&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Here are my observations after watching a few episodes:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;* Participants do not typically implement more than 2 different model types, preferring to spend their time on Feature Engineering and tuning the hyperparameters of their preferred model&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;* Gradient boosting (XGBoost, Catboost, etc) is the dominant technique for tabular data&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;To clarify the first point above - the tuning is not totally manual; grid search functions are typically employed to identify the best hyperparameters from a superset of options. But the time pressure of the competition means that players can’t set up massive grids that lock up compute resources for too long. So it’s generally an iterative process over small grids that are expanded and contracted as needed based on intermediate results of the model predicting on a test set.&lt;/p&gt;
+&lt;p&gt;All this led me to wonder: given the somewhat manual process of hyperparameter optimization and the restricted number of model types… how would AutoML fare in Sliced? The rest of this post will attempt to answer that question, at least for an arbitrary Sliced episode.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;#setup&#34;&gt;Setup&lt;/a&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;#load-libraries&#34;&gt;Load libraries&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#load-dataset&#34;&gt;Load dataset&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#set-up-basic-recipe&#34;&gt;Set Up Basic Recipe&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#prep-and-bake-the-dataset&#34;&gt;Prep and Bake the Dataset&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#working-in-h2o&#34;&gt;Working in h2o&lt;/a&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;#convert-dataset-to-h2o&#34;&gt;Convert Dataset to h2o&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#specify-the-response-and-predictors&#34;&gt;Specify the Response and Predictors&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#automl-search-and-optimization&#34;&gt;autoML Search and Optimization&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#leaderboard-of-best-model&#34;&gt;Leaderboard of Best Model&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#extract-top-model&#34;&gt;Extract Top Model&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#pre-process-the-holdout-set&#34;&gt;Pre-Process the Holdout Set&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#make-predictions&#34;&gt;Make Predictions&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#export-results&#34;&gt;Export Results&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#scoring-the-submission&#34;&gt;Scoring the Submission&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#understanding-the-ensemble&#34;&gt;Understanding the Ensemble&lt;/a&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;#extract-the-ensemble-metalearner-model&#34;&gt;Extract the Ensemble Metalearner Model&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#importance-of-each-contributing-model-in-the-ensemble&#34;&gt;Importance of Each Contributing Model in the Ensemble&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#importance-of-features-in-the-original-dataset&#34;&gt;Importance of Features in the Original Dataset&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#tldr&#34;&gt;TLDR&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#session-info&#34;&gt;Session Info&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#appendix---full-details-of-the-ensemble-model&#34;&gt;Appendix - Full Details of the Ensemble Model&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div id=&#34;setup&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Setup&lt;/h1&gt;
+&lt;p&gt;For this exercise we’ll use the dataset and metrics from &lt;a href=&#34;https://www.kaggle.com/c/sliced-s01e07-HmPsw2&#34;&gt;Episode 7&lt;/a&gt; in which we are asked to predict whether or not a bank customer churned. The scoring metric is LogLoss. I’ll be using the free version of the h2o.ai framework and take the following approach to feature engineering and variable selection:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;All variables will be used (churn explained by everything) and no feature engineering except imputing means for missing values, converting nominal predictors to dummy variables, and removing ID column. This should give a fair look at how h2o will do given the bare minimum of attention to pre-processing and no attention to model selection or hyperparameter range.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Let’s get to it.&lt;/p&gt;
+&lt;div id=&#34;load-libraries&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Load libraries&lt;/h2&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(tidymodels)
+library(tidyverse)
+library(h2o)
+library(here)
+library(gt)&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;load-dataset&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Load dataset&lt;/h2&gt;
+&lt;p&gt;Read the data in as a csv and rename the attrition column&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;dataset &amp;lt;- read_csv(here(&amp;quot;ep7/train.csv&amp;quot;)) %&amp;gt;%
+  mutate(churned = case_when(
+    attrition_flag == 1 ~ &amp;quot;yes&amp;quot;,
+    TRUE ~ &amp;quot;no&amp;quot;
+  ) %&amp;gt;% as_factor()) %&amp;gt;%
+  select(-attrition_flag)
+
+holdout &amp;lt;- read_csv(here(&amp;quot;ep7/test.csv&amp;quot;))
+
+dataset %&amp;gt;%
+  gt_preview() %&amp;gt;% 
+  cols_align(&amp;quot;center&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;vltpykgefg&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;style&gt;html {
+  font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
+}
+
+#vltpykgefg .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#vltpykgefg .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#vltpykgefg .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#vltpykgefg .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#vltpykgefg .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#vltpykgefg .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#vltpykgefg .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#vltpykgefg .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#vltpykgefg .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#vltpykgefg .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#vltpykgefg .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#vltpykgefg .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#vltpykgefg .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#vltpykgefg .gt_from_md &gt; :first-child {
+  margin-top: 0;
+}
+
+#vltpykgefg .gt_from_md &gt; :last-child {
+  margin-bottom: 0;
+}
+
+#vltpykgefg .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#vltpykgefg .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#vltpykgefg .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#vltpykgefg .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#vltpykgefg .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#vltpykgefg .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#vltpykgefg .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#vltpykgefg .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#vltpykgefg .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#vltpykgefg .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#vltpykgefg .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#vltpykgefg .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#vltpykgefg .gt_left {
+  text-align: left;
+}
+
+#vltpykgefg .gt_center {
+  text-align: center;
+}
+
+#vltpykgefg .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#vltpykgefg .gt_font_normal {
+  font-weight: normal;
+}
+
+#vltpykgefg .gt_font_bold {
+  font-weight: bold;
+}
+
+#vltpykgefg .gt_font_italic {
+  font-style: italic;
+}
+
+#vltpykgefg .gt_super {
+  font-size: 65%;
+}
+
+#vltpykgefg .gt_footnote_marks {
+  font-style: italic;
+  font-size: 65%;
+}
+&lt;/style&gt;
+&lt;table class=&#34;gt_table&#34;&gt;
+  
+  &lt;thead class=&#34;gt_col_headings&#34;&gt;
+    &lt;tr&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_left&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;id&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;customer_age&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;gender&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;education_level&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;income_category&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;total_relationship_count&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;months_inactive_12_mon&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;credit_limit&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;total_revolving_bal&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;total_amt_chng_q4_q1&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;total_trans_amt&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;total_trans_ct&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;total_ct_chng_q4_q1&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;avg_utilization_ratio&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;churned&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody class=&#34;gt_table_body&#34;&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;8805&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;27&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;F&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;Post-Graduate&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;Less than $40K&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;2&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1438.3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;990&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.715&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3855&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;73&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.147&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.688&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;no&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;2&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;4231&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;42&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;F&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;College&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;Less than $40K&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;6&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;4&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3050.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1824&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.771&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1973&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;50&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.381&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.598&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;no&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;5263&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;47&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;F&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;Unknown&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;Less than $40K&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1561.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.502&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1947&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;28&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.556&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;yes&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;4&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;2072&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;44&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;M&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;Uneducated&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;$80K - $120K&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;25428.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1528&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.725&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;13360&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;97&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.796&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.060&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;no&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;5&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;7412&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;54&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;M&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;Graduate&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;$60K - $80K&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;2947.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;2216&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.760&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1744&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;53&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.606&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.752&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;no&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier; font-size: x-small; background-color: #E4E4E4;&#34;&gt;6..7087&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;7088&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;7932&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;57&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;F&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;High School&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;Less than $40K&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;5&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3191.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;2517&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.719&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1501&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;35&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.591&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.789&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;no&lt;/td&gt;&lt;/tr&gt;
+  &lt;/tbody&gt;
+  
+  
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;set-up-basic-recipe&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Set Up Basic Recipe&lt;/h2&gt;
+&lt;p&gt;This recipe starts with the model structure, imputes the mean for numeric predictors, and converts nominal variables to dummy. Id is also removed. Note that churned is described by . which means “all variables”.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;basic_rec &amp;lt;- recipe(churned ~ .,
+  data = dataset
+) %&amp;gt;%
+  step_impute_mean(all_numeric_predictors()) %&amp;gt;%
+  step_dummy(all_nominal_predictors()) %&amp;gt;%
+  step_rm(id)&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;prep-and-bake-the-dataset&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Prep and Bake the Dataset&lt;/h2&gt;
+&lt;p&gt;Prepping and baking functions will apply the recipe to the supplied dataset and make it usable in tibble format for passing to h2o.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;baked_dataset_tbl &amp;lt;- basic_rec %&amp;gt;%
+  prep() %&amp;gt;%
+  bake(dataset)
+
+baked_dataset_tbl %&amp;gt;%
+  gt_preview() %&amp;gt;% 
+  cols_align(&amp;quot;center&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;xpgskwosom&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;style&gt;html {
+  font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
+}
+
+#xpgskwosom .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#xpgskwosom .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#xpgskwosom .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#xpgskwosom .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#xpgskwosom .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#xpgskwosom .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#xpgskwosom .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#xpgskwosom .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#xpgskwosom .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#xpgskwosom .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#xpgskwosom .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#xpgskwosom .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#xpgskwosom .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#xpgskwosom .gt_from_md &gt; :first-child {
+  margin-top: 0;
+}
+
+#xpgskwosom .gt_from_md &gt; :last-child {
+  margin-bottom: 0;
+}
+
+#xpgskwosom .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#xpgskwosom .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#xpgskwosom .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#xpgskwosom .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#xpgskwosom .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#xpgskwosom .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#xpgskwosom .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#xpgskwosom .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#xpgskwosom .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#xpgskwosom .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#xpgskwosom .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#xpgskwosom .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#xpgskwosom .gt_left {
+  text-align: left;
+}
+
+#xpgskwosom .gt_center {
+  text-align: center;
+}
+
+#xpgskwosom .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#xpgskwosom .gt_font_normal {
+  font-weight: normal;
+}
+
+#xpgskwosom .gt_font_bold {
+  font-weight: bold;
+}
+
+#xpgskwosom .gt_font_italic {
+  font-style: italic;
+}
+
+#xpgskwosom .gt_super {
+  font-size: 65%;
+}
+
+#xpgskwosom .gt_footnote_marks {
+  font-style: italic;
+  font-size: 65%;
+}
+&lt;/style&gt;
+&lt;table class=&#34;gt_table&#34;&gt;
+  
+  &lt;thead class=&#34;gt_col_headings&#34;&gt;
+    &lt;tr&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_left&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;customer_age&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;total_relationship_count&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;months_inactive_12_mon&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;credit_limit&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;total_revolving_bal&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;total_amt_chng_q4_q1&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;total_trans_amt&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;total_trans_ct&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;total_ct_chng_q4_q1&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;avg_utilization_ratio&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;churned&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;gender_M&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;education_level_Doctorate&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;education_level_Graduate&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;education_level_High.School&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;education_level_Post.Graduate&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;education_level_Uneducated&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;education_level_Unknown&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;income_category_X.40K....60K&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;income_category_X.60K....80K&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;income_category_X.80K....120K&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;income_category_Less.than..40K&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;income_category_Unknown&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody class=&#34;gt_table_body&#34;&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;27&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;2&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1438.3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;990&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.715&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3855&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;73&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.147&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.688&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;no&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;2&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;42&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;6&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;4&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3050.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1824&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.771&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1973&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;50&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.381&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.598&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;no&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;47&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1561.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.502&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1947&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;28&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.556&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;yes&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;4&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;44&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;25428.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1528&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.725&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;13360&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;97&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.796&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.060&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;no&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;5&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;54&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;2947.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;2216&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.760&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1744&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;53&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.606&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.752&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;no&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier; font-size: x-small; background-color: #E4E4E4;&#34;&gt;6..7087&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;7088&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;57&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;5&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3191.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;2517&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.719&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1501&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;35&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.591&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.789&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;no&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;&lt;/tr&gt;
+  &lt;/tbody&gt;
+  
+  
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;working-in-h2o&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Working in h2o&lt;/h2&gt;
+&lt;div id=&#34;convert-dataset-to-h2o&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;Convert Dataset to h2o&lt;/h3&gt;
+&lt;p&gt;h2o must first be initialized and then the data can be coerced to h2o type. Using the h2o.describe() function shows a nice summary of the dataset and verifies that it was imported correctly.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;h2o.init()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;##  Connection successful!
+## 
+## R is connected to the H2O cluster: 
+##     H2O cluster uptime:         7 hours 52 minutes 
+##     H2O cluster timezone:       America/Los_Angeles 
+##     H2O data parsing timezone:  UTC 
+##     H2O cluster version:        3.32.1.3 
+##     H2O cluster version age:    2 months and 5 days  
+##     H2O cluster name:           H2O_started_from_R_kingr17_afp345 
+##     H2O cluster total nodes:    1 
+##     H2O cluster total memory:   0.85 GB 
+##     H2O cluster total cores:    4 
+##     H2O cluster allowed cores:  4 
+##     H2O cluster healthy:        TRUE 
+##     H2O Connection ip:          localhost 
+##     H2O Connection port:        54321 
+##     H2O Connection proxy:       NA 
+##     H2O Internal Security:      FALSE 
+##     H2O API Extensions:         Amazon S3, Algos, AutoML, Core V3, TargetEncoder, Core V4 
+##     R Version:                  R version 4.0.3 (2020-10-10)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;train_h2_tbl &amp;lt;- as.h2o(baked_dataset_tbl)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 
+  |                                                                            
+  |                                                                      |   0%
+  |                                                                            
+  |======================================================================| 100%&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;h2o.describe(train_h2_tbl) %&amp;gt;% 
+  gt() %&amp;gt;% 
+  cols_align(&amp;quot;center&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;kgopzgnjvn&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;style&gt;html {
+  font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
+}
+
+#kgopzgnjvn .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#kgopzgnjvn .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#kgopzgnjvn .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#kgopzgnjvn .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#kgopzgnjvn .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#kgopzgnjvn .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#kgopzgnjvn .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#kgopzgnjvn .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#kgopzgnjvn .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#kgopzgnjvn .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#kgopzgnjvn .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#kgopzgnjvn .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#kgopzgnjvn .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#kgopzgnjvn .gt_from_md &gt; :first-child {
+  margin-top: 0;
+}
+
+#kgopzgnjvn .gt_from_md &gt; :last-child {
+  margin-bottom: 0;
+}
+
+#kgopzgnjvn .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#kgopzgnjvn .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#kgopzgnjvn .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#kgopzgnjvn .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#kgopzgnjvn .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#kgopzgnjvn .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#kgopzgnjvn .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#kgopzgnjvn .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#kgopzgnjvn .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#kgopzgnjvn .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#kgopzgnjvn .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#kgopzgnjvn .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#kgopzgnjvn .gt_left {
+  text-align: left;
+}
+
+#kgopzgnjvn .gt_center {
+  text-align: center;
+}
+
+#kgopzgnjvn .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#kgopzgnjvn .gt_font_normal {
+  font-weight: normal;
+}
+
+#kgopzgnjvn .gt_font_bold {
+  font-weight: bold;
+}
+
+#kgopzgnjvn .gt_font_italic {
+  font-style: italic;
+}
+
+#kgopzgnjvn .gt_super {
+  font-size: 65%;
+}
+
+#kgopzgnjvn .gt_footnote_marks {
+  font-style: italic;
+  font-size: 65%;
+}
+&lt;/style&gt;
+&lt;table class=&#34;gt_table&#34;&gt;
+  
+  &lt;thead class=&#34;gt_col_headings&#34;&gt;
+    &lt;tr&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;Label&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;Type&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;Missing&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;Zeros&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;PosInf&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;NegInf&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;Min&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;Max&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;Mean&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;Sigma&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;Cardinality&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody class=&#34;gt_table_body&#34;&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;customer_age&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;26.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;73.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;4.630742e+01&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;7.9929340&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;total_relationship_count&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;6.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3.818426e+00&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.5516740&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;months_inactive_12_mon&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;22&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;6.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;2.331546e+00&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.0103784&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;credit_limit&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;real&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1438.3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;34516.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;8.703875e+03&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;9152.3072697&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;total_revolving_bal&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1705&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;2517.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.169674e+03&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;815.4734902&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;total_amt_chng_q4_q1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;real&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;5&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3.355&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;7.601713e-01&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.2213876&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;total_trans_amt&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;563.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;18484.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;4.360548e+03&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3339.1008390&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;total_trans_ct&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;10.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;139.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;6.465378e+01&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;23.3431055&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;total_ct_chng_q4_q1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;real&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;7&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3.500&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;7.126414e-01&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.2363882&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;avg_utilization_ratio&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;real&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1705&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.999&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;2.753678e-01&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.2755652&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;churned&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;enum&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;5956&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.597065e-01&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.3663595&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;2&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;gender_M&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3714&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;4.760158e-01&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.4994597&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;education_level_Doctorate&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;6762&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;4.599323e-02&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.2094852&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;education_level_Graduate&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;4876&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3.120767e-01&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.4633737&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;education_level_High.School&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;5710&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.944131e-01&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.3957761&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;education_level_Post.Graduate&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;6745&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;4.839165e-02&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.2146075&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;education_level_Uneducated&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;6050&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.464447e-01&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.3535764&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;education_level_Unknown&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;6005&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.527935e-01&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.3598137&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;income_category_X.40K....60K&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;5865&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.725451e-01&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.3778802&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;income_category_X.60K....80K&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;6064&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.444695e-01&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.3515900&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;income_category_X.80K....120K&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;6007&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.525113e-01&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.3595411&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;income_category_Less.than..40K&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;4621&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3.480530e-01&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.4763865&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;income_category_Unknown&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;int&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;6316&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.089165e-01&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.3115564&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;NA&lt;/td&gt;&lt;/tr&gt;
+  &lt;/tbody&gt;
+  
+  
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;specify-the-response-and-predictors&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;Specify the Response and Predictors&lt;/h3&gt;
+&lt;p&gt;In h2o we must identify the response column and the predictors which we do here. Unfortunately we can’t tidyselect here I don’t think.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;y &amp;lt;- &amp;quot;churned&amp;quot;
+x &amp;lt;- setdiff(names(train_h2_tbl), y)&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;automl-search-and-optimization&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;autoML Search and Optimization&lt;/h3&gt;
+&lt;p&gt;Now we start the autoML session. You can specify the stopping rule by either total number of model or total duration in seconds. Since we’re simulating a timed Sliced competition, we’ll use max time. The longest I observed competitors training for was about 20 minutes, so we’ll use that here and then grab a coffee while it chugs. Notice that in this API we are not specifying any particular type of model or any hyperparameter range to optimize over.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# aml &amp;lt;- h2o.automl(
+#   y = y,
+#   x = x,
+#   training_frame = train_h2_tbl,
+#   project_name = &amp;quot;sliced_ep7_refactored_25bjuly2021&amp;quot;,
+#   max_runtime_secs = 1200,
+#   seed = 07252021
+# )&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;leaderboard-of-best-model&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;Leaderboard of Best Model&lt;/h3&gt;
+&lt;p&gt;Not to be confused with the competition leaderboard, h2o will produce a “leaderboard” of models that it evaluated and ranked as part of its session. Here we access and observe the leaderboard and its best models.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# leaderboard_tbl &amp;lt;- aml@leaderboard %&amp;gt;% as_tibble()
+# a &amp;lt;- leaderboard_tbl %&amp;gt;% gt_preview()
+# a&lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;fthbjjfqrp&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;style&gt;html {
+  font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
+}
+
+#fthbjjfqrp .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#fthbjjfqrp .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#fthbjjfqrp .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#fthbjjfqrp .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#fthbjjfqrp .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#fthbjjfqrp .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#fthbjjfqrp .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#fthbjjfqrp .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#fthbjjfqrp .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#fthbjjfqrp .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#fthbjjfqrp .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#fthbjjfqrp .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#fthbjjfqrp .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#fthbjjfqrp .gt_from_md &gt; :first-child {
+  margin-top: 0;
+}
+
+#fthbjjfqrp .gt_from_md &gt; :last-child {
+  margin-bottom: 0;
+}
+
+#fthbjjfqrp .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#fthbjjfqrp .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#fthbjjfqrp .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#fthbjjfqrp .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#fthbjjfqrp .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#fthbjjfqrp .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#fthbjjfqrp .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#fthbjjfqrp .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#fthbjjfqrp .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#fthbjjfqrp .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#fthbjjfqrp .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#fthbjjfqrp .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#fthbjjfqrp .gt_left {
+  text-align: left;
+}
+
+#fthbjjfqrp .gt_center {
+  text-align: center;
+}
+
+#fthbjjfqrp .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#fthbjjfqrp .gt_font_normal {
+  font-weight: normal;
+}
+
+#fthbjjfqrp .gt_font_bold {
+  font-weight: bold;
+}
+
+#fthbjjfqrp .gt_font_italic {
+  font-style: italic;
+}
+
+#fthbjjfqrp .gt_super {
+  font-size: 65%;
+}
+
+#fthbjjfqrp .gt_footnote_marks {
+  font-style: italic;
+  font-size: 65%;
+}
+&lt;/style&gt;
+&lt;table class=&#34;gt_table&#34;&gt;
+  
+  &lt;thead class=&#34;gt_col_headings&#34;&gt;
+    &lt;tr&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_left&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_left&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;model_id&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;auc&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;logloss&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;aucpr&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;mean_per_class_error&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;rmse&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;mse&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody class=&#34;gt_table_body&#34;&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_left&#34;&gt;StackedEnsemble_AllModels_AutoML_20210725_011103&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.9918194&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.08285245&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.9636402&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.06007334&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.1543060&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.02381035&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;2&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_left&#34;&gt;GBM_2_AutoML_20210725_011103&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.9914487&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.08636589&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.9626320&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.05620012&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.1569434&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.02463124&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_left&#34;&gt;StackedEnsemble_BestOfFamily_AutoML_20210725_011103&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.9914280&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.08451327&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.9625496&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.05620012&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.1556844&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.02423764&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;4&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_left&#34;&gt;GBM_grid__1_AutoML_20210725_011103_model_2&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.9913165&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.09009359&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.9616467&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.06286946&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.1600684&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.02562190&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;5&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_left&#34;&gt;GBM_4_AutoML_20210725_011103&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.9912436&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.09035254&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.9602742&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.07244469&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.1599096&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.02557107&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier; font-size: x-small; background-color: #E4E4E4;&#34;&gt;6..37&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_left&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;38&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_left&#34;&gt;GLM_1_AutoML_20210725_011103&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.9152440&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.24794654&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.7267223&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.18132441&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.2727786&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.07440815&lt;/td&gt;&lt;/tr&gt;
+  &lt;/tbody&gt;
+  
+  
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;extract-top-model&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;Extract Top Model&lt;/h3&gt;
+&lt;p&gt;As expected, the top slot is an ensemble (in my limited experience it usually is). This is the one we’ll use to predict churn on the holdout set and submit to kaggle for our competition results. The ensemble model is extracted and stored as follows:&lt;/p&gt;
+&lt;p&gt;To prepare the holdout data predictions, we apply the basic recipe and convert to h2o, just as before with the training data.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;pre-process-the-holdout-set&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;Pre-Process the Holdout Set&lt;/h3&gt;
+&lt;p&gt;We want the basic recipe applied to the holdout set so the model sees the same type of predictor variables when it goes to make predictions.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;holdout_h2o_tbl &amp;lt;- basic_rec %&amp;gt;%
+  prep() %&amp;gt;%
+  bake(holdout) %&amp;gt;%
+  as.h2o()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 
+  |                                                                            
+  |                                                                      |   0%
+  |                                                                            
+  |======================================================================| 100%&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;make-predictions&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;Make Predictions&lt;/h3&gt;
+&lt;p&gt;Predictions are made using h2o.predict().&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;top_model_basic_preds &amp;lt;- h2o.predict(top_model, newdata = holdout_h2o_tbl) %&amp;gt;%
+  as_tibble() %&amp;gt;%
+  bind_cols(holdout) %&amp;gt;%
+  select(id, attrition_flag = yes)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 
+  |                                                                            
+  |                                                                      |   0%
+  |                                                                            
+  |======================================================================| 100%&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;top_model_basic_preds %&amp;gt;%
+  gt_preview() &lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;jjjfzrzdmk&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;style&gt;html {
+  font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
+}
+
+#jjjfzrzdmk .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#jjjfzrzdmk .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#jjjfzrzdmk .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#jjjfzrzdmk .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#jjjfzrzdmk .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#jjjfzrzdmk .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#jjjfzrzdmk .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#jjjfzrzdmk .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#jjjfzrzdmk .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#jjjfzrzdmk .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#jjjfzrzdmk .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#jjjfzrzdmk .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#jjjfzrzdmk .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#jjjfzrzdmk .gt_from_md &gt; :first-child {
+  margin-top: 0;
+}
+
+#jjjfzrzdmk .gt_from_md &gt; :last-child {
+  margin-bottom: 0;
+}
+
+#jjjfzrzdmk .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#jjjfzrzdmk .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#jjjfzrzdmk .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#jjjfzrzdmk .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#jjjfzrzdmk .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#jjjfzrzdmk .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#jjjfzrzdmk .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#jjjfzrzdmk .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#jjjfzrzdmk .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#jjjfzrzdmk .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#jjjfzrzdmk .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#jjjfzrzdmk .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#jjjfzrzdmk .gt_left {
+  text-align: left;
+}
+
+#jjjfzrzdmk .gt_center {
+  text-align: center;
+}
+
+#jjjfzrzdmk .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#jjjfzrzdmk .gt_font_normal {
+  font-weight: normal;
+}
+
+#jjjfzrzdmk .gt_font_bold {
+  font-weight: bold;
+}
+
+#jjjfzrzdmk .gt_font_italic {
+  font-style: italic;
+}
+
+#jjjfzrzdmk .gt_super {
+  font-size: 65%;
+}
+
+#jjjfzrzdmk .gt_footnote_marks {
+  font-style: italic;
+  font-size: 65%;
+}
+&lt;/style&gt;
+&lt;table class=&#34;gt_table&#34;&gt;
+  
+  &lt;thead class=&#34;gt_col_headings&#34;&gt;
+    &lt;tr&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_left&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;id&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;attrition_flag&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody class=&#34;gt_table_body&#34;&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;3005&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.0020805123&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;2&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;143&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.8462792238&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;5508&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.0003131364&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;4&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;6474&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.0001977184&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;5&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;9784&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.0017571210&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier; font-size: x-small; background-color: #E4E4E4;&#34;&gt;6..3038&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;3039&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;9822&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.9895064264&lt;/td&gt;&lt;/tr&gt;
+  &lt;/tbody&gt;
+  
+  
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;p&gt;Nice! A list of predictions for each id in the holdout set. Let’s write it to file and submit.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;export-results&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;Export Results&lt;/h3&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;top_model_basic_preds %&amp;gt;%
+  write_csv(here(&amp;quot;run1_basic_ep7.csv&amp;quot;))&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;scoring-the-submission&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;Scoring the Submission&lt;/h3&gt;
+&lt;p&gt;To submit the file for assessment, simply upload the csv to the interface on kaggle by browsing and selecting or dragging. In a few seconds our LogLoss on holdout set is revealed. The one we care about is the private score.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-07-24-could-automl-win-in-the-sliced-data-science-competition_files/score_and_board.png&#34; style=&#34;width:100.0%&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;A private score of 0.06921!&lt;/strong&gt; This is honestly way better than I expected for such minimal processing. &lt;strong&gt;This submission would have slotted me into 3rd place out of 31 entries, just behind eventual Episode 7 winner Ethan Douglas.&lt;/strong&gt; And remember, I didn’t need to specify any modeling engine or range of hyperparameters to tune!&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;understanding-the-ensemble&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Understanding the Ensemble&lt;/h1&gt;
+&lt;p&gt;Just so we aren’t totally naive, let’s dig into this model a bit and see what h2o built. For an ensemble, we want to interrogate the “metalearner” which can be thought of as the model that is made up of many models. These are S4 objects which require the @ operator to dig into the different slots / items (I just learned this about 90 seconds ago).&lt;/p&gt;
+&lt;div id=&#34;extract-the-ensemble-metalearner-model&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Extract the Ensemble Metalearner Model&lt;/h2&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;metalearner_model &amp;lt;- h2o.getModel(top_model@model$metalearner$name)
+
+metalearner_model@model$model_summary %&amp;gt;% 
+  as_tibble() %&amp;gt;%
+  gt_preview() %&amp;gt;% 
+  cols_align(&amp;quot;center&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;zrahzfhsjp&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;style&gt;html {
+  font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
+}
+
+#zrahzfhsjp .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#zrahzfhsjp .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#zrahzfhsjp .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#zrahzfhsjp .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#zrahzfhsjp .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#zrahzfhsjp .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#zrahzfhsjp .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#zrahzfhsjp .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#zrahzfhsjp .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#zrahzfhsjp .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#zrahzfhsjp .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#zrahzfhsjp .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#zrahzfhsjp .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#zrahzfhsjp .gt_from_md &gt; :first-child {
+  margin-top: 0;
+}
+
+#zrahzfhsjp .gt_from_md &gt; :last-child {
+  margin-bottom: 0;
+}
+
+#zrahzfhsjp .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#zrahzfhsjp .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#zrahzfhsjp .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#zrahzfhsjp .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#zrahzfhsjp .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#zrahzfhsjp .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#zrahzfhsjp .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#zrahzfhsjp .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#zrahzfhsjp .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#zrahzfhsjp .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#zrahzfhsjp .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#zrahzfhsjp .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#zrahzfhsjp .gt_left {
+  text-align: left;
+}
+
+#zrahzfhsjp .gt_center {
+  text-align: center;
+}
+
+#zrahzfhsjp .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#zrahzfhsjp .gt_font_normal {
+  font-weight: normal;
+}
+
+#zrahzfhsjp .gt_font_bold {
+  font-weight: bold;
+}
+
+#zrahzfhsjp .gt_font_italic {
+  font-style: italic;
+}
+
+#zrahzfhsjp .gt_super {
+  font-size: 65%;
+}
+
+#zrahzfhsjp .gt_footnote_marks {
+  font-style: italic;
+  font-size: 65%;
+}
+&lt;/style&gt;
+&lt;table class=&#34;gt_table&#34;&gt;
+  
+  &lt;thead class=&#34;gt_col_headings&#34;&gt;
+    &lt;tr&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_left&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;family&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;link&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;regularization&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;number_of_predictors_total&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;number_of_active_predictors&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;number_of_iterations&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;training_frame&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody class=&#34;gt_table_body&#34;&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;binomial&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;logit&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;Elastic Net (alpha = 0.5, lambda = 0.00311 )&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;36&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;12&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;7&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;levelone_training_StackedEnsemble_AllModels_AutoML_20210725_011103&lt;/td&gt;&lt;/tr&gt;
+  &lt;/tbody&gt;
+  
+  
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;p&gt;Looks like we have 36 different models combined in a GLM, using Elastic Net regularization. The component models are either GBM or Deep Learning and it looks like they each have different hyperparameter grids that were searched across. I’ll put the full model output in the Appendix. Here are a list of the models that compose the ensemble and their relative importance to the ensemble. The top performing models take a greater weight.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;importance-of-each-contributing-model-in-the-ensemble&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Importance of Each Contributing Model in the Ensemble&lt;/h2&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;h2o.varimp(metalearner_model) %&amp;gt;%
+  as_tibble() %&amp;gt;%
+  gt_preview() %&amp;gt;%
+  cols_align(&amp;quot;center&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;cwlloipicv&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;style&gt;html {
+  font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
+}
+
+#cwlloipicv .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#cwlloipicv .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#cwlloipicv .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#cwlloipicv .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#cwlloipicv .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#cwlloipicv .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#cwlloipicv .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#cwlloipicv .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#cwlloipicv .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#cwlloipicv .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#cwlloipicv .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#cwlloipicv .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#cwlloipicv .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#cwlloipicv .gt_from_md &gt; :first-child {
+  margin-top: 0;
+}
+
+#cwlloipicv .gt_from_md &gt; :last-child {
+  margin-bottom: 0;
+}
+
+#cwlloipicv .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#cwlloipicv .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#cwlloipicv .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#cwlloipicv .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#cwlloipicv .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#cwlloipicv .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#cwlloipicv .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#cwlloipicv .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#cwlloipicv .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#cwlloipicv .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#cwlloipicv .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#cwlloipicv .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#cwlloipicv .gt_left {
+  text-align: left;
+}
+
+#cwlloipicv .gt_center {
+  text-align: center;
+}
+
+#cwlloipicv .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#cwlloipicv .gt_font_normal {
+  font-weight: normal;
+}
+
+#cwlloipicv .gt_font_bold {
+  font-weight: bold;
+}
+
+#cwlloipicv .gt_font_italic {
+  font-style: italic;
+}
+
+#cwlloipicv .gt_super {
+  font-size: 65%;
+}
+
+#cwlloipicv .gt_footnote_marks {
+  font-style: italic;
+  font-size: 65%;
+}
+&lt;/style&gt;
+&lt;table class=&#34;gt_table&#34;&gt;
+  
+  &lt;thead class=&#34;gt_col_headings&#34;&gt;
+    &lt;tr&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_left&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;variable&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;relative_importance&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;scaled_importance&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;percentage&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody class=&#34;gt_table_body&#34;&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;GBM_2_AutoML_20210725_011103&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.7014266&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.0000000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.16199734&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;2&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;GBM_grid__1_AutoML_20210725_011103_model_18&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.6565727&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.9360534&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.15163815&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;GBM_grid__1_AutoML_20210725_011103_model_9&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.6336205&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.9033312&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.14633725&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;4&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;GBM_grid__1_AutoML_20210725_011103_model_19&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.4374311&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.6236307&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.10102651&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;5&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;GBM_grid__1_AutoML_20210725_011103_model_3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.4047249&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.5770026&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.09347288&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier; font-size: x-small; background-color: #E4E4E4;&#34;&gt;6..35&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;36&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;GLM_1_AutoML_20210725_011103&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0000000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0000000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.00000000&lt;/td&gt;&lt;/tr&gt;
+  &lt;/tbody&gt;
+  
+  
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;p&gt;We could also visualize the data above for scaled importance of each model within the ensemble:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;h2o.varimp_plot(metalearner_model)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-07-24-could-automl-win-in-the-sliced-data-science-competition_files/figure-html/unnamed-chunk-18-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;importance-of-features-in-the-original-dataset&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Importance of Features in the Original Dataset&lt;/h2&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;top_individual_model &amp;lt;- h2o.getModel(metalearner_model@model$names[1])
+
+metalearner_model@model$names[1]&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## [1] &amp;quot;GBM_2_AutoML_20210725_011103&amp;quot;&lt;/code&gt;&lt;/pre&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;h2o.varimp(top_individual_model) %&amp;gt;%
+  as_tibble() %&amp;gt;%
+  gt() %&amp;gt;% 
+  cols_align(&amp;quot;center&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;qbfplnbfme&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;style&gt;html {
+  font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
+}
+
+#qbfplnbfme .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#qbfplnbfme .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#qbfplnbfme .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#qbfplnbfme .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#qbfplnbfme .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#qbfplnbfme .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#qbfplnbfme .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#qbfplnbfme .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#qbfplnbfme .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#qbfplnbfme .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#qbfplnbfme .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#qbfplnbfme .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#qbfplnbfme .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#qbfplnbfme .gt_from_md &gt; :first-child {
+  margin-top: 0;
+}
+
+#qbfplnbfme .gt_from_md &gt; :last-child {
+  margin-bottom: 0;
+}
+
+#qbfplnbfme .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#qbfplnbfme .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#qbfplnbfme .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#qbfplnbfme .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#qbfplnbfme .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#qbfplnbfme .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#qbfplnbfme .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#qbfplnbfme .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#qbfplnbfme .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#qbfplnbfme .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#qbfplnbfme .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#qbfplnbfme .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#qbfplnbfme .gt_left {
+  text-align: left;
+}
+
+#qbfplnbfme .gt_center {
+  text-align: center;
+}
+
+#qbfplnbfme .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#qbfplnbfme .gt_font_normal {
+  font-weight: normal;
+}
+
+#qbfplnbfme .gt_font_bold {
+  font-weight: bold;
+}
+
+#qbfplnbfme .gt_font_italic {
+  font-style: italic;
+}
+
+#qbfplnbfme .gt_super {
+  font-size: 65%;
+}
+
+#qbfplnbfme .gt_footnote_marks {
+  font-style: italic;
+  font-size: 65%;
+}
+&lt;/style&gt;
+&lt;table class=&#34;gt_table&#34;&gt;
+  
+  &lt;thead class=&#34;gt_col_headings&#34;&gt;
+    &lt;tr&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;variable&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;relative_importance&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;scaled_importance&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;percentage&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody class=&#34;gt_table_body&#34;&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;total_trans_ct&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;972.9781494&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.0000000000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.2535628117&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;total_trans_amt&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;773.8638306&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.7953558166&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.2016726572&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;total_ct_chng_q4_q1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;567.8966675&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.5836684697&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.1479966183&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;total_revolving_bal&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;500.5438232&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.5144450814&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.1304441413&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;total_relationship_count&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;341.5622864&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.3510482600&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0890127838&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;total_amt_chng_q4_q1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;175.8822327&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.1807668885&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0458357605&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;customer_age&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;160.4104614&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.1648654305&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0418037421&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;avg_utilization_ratio&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;132.2019196&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.1358734722&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0344524597&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;credit_limit&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;72.8332520&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0748559996&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0189806977&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;months_inactive_12_mon&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;70.7272568&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0726915161&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0184318652&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;gender_M&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;37.5323524&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0385747126&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0097811126&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;income_category_X.80K....120K&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;6.2846680&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0064592077&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0016378149&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;income_category_X.40K....60K&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;6.1469312&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0063176456&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0016019200&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;education_level_High.School&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3.8736489&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0039812291&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0010094916&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;education_level_Graduate&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;3.1741629&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0032623167&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0008272022&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;education_level_Unknown&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;2.5144935&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0025843268&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0006552892&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;income_category_Less.than..40K&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.8054181&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0018555588&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0004705007&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;education_level_Uneducated&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.7907501&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0018404834&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0004666781&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;income_category_Unknown&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.4599973&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0015005448&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0003804824&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;income_category_X.60K....80K&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.4241761&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0014637288&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0003711472&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;education_level_Post.Graduate&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1.4217629&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0014612486&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0003705183&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;education_level_Doctorate&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.8990833&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0009240529&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0002343054&lt;/td&gt;&lt;/tr&gt;
+  &lt;/tbody&gt;
+  
+  
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;h2o.varimp_plot(top_individual_model)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-07-24-could-automl-win-in-the-sliced-data-science-competition_files/figure-html/unnamed-chunk-20-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;My takeaway is that h2o autoML is really quite powerful for purely predictive tasks and is even feasible for a timed competition like Sliced. I look forward to the upcoming playoffs and will be interested to try h2o on some new datasets to see if we just got lucky here, or if it’s really that good.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;tldr&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;TLDR&lt;/h2&gt;
+&lt;p&gt;&lt;strong&gt;TLDR: AutoML wouldn’t have won this competition (at least with the minimal feature engineering I did), but it sure got way closer than I expected!&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Thank you for your attention!&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;session-info&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Session Info&lt;/h1&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;sessionInfo()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## R version 4.0.3 (2020-10-10)
+## Platform: x86_64-w64-mingw32/x64 (64-bit)
+## Running under: Windows 10 x64 (build 18363)
+## 
+## Matrix products: default
+## 
+## locale:
+## [1] LC_COLLATE=English_United States.1252 
+## [2] LC_CTYPE=English_United States.1252   
+## [3] LC_MONETARY=English_United States.1252
+## [4] LC_NUMERIC=C                          
+## [5] LC_TIME=English_United States.1252    
+## 
+## attached base packages:
+## [1] stats     graphics  grDevices utils     datasets  methods   base     
+## 
+## other attached packages:
+##  [1] gt_0.2.2           here_1.0.0         h2o_3.32.1.3       forcats_0.5.0     
+##  [5] stringr_1.4.0      readr_1.4.0        tidyverse_1.3.0    yardstick_0.0.8   
+##  [9] workflowsets_0.0.2 workflows_0.2.3    tune_0.1.5         tidyr_1.1.3       
+## [13] tibble_3.1.2       rsample_0.1.0      recipes_0.1.16     purrr_0.3.4       
+## [17] parsnip_0.1.6.9000 modeldata_0.1.0    infer_0.5.4        ggplot2_3.3.5     
+## [21] dplyr_1.0.7        dials_0.0.9        scales_1.1.1       broom_0.7.8       
+## [25] tidymodels_0.1.3  
+## 
+## loaded via a namespace (and not attached):
+##  [1] colorspace_2.0-0   ellipsis_0.3.2     class_7.3-17       rprojroot_2.0.2   
+##  [5] fs_1.5.0           rstudioapi_0.13    listenv_0.8.0      furrr_0.2.1       
+##  [9] bit64_4.0.5        prodlim_2019.11.13 fansi_0.5.0        lubridate_1.7.9.2 
+## [13] xml2_1.3.2         codetools_0.2-18   splines_4.0.3      knitr_1.30        
+## [17] jsonlite_1.7.1     pROC_1.16.2        dbplyr_2.0.0       compiler_4.0.3    
+## [21] httr_1.4.2         backports_1.2.0    assertthat_0.2.1   Matrix_1.2-18     
+## [25] cli_3.0.1          htmltools_0.5.0    tools_4.0.3        gtable_0.3.0      
+## [29] glue_1.4.2         Rcpp_1.0.5         cellranger_1.1.0   DiceDesign_1.8-1  
+## [33] vctrs_0.3.8        blogdown_0.15      iterators_1.0.13   timeDate_3043.102 
+## [37] gower_0.2.2        xfun_0.19          globals_0.14.0     rvest_0.3.6       
+## [41] lifecycle_1.0.0    future_1.20.1      MASS_7.3-53        ipred_0.9-9       
+## [45] hms_0.5.3          parallel_4.0.3     yaml_2.2.1         sass_0.3.1        
+## [49] rpart_4.1-15       stringi_1.5.3      foreach_1.5.1      checkmate_2.0.0   
+## [53] lhs_1.1.1          hardhat_0.1.6      lava_1.6.8.1       rlang_0.4.11      
+## [57] pkgconfig_2.0.3    bitops_1.0-6       evaluate_0.14      lattice_0.20-41   
+## [61] bit_4.0.4          tidyselect_1.1.1   parallelly_1.21.0  plyr_1.8.6        
+## [65] magrittr_2.0.1     bookdown_0.21      R6_2.5.0           generics_0.1.0    
+## [69] DBI_1.1.0          pillar_1.6.1       haven_2.3.1        withr_2.3.0       
+## [73] survival_3.2-7     RCurl_1.98-1.2     nnet_7.3-14        modelr_0.1.8      
+## [77] crayon_1.4.1       utf8_1.2.1         rmarkdown_2.5      grid_4.0.3        
+## [81] readxl_1.3.1       data.table_1.14.0  reprex_0.3.0       digest_0.6.27     
+## [85] GPfit_1.0-8        munsell_0.5.0&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;appendix---full-details-of-the-ensemble-model&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Appendix - Full Details of the Ensemble Model&lt;/h1&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;str(metalearner_model@model)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## List of 35
+##  $ names                                           : chr [1:37] &amp;quot;GBM_2_AutoML_20210725_011103&amp;quot; &amp;quot;GBM_grid__1_AutoML_20210725_011103_model_2&amp;quot; &amp;quot;GBM_4_AutoML_20210725_011103&amp;quot; &amp;quot;GBM_grid__1_AutoML_20210725_011103_model_11&amp;quot; ...
+##  $ original_names                                  : NULL
+##  $ column_types                                    : chr [1:37] &amp;quot;Numeric&amp;quot; &amp;quot;Numeric&amp;quot; &amp;quot;Numeric&amp;quot; &amp;quot;Numeric&amp;quot; ...
+##  $ domains                                         :List of 37
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : NULL
+##   ..$ : chr [1:2] &amp;quot;no&amp;quot; &amp;quot;yes&amp;quot;
+##  $ cross_validation_models                         : NULL
+##  $ cross_validation_predictions                    : NULL
+##  $ cross_validation_holdout_predictions_frame_id   : NULL
+##  $ cross_validation_fold_assignment_frame_id       : NULL
+##  $ model_summary                                   :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;: 1 obs. of  7 variables:
+##   ..$ family                     : chr &amp;quot;binomial&amp;quot;
+##   ..$ link                       : chr &amp;quot;logit&amp;quot;
+##   ..$ regularization             : chr &amp;quot;Elastic Net (alpha = 0.5, lambda = 0.00311 )&amp;quot;
+##   ..$ number_of_predictors_total : int 36
+##   ..$ number_of_active_predictors: int 12
+##   ..$ number_of_iterations       : int 7
+##   ..$ training_frame             : chr &amp;quot;levelone_training_StackedEnsemble_AllModels_AutoML_20210725_011103&amp;quot;
+##   ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;GLM Model&amp;quot;
+##   ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:7] &amp;quot;%s&amp;quot; &amp;quot;%s&amp;quot; &amp;quot;%s&amp;quot; &amp;quot;%d&amp;quot; ...
+##   ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;summary&amp;quot;
+##  $ scoring_history                                 :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;: 2 obs. of  17 variables:
+##   ..$ timestamp                    : chr [1:2] &amp;quot;2021-07-25 01:26:33&amp;quot; &amp;quot;2021-07-25 01:26:33&amp;quot;
+##   ..$ duration                     : chr [1:2] &amp;quot; 0.000 sec&amp;quot; &amp;quot; 0.172 sec&amp;quot;
+##   ..$ iterations                   : int [1:2] 5 7
+##   ..$ negative_log_likelihood      : num [1:2] 571 571
+##   ..$ objective                    : num [1:2] 0.0822 0.0837
+##   ..$ alpha                        : num [1:2] 0.5 1
+##   ..$ lambda                       : num [1:2] 0.00311 0.00311
+##   ..$ deviance_train               : num [1:2] 0.161 0.161
+##   ..$ deviance_xval                : num [1:2] 0.166 0.166
+##   ..$ deviance_se                  : num [1:2] 0.075 0.0751
+##   ..$ training_rmse                : num [1:2] 0.152 0.152
+##   ..$ training_logloss             : num [1:2] 0.0806 0.0805
+##   ..$ training_r2                  : num [1:2] 0.828 0.828
+##   ..$ training_auc                 : num [1:2] 0.992 0.992
+##   ..$ training_pr_auc              : num [1:2] 0.966 0.965
+##   ..$ training_lift                : num [1:2] 6.26 6.26
+##   ..$ training_classification_error: num [1:2] 0.0295 0.0298
+##   ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Scoring History&amp;quot;
+##   ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:17] &amp;quot;%s&amp;quot; &amp;quot;%s&amp;quot; &amp;quot;%d&amp;quot; &amp;quot;%.5f&amp;quot; ...
+##   ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;&amp;quot;
+##  $ cv_scoring_history                              :List of 5
+##   ..$ :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;:  2 obs. of  23 variables:
+##   .. ..$ timestamp                      : chr [1:2] &amp;quot;2021-07-25 01:26:31&amp;quot; &amp;quot;2021-07-25 01:26:31&amp;quot;
+##   .. ..$ duration                       : chr [1:2] &amp;quot; 0.000 sec&amp;quot; &amp;quot; 0.205 sec&amp;quot;
+##   .. ..$ iterations                     : int [1:2] 5 7
+##   .. ..$ negative_log_likelihood        : num [1:2] 473 473
+##   .. ..$ objective                      : num [1:2] 0.0684 0.0698
+##   .. ..$ alpha                          : num [1:2] 0.5 1
+##   .. ..$ lambda                         : num [1:2] 0.00311 0.00311
+##   .. ..$ deviance_train                 : num [1:2] 0.166 0.166
+##   .. ..$ deviance_test                  : num [1:2] 0.144 0.144
+##   .. ..$ training_rmse                  : num [1:2] 0.154 0.154
+##   .. ..$ training_logloss               : num [1:2] 0.083 0.083
+##   .. ..$ training_r2                    : num [1:2] 0.826 0.826
+##   .. ..$ training_auc                   : num [1:2] 0.992 0.992
+##   .. ..$ training_pr_auc                : num [1:2] 0.964 0.964
+##   .. ..$ training_lift                  : num [1:2] 6.16 6.16
+##   .. ..$ training_classification_error  : num [1:2] 0.0297 0.0295
+##   .. ..$ validation_rmse                : num [1:2] 0.147 0.147
+##   .. ..$ validation_logloss             : num [1:2] 0.072 0.0721
+##   .. ..$ validation_r2                  : num [1:2] 0.83 0.829
+##   .. ..$ validation_auc                 : num [1:2] 0.994 0.994
+##   .. ..$ validation_pr_auc              : num [1:2] 0.97 0.97
+##   .. ..$ validation_lift                : num [1:2] 6.71 6.71
+##   .. ..$ validation_classification_error: num [1:2] 0.0288 0.0295
+##   .. ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Scoring History&amp;quot;
+##   .. ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:23] &amp;quot;%s&amp;quot; &amp;quot;%s&amp;quot; &amp;quot;%d&amp;quot; &amp;quot;%.5f&amp;quot; ...
+##   .. ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;&amp;quot;
+##   ..$ :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;:  2 obs. of  23 variables:
+##   .. ..$ timestamp                      : chr [1:2] &amp;quot;2021-07-25 01:26:31&amp;quot; &amp;quot;2021-07-25 01:26:32&amp;quot;
+##   .. ..$ duration                       : chr [1:2] &amp;quot; 0.000 sec&amp;quot; &amp;quot; 0.192 sec&amp;quot;
+##   .. ..$ iterations                     : int [1:2] 5 7
+##   .. ..$ negative_log_likelihood        : num [1:2] 448 448
+##   .. ..$ objective                      : num [1:2] 0.065 0.0664
+##   .. ..$ alpha                          : num [1:2] 0.5 1
+##   .. ..$ lambda                         : num [1:2] 0.00311 0.00311
+##   .. ..$ deviance_train                 : num [1:2] 0.157 0.157
+##   .. ..$ deviance_test                  : num [1:2] 0.179 0.179
+##   .. ..$ training_rmse                  : num [1:2] 0.151 0.151
+##   .. ..$ training_logloss               : num [1:2] 0.0785 0.0785
+##   .. ..$ training_r2                    : num [1:2] 0.831 0.831
+##   .. ..$ training_auc                   : num [1:2] 0.993 0.993
+##   .. ..$ training_pr_auc                : num [1:2] 0.968 0.968
+##   .. ..$ training_lift                  : num [1:2] 6.21 6.21
+##   .. ..$ training_classification_error  : num [1:2] 0.0293 0.0293
+##   .. ..$ validation_rmse                : num [1:2] 0.157 0.157
+##   .. ..$ validation_logloss             : num [1:2] 0.0894 0.0894
+##   .. ..$ validation_r2                  : num [1:2] 0.811 0.812
+##   .. ..$ validation_auc                 : num [1:2] 0.99 0.99
+##   .. ..$ validation_pr_auc              : num [1:2] 0.954 0.954
+##   .. ..$ validation_lift                : num [1:2] 6.5 6.5
+##   .. ..$ validation_classification_error: num [1:2] 0.0305 0.0305
+##   .. ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Scoring History&amp;quot;
+##   .. ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:23] &amp;quot;%s&amp;quot; &amp;quot;%s&amp;quot; &amp;quot;%d&amp;quot; &amp;quot;%.5f&amp;quot; ...
+##   .. ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;&amp;quot;
+##   ..$ :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;:  2 obs. of  23 variables:
+##   .. ..$ timestamp                      : chr [1:2] &amp;quot;2021-07-25 01:26:32&amp;quot; &amp;quot;2021-07-25 01:26:32&amp;quot;
+##   .. ..$ duration                       : chr [1:2] &amp;quot; 0.000 sec&amp;quot; &amp;quot; 0.208 sec&amp;quot;
+##   .. ..$ iterations                     : int [1:2] 5 7
+##   .. ..$ negative_log_likelihood        : num [1:2] 440 440
+##   .. ..$ objective                      : num [1:2] 0.0638 0.0653
+##   .. ..$ alpha                          : num [1:2] 0.5 1
+##   .. ..$ lambda                         : num [1:2] 0.00311 0.00311
+##   .. ..$ deviance_train                 : num [1:2] 0.155 0.155
+##   .. ..$ deviance_test                  : num [1:2] 0.19 0.191
+##   .. ..$ training_rmse                  : num [1:2] 0.149 0.149
+##   .. ..$ training_logloss               : num [1:2] 0.0774 0.0773
+##   .. ..$ training_r2                    : num [1:2] 0.832 0.832
+##   .. ..$ training_auc                   : num [1:2] 0.993 0.993
+##   .. ..$ training_pr_auc                : num [1:2] 0.967 0.967
+##   .. ..$ training_lift                  : num [1:2] 6.37 6.37
+##   .. ..$ training_classification_error  : num [1:2] 0.0294 0.0294
+##   .. ..$ validation_rmse                : num [1:2] 0.166 0.166
+##   .. ..$ validation_logloss             : num [1:2] 0.0948 0.0953
+##   .. ..$ validation_r2                  : num [1:2] 0.806 0.805
+##   .. ..$ validation_auc                 : num [1:2] 0.99 0.99
+##   .. ..$ validation_pr_auc              : num [1:2] 0.959 0.959
+##   .. ..$ validation_lift                : num [1:2] 5.86 5.86
+##   .. ..$ validation_classification_error: num [1:2] 0.0314 0.0321
+##   .. ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Scoring History&amp;quot;
+##   .. ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:23] &amp;quot;%s&amp;quot; &amp;quot;%s&amp;quot; &amp;quot;%d&amp;quot; &amp;quot;%.5f&amp;quot; ...
+##   .. ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;&amp;quot;
+##   ..$ :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;:  2 obs. of  23 variables:
+##   .. ..$ timestamp                      : chr [1:2] &amp;quot;2021-07-25 01:26:32&amp;quot; &amp;quot;2021-07-25 01:26:32&amp;quot;
+##   .. ..$ duration                       : chr [1:2] &amp;quot; 0.000 sec&amp;quot; &amp;quot; 0.173 sec&amp;quot;
+##   .. ..$ iterations                     : int [1:2] 5 7
+##   .. ..$ negative_log_likelihood        : num [1:2] 470 470
+##   .. ..$ objective                      : num [1:2] 0.0679 0.0694
+##   .. ..$ alpha                          : num [1:2] 0.5 1
+##   .. ..$ lambda                         : num [1:2] 0.00311 0.00311
+##   .. ..$ deviance_train                 : num [1:2] 0.168 0.169
+##   .. ..$ deviance_test                  : num [1:2] 0.137 0.136
+##   .. ..$ training_rmse                  : num [1:2] 0.156 0.156
+##   .. ..$ training_logloss               : num [1:2] 0.0842 0.0842
+##   .. ..$ training_r2                    : num [1:2] 0.82 0.82
+##   .. ..$ training_auc                   : num [1:2] 0.992 0.992
+##   .. ..$ training_pr_auc                : num [1:2] 0.963 0.963
+##   .. ..$ training_lift                  : num [1:2] 6.17 6.17
+##   .. ..$ training_classification_error  : num [1:2] 0.0317 0.0314
+##   .. ..$ validation_rmse                : num [1:2] 0.136 0.136
+##   .. ..$ validation_logloss             : num [1:2] 0.0683 0.0682
+##   .. ..$ validation_r2                  : num [1:2] 0.856 0.856
+##   .. ..$ validation_auc                 : num [1:2] 0.994 0.994
+##   .. ..$ validation_pr_auc              : num [1:2] 0.972 0.972
+##   .. ..$ validation_lift                : num [1:2] 6.61 6.61
+##   .. ..$ validation_classification_error: num [1:2] 0.0206 0.0206
+##   .. ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Scoring History&amp;quot;
+##   .. ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:23] &amp;quot;%s&amp;quot; &amp;quot;%s&amp;quot; &amp;quot;%d&amp;quot; &amp;quot;%.5f&amp;quot; ...
+##   .. ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;&amp;quot;
+##   ..$ :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;:  2 obs. of  23 variables:
+##   .. ..$ timestamp                      : chr [1:2] &amp;quot;2021-07-25 01:26:32&amp;quot; &amp;quot;2021-07-25 01:26:33&amp;quot;
+##   .. ..$ duration                       : chr [1:2] &amp;quot; 0.000 sec&amp;quot; &amp;quot; 0.179 sec&amp;quot;
+##   .. ..$ iterations                     : int [1:2] 5 7
+##   .. ..$ negative_log_likelihood        : num [1:2] 445 445
+##   .. ..$ objective                      : num [1:2] 0.0645 0.0659
+##   .. ..$ alpha                          : num [1:2] 0.5 1
+##   .. ..$ lambda                         : num [1:2] 0.00311 0.00311
+##   .. ..$ deviance_train                 : num [1:2] 0.157 0.157
+##   .. ..$ deviance_test                  : num [1:2] 0.181 0.181
+##   .. ..$ training_rmse                  : num [1:2] 0.149 0.149
+##   .. ..$ training_logloss               : num [1:2] 0.0784 0.0784
+##   .. ..$ training_r2                    : num [1:2] 0.832 0.832
+##   .. ..$ training_auc                   : num [1:2] 0.992 0.992
+##   .. ..$ training_pr_auc                : num [1:2] 0.966 0.966
+##   .. ..$ training_lift                  : num [1:2] 6.41 6.41
+##   .. ..$ training_classification_error  : num [1:2] 0.0275 0.0275
+##   .. ..$ validation_rmse                : num [1:2] 0.165 0.165
+##   .. ..$ validation_logloss             : num [1:2] 0.0905 0.0903
+##   .. ..$ validation_r2                  : num [1:2] 0.811 0.811
+##   .. ..$ validation_auc                 : num [1:2] 0.991 0.992
+##   .. ..$ validation_pr_auc              : num [1:2] 0.964 0.964
+##   .. ..$ validation_lift                : num [1:2] 5.74 5.74
+##   .. ..$ validation_classification_error: num [1:2] 0.0361 0.0369
+##   .. ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Scoring History&amp;quot;
+##   .. ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:23] &amp;quot;%s&amp;quot; &amp;quot;%s&amp;quot; &amp;quot;%d&amp;quot; &amp;quot;%.5f&amp;quot; ...
+##   .. ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;&amp;quot;
+##  $ reproducibility_information_table               :List of 3
+##   ..$ :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;:  1 obs. of  26 variables:
+##   .. ..$ node                 : int 0
+##   .. ..$ h2o                  : chr &amp;quot;127.0.0.1:54321&amp;quot;
+##   .. ..$ healthy              : chr &amp;quot;true&amp;quot;
+##   .. ..$ last_ping            : chr &amp;quot;1627201591256&amp;quot;
+##   .. ..$ num_cpus             : int 4
+##   .. ..$ sys_load             : num 0.564
+##   .. ..$ mem_value_size       : num 70732923
+##   .. ..$ free_mem             : num 7.76e+08
+##   .. ..$ pojo_mem             : num 1.91e+08
+##   .. ..$ swap_mem             : num 0
+##   .. ..$ free_disc            : num 3.6e+10
+##   .. ..$ max_disc             : num 2.55e+11
+##   .. ..$ pid                  : int 7916
+##   .. ..$ num_keys             : int 9133
+##   .. ..$ tcps_active          : chr &amp;quot;&amp;quot;
+##   .. ..$ open_fds             : int -1
+##   .. ..$ rpcs_active          : chr &amp;quot;&amp;quot;
+##   .. ..$ nthreads             : int 4
+##   .. ..$ is_leader            : chr &amp;quot;true&amp;quot;
+##   .. ..$ total_mem            : num 6.27e+08
+##   .. ..$ max_mem              : num 1.04e+09
+##   .. ..$ java_version         : chr &amp;quot;Java 1.8.0_77 (from Oracle Corporation)&amp;quot;
+##   .. ..$ jvm_launch_parameters: chr &amp;quot;[-Xmx1g, -ea]&amp;quot;
+##   .. ..$ os_version           : chr &amp;quot;Windows 10 10.0 (x86)&amp;quot;
+##   .. ..$ machine_physical_mem : num 1.7e+10
+##   .. ..$ machine_locale       : chr &amp;quot;en_US&amp;quot;
+##   .. ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Node Information&amp;quot;
+##   .. ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:26] &amp;quot;%d&amp;quot; &amp;quot;%s&amp;quot; &amp;quot;%s&amp;quot; &amp;quot;%s&amp;quot; ...
+##   .. ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;&amp;quot;
+##   ..$ :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;:  1 obs. of  13 variables:
+##   .. ..$ h2o_cluster_uptime       : num 1394453
+##   .. ..$ h2o_cluster_timezone     : chr &amp;quot;America/Los_Angeles&amp;quot;
+##   .. ..$ h2o_data_parsing_timezone: chr &amp;quot;UTC&amp;quot;
+##   .. ..$ h2o_cluster_version      : chr &amp;quot;3.32.1.3&amp;quot;
+##   .. ..$ h2o_cluster_version_age  : chr &amp;quot;2 months and 5 days&amp;quot;
+##   .. ..$ h2o_cluster_name         : chr &amp;quot;H2O_started_from_R_kingr17_afp345&amp;quot;
+##   .. ..$ h2o_cluster_total_nodes  : int 1
+##   .. ..$ h2o_cluster_free_memory  : num 7.76e+08
+##   .. ..$ h2o_cluster_total_cores  : int 4
+##   .. ..$ h2o_cluster_allowed_cores: int 4
+##   .. ..$ h2o_cluster_status       : chr &amp;quot;locked, healthly&amp;quot;
+##   .. ..$ h2o_internal_security    : chr &amp;quot;false&amp;quot;
+##   .. ..$ h2o_api_extensions       : chr &amp;quot;Amazon S3, Algos, AutoML, Core V3, TargetEncoder, Core V4&amp;quot;
+##   .. ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Cluster Configuration&amp;quot;
+##   .. ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:13] &amp;quot;%d&amp;quot; &amp;quot;%s&amp;quot; &amp;quot;%s&amp;quot; &amp;quot;%s&amp;quot; ...
+##   .. ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;&amp;quot;
+##   ..$ :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;:  2 obs. of  3 variables:
+##   .. ..$ input_frame: chr [1:2] &amp;quot;training_frame&amp;quot; &amp;quot;validation_frame&amp;quot;
+##   .. ..$ checksum   : num [1:2] 3.75e+18 -1.00
+##   .. ..$ espc       : chr [1:2] &amp;quot;[0, 1772, 3544, 5316, 7088]&amp;quot; &amp;quot;-1&amp;quot;
+##   .. ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Input Frames Information&amp;quot;
+##   .. ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:3] &amp;quot;%s&amp;quot; &amp;quot;%d&amp;quot; &amp;quot;%d&amp;quot;
+##   .. ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;&amp;quot;
+##  $ training_metrics                                :Formal class &amp;#39;H2OBinomialMetrics&amp;#39; [package &amp;quot;h2o&amp;quot;] with 5 slots
+##   .. ..@ algorithm: chr &amp;quot;glm&amp;quot;
+##   .. ..@ on_train : logi TRUE
+##   .. ..@ on_valid : logi FALSE
+##   .. ..@ on_xval  : logi FALSE
+##   .. ..@ metrics  :List of 30
+##   .. .. ..$ __meta                        :List of 3
+##   .. .. .. ..$ schema_version: int 3
+##   .. .. .. ..$ schema_name   : chr &amp;quot;ModelMetricsBinomialGLMV3&amp;quot;
+##   .. .. .. ..$ schema_type   : chr &amp;quot;ModelMetricsBinomialGLM&amp;quot;
+##   .. .. ..$ model                         :List of 4
+##   .. .. .. ..$ __meta:List of 3
+##   .. .. .. .. ..$ schema_version: int 3
+##   .. .. .. .. ..$ schema_name   : chr &amp;quot;ModelKeyV3&amp;quot;
+##   .. .. .. .. ..$ schema_type   : chr &amp;quot;Key&amp;lt;Model&amp;gt;&amp;quot;
+##   .. .. .. ..$ name  : chr &amp;quot;metalearner_AUTO_StackedEnsemble_AllModels_AutoML_20210725_011103&amp;quot;
+##   .. .. .. ..$ type  : chr &amp;quot;Key&amp;lt;Model&amp;gt;&amp;quot;
+##   .. .. .. ..$ URL   : chr &amp;quot;/3/Models/metalearner_AUTO_StackedEnsemble_AllModels_AutoML_20210725_011103&amp;quot;
+##   .. .. ..$ model_checksum                : chr &amp;quot;1672530778380092240&amp;quot;
+##   .. .. ..$ frame                         :List of 4
+##   .. .. .. ..$ __meta:List of 3
+##   .. .. .. .. ..$ schema_version: int 3
+##   .. .. .. .. ..$ schema_name   : chr &amp;quot;FrameKeyV3&amp;quot;
+##   .. .. .. .. ..$ schema_type   : chr &amp;quot;Key&amp;lt;Frame&amp;gt;&amp;quot;
+##   .. .. .. ..$ name  : chr &amp;quot;levelone_training_StackedEnsemble_AllModels_AutoML_20210725_011103&amp;quot;
+##   .. .. .. ..$ type  : chr &amp;quot;Key&amp;lt;Frame&amp;gt;&amp;quot;
+##   .. .. .. ..$ URL   : chr &amp;quot;/3/Frames/levelone_training_StackedEnsemble_AllModels_AutoML_20210725_011103&amp;quot;
+##   .. .. ..$ frame_checksum                : chr &amp;quot;3754607664224636173&amp;quot;
+##   .. .. ..$ description                   : NULL
+##   .. .. ..$ model_category                : chr &amp;quot;Binomial&amp;quot;
+##   .. .. ..$ scoring_time                  : num 1.63e+12
+##   .. .. ..$ predictions                   : NULL
+##   .. .. ..$ MSE                           : num 0.0231
+##   .. .. ..$ RMSE                          : num 0.152
+##   .. .. ..$ nobs                          : int 7088
+##   .. .. ..$ custom_metric_name            : NULL
+##   .. .. ..$ custom_metric_value           : num 0
+##   .. .. ..$ r2                            : num 0.828
+##   .. .. ..$ logloss                       : num 0.0805
+##   .. .. ..$ AUC                           : num 0.992
+##   .. .. ..$ pr_auc                        : num 0.965
+##   .. .. ..$ Gini                          : num 0.985
+##   .. .. ..$ mean_per_class_error          : num 0.0563
+##   .. .. ..$ domain                        : chr [1:2] &amp;quot;no&amp;quot; &amp;quot;yes&amp;quot;
+##   .. .. ..$ cm                            :List of 2
+##   .. .. .. ..$ __meta:List of 3
+##   .. .. .. .. ..$ schema_version: int 3
+##   .. .. .. .. ..$ schema_name   : chr &amp;quot;ConfusionMatrixV3&amp;quot;
+##   .. .. .. .. ..$ schema_type   : chr &amp;quot;ConfusionMatrix&amp;quot;
+##   .. .. .. ..$ table :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;:   3 obs. of  4 variables:
+##   .. .. .. .. ..$ no   : num [1:3] 5853 108 5961
+##   .. .. .. .. ..$ yes  : num [1:3] 103 1024 1127
+##   .. .. .. .. ..$ Error: num [1:3] 0.0173 0.0954 0.0298
+##   .. .. .. .. ..$ Rate : chr [1:3] &amp;quot;103 / 5,956&amp;quot; &amp;quot;108 / 1,132&amp;quot; &amp;quot;211 / 7,088&amp;quot;
+##   .. .. .. .. ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Confusion Matrix&amp;quot;
+##   .. .. .. .. ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:4] &amp;quot;%d&amp;quot; &amp;quot;%d&amp;quot; &amp;quot;%.4f&amp;quot; &amp;quot;= %11s&amp;quot;
+##   .. .. .. .. ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;Row labels: Actual class; Column labels: Predicted class&amp;quot;
+##   .. .. ..$ thresholds_and_metric_scores  :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;:  400 obs. of  20 variables:
+##   .. .. .. ..$ threshold              : num [1:400] 0.999 0.999 0.998 0.998 0.997 ...
+##   .. .. .. ..$ f1                     : num [1:400] 0.0666 0.1305 0.1757 0.2299 0.2665 ...
+##   .. .. .. ..$ f2                     : num [1:400] 0.0427 0.0857 0.1175 0.1572 0.185 ...
+##   .. .. .. ..$ f0point5               : num [1:400] 0.151 0.273 0.348 0.427 0.476 ...
+##   .. .. .. ..$ accuracy               : num [1:400] 0.846 0.851 0.856 0.861 0.865 ...
+##   .. .. .. ..$ precision              : num [1:400] 1 1 1 1 1 1 1 1 1 1 ...
+##   .. .. .. ..$ recall                 : num [1:400] 0.0345 0.0698 0.0963 0.1299 0.1537 ...
+##   .. .. .. ..$ specificity            : num [1:400] 1 1 1 1 1 1 1 1 1 1 ...
+##   .. .. .. ..$ absolute_mcc           : num [1:400] 0.171 0.244 0.287 0.334 0.364 ...
+##   .. .. .. ..$ min_per_class_accuracy : num [1:400] 0.0345 0.0698 0.0963 0.1299 0.1537 ...
+##   .. .. .. ..$ mean_per_class_accuracy: num [1:400] 0.517 0.535 0.548 0.565 0.577 ...
+##   .. .. .. ..$ tns                    : num [1:400] 5956 5956 5956 5956 5956 ...
+##   .. .. .. ..$ fns                    : num [1:400] 1093 1053 1023 985 958 ...
+##   .. .. .. ..$ fps                    : num [1:400] 0 0 0 0 0 0 0 0 0 0 ...
+##   .. .. .. ..$ tps                    : num [1:400] 39 79 109 147 174 198 226 254 276 302 ...
+##   .. .. .. ..$ tnr                    : num [1:400] 1 1 1 1 1 1 1 1 1 1 ...
+##   .. .. .. ..$ fnr                    : num [1:400] 0.966 0.93 0.904 0.87 0.846 ...
+##   .. .. .. ..$ fpr                    : num [1:400] 0 0 0 0 0 0 0 0 0 0 ...
+##   .. .. .. ..$ tpr                    : num [1:400] 0.0345 0.0698 0.0963 0.1299 0.1537 ...
+##   .. .. .. ..$ idx                    : int [1:400] 0 1 2 3 4 5 6 7 8 9 ...
+##   .. .. .. ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Metrics for Thresholds&amp;quot;
+##   .. .. .. ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:20] &amp;quot;%f&amp;quot; &amp;quot;%f&amp;quot; &amp;quot;%f&amp;quot; &amp;quot;%f&amp;quot; ...
+##   .. .. .. ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;Binomial metrics as a function of classification thresholds&amp;quot;
+##   .. .. ..$ max_criteria_and_metric_scores:Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;:  18 obs. of  4 variables:
+##   .. .. .. ..$ metric   : chr [1:18] &amp;quot;max f1&amp;quot; &amp;quot;max f2&amp;quot; &amp;quot;max f0point5&amp;quot; &amp;quot;max accuracy&amp;quot; ...
+##   .. .. .. ..$ threshold: num [1:18] 0.441 0.244 0.731 0.492 0.999 ...
+##   .. .. .. ..$ value    : num [1:18] 0.907 0.923 0.926 0.97 1 ...
+##   .. .. .. ..$ idx      : num [1:18] 191 243 119 180 0 378 0 191 272 254 ...
+##   .. .. .. ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Maximum Metrics&amp;quot;
+##   .. .. .. ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:4] &amp;quot;%s&amp;quot; &amp;quot;%f&amp;quot; &amp;quot;%f&amp;quot; &amp;quot;%d&amp;quot;
+##   .. .. .. ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;Maximum metrics at their respective thresholds&amp;quot;
+##   .. .. ..$ gains_lift_table              :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;:  16 obs. of  14 variables:
+##   .. .. .. ..$ group                   : int [1:16] 1 2 3 4 5 6 7 8 9 10 ...
+##   .. .. .. ..$ cumulative_data_fraction: num [1:16] 0.01 0.02 0.0301 0.0401 0.0501 ...
+##   .. .. .. ..$ lower_threshold         : num [1:16] 0.999 0.998 0.996 0.995 0.993 ...
+##   .. .. .. ..$ lift                    : num [1:16] 6.26 6.26 6.26 6.26 6.26 ...
+##   .. .. .. ..$ cumulative_lift         : num [1:16] 6.26 6.26 6.26 6.26 6.26 ...
+##   .. .. .. ..$ response_rate           : num [1:16] 1 1 1 1 1 ...
+##   .. .. .. ..$ score                   : num [1:16] 0.999 0.998 0.997 0.996 0.994 ...
+##   .. .. .. ..$ cumulative_response_rate: num [1:16] 1 1 1 1 1 ...
+##   .. .. .. ..$ cumulative_score        : num [1:16] 0.999 0.999 0.998 0.997 0.997 ...
+##   .. .. .. ..$ capture_rate            : num [1:16] 0.0627 0.0627 0.0627 0.0627 0.0627 ...
+##   .. .. .. ..$ cumulative_capture_rate : num [1:16] 0.0627 0.1254 0.1882 0.2509 0.3136 ...
+##   .. .. .. ..$ gain                    : num [1:16] 526 526 526 526 526 ...
+##   .. .. .. ..$ cumulative_gain         : num [1:16] 526 526 526 526 526 ...
+##   .. .. .. ..$ kolmogorov_smirnov      : num [1:16] 0.0627 0.1254 0.1882 0.2509 0.3136 ...
+##   .. .. .. ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Gains/Lift Table&amp;quot;
+##   .. .. .. ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:14] &amp;quot;%d&amp;quot; &amp;quot;%.8f&amp;quot; &amp;quot;%5f&amp;quot; &amp;quot;%5f&amp;quot; ...
+##   .. .. .. ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;Avg response rate: 15.97 %, avg score: 15.97 %&amp;quot;
+##   .. .. ..$ residual_deviance             : num 1141
+##   .. .. ..$ null_deviance                 : num 6226
+##   .. .. ..$ AIC                           : num 1167
+##   .. .. ..$ null_degrees_of_freedom       : int 7087
+##   .. .. ..$ residual_degrees_of_freedom   : int 7075
+##  $ validation_metrics                              :Formal class &amp;#39;H2OBinomialMetrics&amp;#39; [package &amp;quot;h2o&amp;quot;] with 5 slots
+##   .. ..@ algorithm: chr &amp;quot;glm&amp;quot;
+##   .. ..@ on_train : logi FALSE
+##   .. ..@ on_valid : logi TRUE
+##   .. ..@ on_xval  : logi FALSE
+##   .. ..@ metrics  : NULL
+##  $ cross_validation_metrics                        :Formal class &amp;#39;H2OBinomialMetrics&amp;#39; [package &amp;quot;h2o&amp;quot;] with 5 slots
+##   .. ..@ algorithm: chr &amp;quot;glm&amp;quot;
+##   .. ..@ on_train : logi FALSE
+##   .. ..@ on_valid : logi FALSE
+##   .. ..@ on_xval  : logi TRUE
+##   .. ..@ metrics  :List of 30
+##   .. .. ..$ __meta                        :List of 3
+##   .. .. .. ..$ schema_version: int 3
+##   .. .. .. ..$ schema_name   : chr &amp;quot;ModelMetricsBinomialGLMV3&amp;quot;
+##   .. .. .. ..$ schema_type   : chr &amp;quot;ModelMetricsBinomialGLM&amp;quot;
+##   .. .. ..$ model                         :List of 4
+##   .. .. .. ..$ __meta:List of 3
+##   .. .. .. .. ..$ schema_version: int 3
+##   .. .. .. .. ..$ schema_name   : chr &amp;quot;ModelKeyV3&amp;quot;
+##   .. .. .. .. ..$ schema_type   : chr &amp;quot;Key&amp;lt;Model&amp;gt;&amp;quot;
+##   .. .. .. ..$ name  : chr &amp;quot;metalearner_AUTO_StackedEnsemble_AllModels_AutoML_20210725_011103&amp;quot;
+##   .. .. .. ..$ type  : chr &amp;quot;Key&amp;lt;Model&amp;gt;&amp;quot;
+##   .. .. .. ..$ URL   : chr &amp;quot;/3/Models/metalearner_AUTO_StackedEnsemble_AllModels_AutoML_20210725_011103&amp;quot;
+##   .. .. ..$ model_checksum                : chr &amp;quot;1672530778380092240&amp;quot;
+##   .. .. ..$ frame                         :List of 4
+##   .. .. .. ..$ __meta:List of 3
+##   .. .. .. .. ..$ schema_version: int 3
+##   .. .. .. .. ..$ schema_name   : chr &amp;quot;FrameKeyV3&amp;quot;
+##   .. .. .. .. ..$ schema_type   : chr &amp;quot;Key&amp;lt;Frame&amp;gt;&amp;quot;
+##   .. .. .. ..$ name  : chr &amp;quot;levelone_training_StackedEnsemble_AllModels_AutoML_20210725_011103&amp;quot;
+##   .. .. .. ..$ type  : chr &amp;quot;Key&amp;lt;Frame&amp;gt;&amp;quot;
+##   .. .. .. ..$ URL   : chr &amp;quot;/3/Frames/levelone_training_StackedEnsemble_AllModels_AutoML_20210725_011103&amp;quot;
+##   .. .. ..$ frame_checksum                : chr &amp;quot;3754607664224636173&amp;quot;
+##   .. .. ..$ description                   : chr &amp;quot;5-fold cross-validation on training data (Metrics computed for combined holdout predictions)&amp;quot;
+##   .. .. ..$ model_category                : chr &amp;quot;Binomial&amp;quot;
+##   .. .. ..$ scoring_time                  : num 1.63e+12
+##   .. .. ..$ predictions                   : NULL
+##   .. .. ..$ MSE                           : num 0.0238
+##   .. .. ..$ RMSE                          : num 0.154
+##   .. .. ..$ nobs                          : int 7088
+##   .. .. ..$ custom_metric_name            : NULL
+##   .. .. ..$ custom_metric_value           : num 0
+##   .. .. ..$ r2                            : num 0.823
+##   .. .. ..$ logloss                       : num 0.0829
+##   .. .. ..$ AUC                           : num 0.992
+##   .. .. ..$ pr_auc                        : num 0.964
+##   .. .. ..$ Gini                          : num 0.984
+##   .. .. ..$ mean_per_class_error          : num 0.0601
+##   .. .. ..$ domain                        : chr [1:2] &amp;quot;no&amp;quot; &amp;quot;yes&amp;quot;
+##   .. .. ..$ cm                            :List of 2
+##   .. .. .. ..$ __meta:List of 3
+##   .. .. .. .. ..$ schema_version: int 3
+##   .. .. .. .. ..$ schema_name   : chr &amp;quot;ConfusionMatrixV3&amp;quot;
+##   .. .. .. .. ..$ schema_type   : chr &amp;quot;ConfusionMatrix&amp;quot;
+##   .. .. .. ..$ table :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;:   3 obs. of  4 variables:
+##   .. .. .. .. ..$ no   : num [1:3] 5856 117 5973
+##   .. .. .. .. ..$ yes  : num [1:3] 100 1015 1115
+##   .. .. .. .. ..$ Error: num [1:3] 0.0168 0.1034 0.0306
+##   .. .. .. .. ..$ Rate : chr [1:3] &amp;quot;100 / 5,956&amp;quot; &amp;quot;117 / 1,132&amp;quot; &amp;quot;217 / 7,088&amp;quot;
+##   .. .. .. .. ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Confusion Matrix&amp;quot;
+##   .. .. .. .. ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:4] &amp;quot;%d&amp;quot; &amp;quot;%d&amp;quot; &amp;quot;%.4f&amp;quot; &amp;quot;= %11s&amp;quot;
+##   .. .. .. .. ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;Row labels: Actual class; Column labels: Predicted class&amp;quot;
+##   .. .. ..$ thresholds_and_metric_scores  :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;:  400 obs. of  20 variables:
+##   .. .. .. ..$ threshold              : num [1:400] 0.999 0.999 0.998 0.998 0.997 ...
+##   .. .. .. ..$ f1                     : num [1:400] 0.0781 0.1258 0.1668 0.2046 0.2463 ...
+##   .. .. .. ..$ f2                     : num [1:400] 0.0503 0.0825 0.1112 0.1385 0.1696 ...
+##   .. .. .. ..$ f0point5               : num [1:400] 0.175 0.265 0.334 0.391 0.45 ...
+##   .. .. .. ..$ accuracy               : num [1:400] 0.847 0.851 0.855 0.858 0.863 ...
+##   .. .. .. ..$ precision              : num [1:400] 1 1 1 1 1 1 1 1 1 1 ...
+##   .. .. .. ..$ recall                 : num [1:400] 0.0406 0.0671 0.091 0.114 0.1405 ...
+##   .. .. .. ..$ specificity            : num [1:400] 1 1 1 1 1 1 1 1 1 1 ...
+##   .. .. .. ..$ absolute_mcc           : num [1:400] 0.185 0.239 0.279 0.312 0.347 ...
+##   .. .. .. ..$ min_per_class_accuracy : num [1:400] 0.0406 0.0671 0.091 0.114 0.1405 ...
+##   .. .. .. ..$ mean_per_class_accuracy: num [1:400] 0.52 0.534 0.545 0.557 0.57 ...
+##   .. .. .. ..$ tns                    : num [1:400] 5956 5956 5956 5956 5956 ...
+##   .. .. .. ..$ fns                    : num [1:400] 1086 1056 1029 1003 973 ...
+##   .. .. .. ..$ fps                    : num [1:400] 0 0 0 0 0 0 0 0 0 0 ...
+##   .. .. .. ..$ tps                    : num [1:400] 46 76 103 129 159 190 224 256 280 300 ...
+##   .. .. .. ..$ tnr                    : num [1:400] 1 1 1 1 1 1 1 1 1 1 ...
+##   .. .. .. ..$ fnr                    : num [1:400] 0.959 0.933 0.909 0.886 0.86 ...
+##   .. .. .. ..$ fpr                    : num [1:400] 0 0 0 0 0 0 0 0 0 0 ...
+##   .. .. .. ..$ tpr                    : num [1:400] 0.0406 0.0671 0.091 0.114 0.1405 ...
+##   .. .. .. ..$ idx                    : int [1:400] 0 1 2 3 4 5 6 7 8 9 ...
+##   .. .. .. ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Metrics for Thresholds&amp;quot;
+##   .. .. .. ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:20] &amp;quot;%f&amp;quot; &amp;quot;%f&amp;quot; &amp;quot;%f&amp;quot; &amp;quot;%f&amp;quot; ...
+##   .. .. .. ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;Binomial metrics as a function of classification thresholds&amp;quot;
+##   .. .. ..$ max_criteria_and_metric_scores:Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;:  18 obs. of  4 variables:
+##   .. .. .. ..$ metric   : chr [1:18] &amp;quot;max f1&amp;quot; &amp;quot;max f2&amp;quot; &amp;quot;max f0point5&amp;quot; &amp;quot;max accuracy&amp;quot; ...
+##   .. .. .. ..$ threshold: num [1:18] 0.468 0.201 0.773 0.527 0.999 ...
+##   .. .. .. ..$ value    : num [1:18] 0.903 0.921 0.924 0.97 1 ...
+##   .. .. .. ..$ idx      : num [1:18] 183 256 108 168 0 381 0 183 272 258 ...
+##   .. .. .. ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Maximum Metrics&amp;quot;
+##   .. .. .. ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:4] &amp;quot;%s&amp;quot; &amp;quot;%f&amp;quot; &amp;quot;%f&amp;quot; &amp;quot;%d&amp;quot;
+##   .. .. .. ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;Maximum metrics at their respective thresholds&amp;quot;
+##   .. .. ..$ gains_lift_table              :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;:  16 obs. of  14 variables:
+##   .. .. .. ..$ group                   : int [1:16] 1 2 3 4 5 6 7 8 9 10 ...
+##   .. .. .. ..$ cumulative_data_fraction: num [1:16] 0.01 0.02 0.0301 0.0401 0.0501 ...
+##   .. .. .. ..$ lower_threshold         : num [1:16] 0.999 0.997 0.996 0.995 0.993 ...
+##   .. .. .. ..$ lift                    : num [1:16] 6.26 6.26 6.26 6.26 6.26 ...
+##   .. .. .. ..$ cumulative_lift         : num [1:16] 6.26 6.26 6.26 6.26 6.26 ...
+##   .. .. .. ..$ response_rate           : num [1:16] 1 1 1 1 1 ...
+##   .. .. .. ..$ score                   : num [1:16] 0.999 0.998 0.997 0.995 0.994 ...
+##   .. .. .. ..$ cumulative_response_rate: num [1:16] 1 1 1 1 1 ...
+##   .. .. .. ..$ cumulative_score        : num [1:16] 0.999 0.999 0.998 0.997 0.997 ...
+##   .. .. .. ..$ capture_rate            : num [1:16] 0.0627 0.0627 0.0627 0.0627 0.0627 ...
+##   .. .. .. ..$ cumulative_capture_rate : num [1:16] 0.0627 0.1254 0.1882 0.2509 0.3136 ...
+##   .. .. .. ..$ gain                    : num [1:16] 526 526 526 526 526 ...
+##   .. .. .. ..$ cumulative_gain         : num [1:16] 526 526 526 526 526 ...
+##   .. .. .. ..$ kolmogorov_smirnov      : num [1:16] 0.0627 0.1254 0.1882 0.2509 0.3136 ...
+##   .. .. .. ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Gains/Lift Table&amp;quot;
+##   .. .. .. ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:14] &amp;quot;%d&amp;quot; &amp;quot;%.8f&amp;quot; &amp;quot;%5f&amp;quot; &amp;quot;%5f&amp;quot; ...
+##   .. .. .. ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;Avg response rate: 15.97 %, avg score: 15.98 %&amp;quot;
+##   .. .. ..$ residual_deviance             : num 1175
+##   .. .. ..$ null_deviance                 : num 6229
+##   .. .. ..$ AIC                           : num 1201
+##   .. .. ..$ null_degrees_of_freedom       : int 7087
+##   .. .. ..$ residual_degrees_of_freedom   : int 7075
+##  $ cross_validation_metrics_summary                :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;: 22 obs. of  7 variables:
+##   ..$ mean      : chr [1:22] &amp;quot;0.9701006&amp;quot; &amp;quot;0.9918038&amp;quot; &amp;quot;0.029899428&amp;quot; &amp;quot;42.2&amp;quot; ...
+##   ..$ sd        : chr [1:22] &amp;quot;0.0059326575&amp;quot; &amp;quot;0.0018960662&amp;quot; &amp;quot;0.0059326575&amp;quot; &amp;quot;7.5960517&amp;quot; ...
+##   ..$ cv_1_valid: chr [1:22] &amp;quot;0.97050357&amp;quot; &amp;quot;0.993848&amp;quot; &amp;quot;0.029496403&amp;quot; &amp;quot;41.0&amp;quot; ...
+##   ..$ cv_2_valid: chr [1:22] &amp;quot;0.96954316&amp;quot; &amp;quot;0.9896141&amp;quot; &amp;quot;0.030456852&amp;quot; &amp;quot;42.0&amp;quot; ...
+##   ..$ cv_3_valid: chr [1:22] &amp;quot;0.9678801&amp;quot; &amp;quot;0.99040574&amp;quot; &amp;quot;0.032119915&amp;quot; &amp;quot;45.0&amp;quot; ...
+##   ..$ cv_4_valid: chr [1:22] &amp;quot;0.9794293&amp;quot; &amp;quot;0.9936388&amp;quot; &amp;quot;0.02057067&amp;quot; &amp;quot;31.0&amp;quot; ...
+##   ..$ cv_5_valid: chr [1:22] &amp;quot;0.9631467&amp;quot; &amp;quot;0.99151224&amp;quot; &amp;quot;0.036853295&amp;quot; &amp;quot;52.0&amp;quot; ...
+##   ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Cross-Validation Metrics Summary&amp;quot;
+##   ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:7] &amp;quot;%s&amp;quot; &amp;quot;%s&amp;quot; &amp;quot;%s&amp;quot; &amp;quot;%s&amp;quot; ...
+##   ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;&amp;quot;
+##  $ status                                          : NULL
+##  $ start_time                                      : num 1.63e+12
+##  $ end_time                                        : num 1.63e+12
+##  $ run_time                                        : int 266
+##  $ default_threshold                               : num 0.441
+##  $ help                                            :List of 36
+##   ..$ domains                                         : chr &amp;quot;Domains for categorical columns&amp;quot;
+##   ..$ __meta                                          : chr &amp;quot;Metadata on this schema instance, to make it self-describing.&amp;quot;
+##   ..$ standardized_coefficient_magnitudes             : chr &amp;quot;Standardized Coefficient Magnitudes&amp;quot;
+##   ..$ help                                            : chr &amp;quot;Help information for output fields&amp;quot;
+##   ..$ training_metrics                                : chr &amp;quot;Training data model metrics&amp;quot;
+##   ..$ cross_validation_models                         : chr &amp;quot;Cross-validation models (model ids)&amp;quot;
+##   ..$ cross_validation_predictions                    : chr &amp;quot;Cross-validation predictions, one per cv model (deprecated, use cross_validation_holdout_predictions_frame_id instead)&amp;quot;
+##   ..$ lambda_best                                     : chr &amp;quot;Lambda minimizing the objective value, only applicable with lambda search or when arrays of alpha and lambdas are provided&amp;quot;
+##   ..$ cross_validation_metrics_summary                : chr &amp;quot;Cross-validation model metrics summary&amp;quot;
+##   ..$ status                                          : chr &amp;quot;Job status&amp;quot;
+##   ..$ reproducibility_information_table               : chr &amp;quot;Model reproducibility information&amp;quot;
+##   ..$ variable_importances                            : chr &amp;quot;Variable Importances&amp;quot;
+##   ..$ model_summary                                   : chr &amp;quot;Model summary&amp;quot;
+##   ..$ end_time                                        : chr &amp;quot;End time in milliseconds&amp;quot;
+##   ..$ names                                           : chr &amp;quot;Column names&amp;quot;
+##   ..$ cross_validation_fold_assignment_frame_id       : chr &amp;quot;Cross-validation fold assignment (each row is assigned to one holdout fold)&amp;quot;
+##   ..$ lambda_1se                                      : chr &amp;quot;Lambda best + 1 standard error. Only applicable with lambda search and cross-validation&amp;quot;
+##   ..$ run_time                                        : chr &amp;quot;Runtime in milliseconds&amp;quot;
+##   ..$ lambda_max                                      : chr &amp;quot;Starting lambda value used when lambda search is enabled.&amp;quot;
+##   ..$ default_threshold                               : chr &amp;quot;Default threshold used for predictions&amp;quot;
+##   ..$ scoring_history                                 : chr &amp;quot;Scoring history&amp;quot;
+##   ..$ dispersion                                      : chr &amp;quot;Dispersion parameter, only applicable to Tweedie family (input/output) and fractional Binomial (output only)&amp;quot;
+##   ..$ cross_validation_holdout_predictions_frame_id   : chr &amp;quot;Cross-validation holdout predictions (full out-of-sample predictions on training data)&amp;quot;
+##   ..$ alpha_best                                      : chr &amp;quot;Alpha minimizing the objective value, only applicable when arrays of alphas are given &amp;quot;
+##   ..$ lambda_min                                      : chr &amp;quot;Minimum lambda value calculated that may be used for lambda search.  Early-stop may happen and the minimum lamb&amp;quot;| __truncated__
+##   ..$ coefficients_table_multinomials_with_class_names: chr &amp;quot;Table of Coefficients with coefficients denoted with class names for GLM multinonimals only.&amp;quot;
+##   ..$ model_category                                  : chr &amp;quot;Category of the model (e.g., Binomial)&amp;quot;
+##   ..$ random_coefficients_table                       : chr &amp;quot;Table of Random Coefficients for HGLM&amp;quot;
+##   ..$ best_submodel_index                             : chr &amp;quot;submodel index minimizing the objective value, only applicable for arrays of alphas/lambda &amp;quot;
+##   ..$ column_types                                    : chr &amp;quot;Column types&amp;quot;
+##   ..$ original_names                                  : chr &amp;quot;Original column names&amp;quot;
+##   ..$ start_time                                      : chr &amp;quot;Start time in milliseconds&amp;quot;
+##   ..$ cv_scoring_history                              : chr &amp;quot;Cross-Validation scoring history&amp;quot;
+##   ..$ cross_validation_metrics                        : chr &amp;quot;Cross-validation model metrics&amp;quot;
+##   ..$ coefficients_table                              : chr &amp;quot;Table of Coefficients&amp;quot;
+##   ..$ validation_metrics                              : chr &amp;quot;Validation data model metrics&amp;quot;
+##  $ coefficients_table                              :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;: 37 obs. of  3 variables:
+##   ..$ names                    : chr [1:37] &amp;quot;Intercept&amp;quot; &amp;quot;GBM_2_AutoML_20210725_011103&amp;quot; &amp;quot;GBM_grid__1_AutoML_20210725_011103_model_2&amp;quot; &amp;quot;GBM_4_AutoML_20210725_011103&amp;quot; ...
+##   ..$ coefficients             : num [1:37] 0.3863 0.183 0.0834 0 0.0228 ...
+##   ..$ standardized_coefficients: num [1:37] -4.7185 0.7014 0.3552 0 0.0961 ...
+##   ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Coefficients&amp;quot;
+##   ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:3] &amp;quot;%s&amp;quot; &amp;quot;%5f&amp;quot; &amp;quot;%5f&amp;quot;
+##   ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;glm coefficients&amp;quot;
+##  $ random_coefficients_table                       : NULL
+##  $ coefficients_table_multinomials_with_class_names: NULL
+##  $ standardized_coefficient_magnitudes             :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;: 36 obs. of  3 variables:
+##   ..$ names       : chr [1:36] &amp;quot;GBM_2_AutoML_20210725_011103&amp;quot; &amp;quot;GBM_grid__1_AutoML_20210725_011103_model_18&amp;quot; &amp;quot;GBM_grid__1_AutoML_20210725_011103_model_9&amp;quot; &amp;quot;GBM_grid__1_AutoML_20210725_011103_model_19&amp;quot; ...
+##   ..$ coefficients: num [1:36] 0.701 0.657 0.634 0.437 0.405 ...
+##   ..$ sign        : chr [1:36] &amp;quot;POS&amp;quot; &amp;quot;POS&amp;quot; &amp;quot;POS&amp;quot; &amp;quot;POS&amp;quot; ...
+##   ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Standardized Coefficient Magnitudes&amp;quot;
+##   ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:3] &amp;quot;%s&amp;quot; &amp;quot;%5f&amp;quot; &amp;quot;%s&amp;quot;
+##   ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;standardized coefficient magnitudes&amp;quot;
+##  $ variable_importances                            :Classes &amp;#39;H2OTable&amp;#39; and &amp;#39;data.frame&amp;#39;: 36 obs. of  4 variables:
+##   ..$ variable           : chr [1:36] &amp;quot;GBM_2_AutoML_20210725_011103&amp;quot; &amp;quot;GBM_grid__1_AutoML_20210725_011103_model_18&amp;quot; &amp;quot;GBM_grid__1_AutoML_20210725_011103_model_9&amp;quot; &amp;quot;GBM_grid__1_AutoML_20210725_011103_model_19&amp;quot; ...
+##   ..$ relative_importance: num [1:36] 0.701 0.657 0.634 0.437 0.405 ...
+##   ..$ scaled_importance  : num [1:36] 1 0.936 0.903 0.624 0.577 ...
+##   ..$ percentage         : num [1:36] 0.162 0.1516 0.1463 0.101 0.0935 ...
+##   ..- attr(*, &amp;quot;header&amp;quot;)= chr &amp;quot;Variable Importances&amp;quot;
+##   ..- attr(*, &amp;quot;formats&amp;quot;)= chr [1:4] &amp;quot;%s&amp;quot; &amp;quot;%5f&amp;quot; &amp;quot;%5f&amp;quot; &amp;quot;%5f&amp;quot;
+##   ..- attr(*, &amp;quot;description&amp;quot;)= chr &amp;quot;&amp;quot;
+##  $ lambda_best                                     : num 0.00311
+##  $ alpha_best                                      : num 0.5
+##  $ best_submodel_index                             : int 0
+##  $ lambda_1se                                      : num 0.00311
+##  $ lambda_min                                      : num -1
+##  $ lambda_max                                      : num -1
+##  $ dispersion                                      : num 0
+##  $ coefficients                                    : Named num [1:37] 0.3863 0.183 0.0834 0 0.0228 ...
+##   ..- attr(*, &amp;quot;names&amp;quot;)= chr [1:37] &amp;quot;Intercept&amp;quot; &amp;quot;GBM_2_AutoML_20210725_011103&amp;quot; &amp;quot;GBM_grid__1_AutoML_20210725_011103_model_2&amp;quot; &amp;quot;GBM_4_AutoML_20210725_011103&amp;quot; ...&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+</description>
+    </item>
     
     <item>
       <title>Exploring Frequentist and Bayesian Tolerance Intervals in R</title>
