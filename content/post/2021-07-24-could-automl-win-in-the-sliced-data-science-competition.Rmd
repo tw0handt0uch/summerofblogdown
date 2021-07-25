@@ -220,8 +220,8 @@ lb
 ### Extract Top Model 
 
 As expected, the top slot is an ensemble (in my limited experience it usually is).  This is the one we'll use to predict churn on the holdout set and submit to kaggle for our competition results.  The ensemble model is extracted and stored as follows:
-
-```{r echo=FALSE}
+ 
+```{r}
 # model_names <- leaderboard_tbl$model_id
 # top_model <- h2o.getModel(model_names[1])
 ```
@@ -273,7 +273,7 @@ To submit the file for assessment, simply upload the csv to the interface on kag
 
 ![](/post/2021-07-24-could-automl-win-in-the-sliced-data-science-competition_files/score_and_board.png){width=100%}
 
-__A private score of 0.06921!__  This is honestly way better than I expected for such minimal processing.  __This submission would have slotted me into 3rd place out of 31 entries, just behind eventual Episode 7 winner Ethan Douglas.__  And remember, I didn't need to specify any modeling engine or range of hyperparameters to tune!
+__A private score of 0.06921!__  Would it have won the modeling portion of the competition? No.  But it appears to be a very efficient way to get reasonably close to the goal.    __This submission would have slotted me into 3rd place out of 31 entries, just behind eventual Episode 7 winner Ethan Douglas.__  And remember, I didn't need to specify any modeling engine or range of hyperparameters to tune!
 
 # Understanding the Ensemble
 
@@ -335,7 +335,9 @@ top_individual_model@parameters
 
 # Final Thoughts
 
-My takeaway is that h2o autoML is really quite powerful for purely predictive tasks and is even feasible for a timed competition like Sliced.  I look forward to the upcoming playoffs and will be interested to try h2o on some new datasets to see if we just got lucky here, or if it's really that good.
+My takeaway is that h2o autoML is really quite powerful for purely predictive tasks and is even feasible for a timed competition like Sliced.  It would not have won the modeling portion of Sliced, but still did well.  There are also other aspects of winning the competition that I ignored (Data Vis, Golden Features).  
+
+I look forward to the upcoming playoffs and will be interested to try h2o on some new datasets to see if we just got lucky here, or if it's really that good.
 
 ## TLDR
 
