@@ -456,6 +456,11 @@ In the end, we found out that we can trick the linear regression model, just not
 
 Thank you for following along with this post if you've made it this far.  If you are interested in the math behind what we showed in the above simulations, please refer to this response on Cross Validated: https://stats.stackexchange.com/a/366579/31189 
 
+# Session Info
+
+```{r}
+sessionInfo()
+```
 
 
 
