@@ -47,7 +47,7 @@ for each observation $i = 1, ... , n$.
 
 In the formula above we consider n observations of one dependent variable and $p$ independent variables. Thus, $Yi$ is the $i$th observation of the dependent variable, $Xij$ is $i$th observation of the $j$th independent variable, $j = 1, 2, ..., p$. The values $βj$ represent parameters to be estimated, and $εi$ is the $i$th independent identically distributed normal error.^[This is a straight copy-paste job from the mathy explanation on Wikipedia here: https://en.wikipedia.org/wiki/Linear_regression#Simple_and_multiple_linear_regression]
 
-Let's start by setting up some placeholder columns to hold the beta coefficients and the values of the x's (predictors variables).   Thinking ahead, we'll want to be working row-wise to combine the coefficients, x's, and error in order to generate an observation y for each row.  Note that the values for the x's are just placeholders; we'll assign them values after getting the structure of our dataframe into good shape.  We'll make 10 predictor variables total and 10 coefficients to go with them - a relatively large but still reasonable number of variables for a benchtop experiment in the medical device domain. The first coefficient is set to 1 so that the value of that variable will have a real, causal impact on the outcome.  All other coefficients are set to zero, meaning they have no true effect with respect to generating the observations.
+Let's start by setting up some placeholder columns to hold the beta coefficients and the values of the x's (predictors variables).   Thinking ahead, we'll want to be working row-wise to combine the coefficients, x's, and error in order to generate an observation $y$ for each row.  Note that the values for the $x$`'s are just placeholders; we'll assign them values after getting the structure of our dataframe into good shape.  We'll make 10 predictor variables total and 10 coefficients to go with them - a relatively large but still reasonable number of variables for a benchtop experiment in the medical device domain. The first coefficient is set to 1 so that the value of that variable will have a real, causal impact on the outcome.  All other coefficients are set to zero, meaning they have no true effect with respect to generating the observations.
 
 ```{r}
 betas_tbl <- tibble(
@@ -78,11 +78,11 @@ x_tbl %>%
 ```
 
 
-Now that we have placeholders set up to handle our eventual row-wise operations, we can proceed with populating the values for the observed variables $X_{i}$ and the residual error $εi$ and then eventually assembling the set of observations.^[Note that this structure for the simulation is perhaps a bit verbose and potentially not optimized for speed, but given that the purpose is to explore and understand, I prefer to make things more readable and easily observed at the expense of speed and length]  Datasets usually have many of observations, not just one, so after combining the columns using `bind_cols()` we use `slice()` to copy the setup structure many times, making a duplicate row for each instance (set by the `each` argument).  The setup is consistent with the tidy format for data structures, where each row is an observation.
+Now that we have placeholders set up to handle our eventual row-wise operations, we can proceed with populating the values for the observed variables $X_{i}$ and the residuals $εi$ and then eventually assembling the set of observations.^[Note that this structure for the simulation is perhaps a bit verbose and potentially not optimized for speed, but given that the purpose is to explore and understand, I prefer to make things more readable and easily observed at the expense of speed and length]  After combining the columns using `bind_cols()` we use `slice()` to copy the setup structure many times, making a duplicate row for each instance (set by the `each` argument).  The setup is consistent with the tidy format for data structures, where each row is an observation.
 
-After replicating the setup, we use `rowwise()` to group by individual rows to allow our random number generation to be unique for each row (and therefore `each` observation).  The next step is to replace the $X$ values with a random number from the standard normal distribution by mutating `across` the $X$ columns.  
+After replicating the setup, we use `rowwise()` to group by individual rows and allow our random number generation to be unique for each row.  The next step is to replace the $X$ values with a random number from the standard normal distribution by mutating `across` the $X$ columns.  
 
-Now to the part where we try to trick the algorithm.  The line `mutate(x_2 = x_1 + rnorm(n=1, mean = 0, sd = 1))` replaces the randomly drawn $X_2$ value from above with the exact value drawn for the one true predictor $X_1$ plus a little noise.  This is the critical step to our deception because we can see that $X_2$ is still not involved with the data generation process since it gets multiplied to $β_2$ which is zero before getting added into the observation.  However, it will still be correlated with the true predictor $X_1$ and also the observation $Y_i$.
+Now to the part where we try to trick the algorithm.  The line `mutate(x_2 = x_1 + rnorm(n=1, mean = 0, sd = 1))` replaces the randomly drawn $X_2$ value from above with the exact value drawn for the one true predictor $X_1$ plus a little noise.  This is the critical step to our deception because we can see that $X_2$ is still not involved with the data generation process since it gets multiplied to $β_2$ (zero) before getting added into the observation.  However, it will still be correlated with the true predictor $X_1$ and also the observation $Y_i$.
 
 After laying the trap, we move on to combining the $X$s and the $β$s before adding a residual error term through `resid = rnorm(1, mean = 0, sd = residual_sd))`.  The last step is to add up the `bx` and `resid` values to make the observation using `rowSums`.
 
@@ -121,7 +121,7 @@ full_wide_tbl %>%
 ```
 
 
-Perfect - n=100 observations organized as 1 in each row, with the generative components available for examination in the other rows.  Let's see what happens if we plot the predictor variables vs. the outcome for each instance:
+Perfect.  n=100 observations organized as 1 in each row, with the generative components available for examination in the other rows.  Let's see what happens if we plot the predictor variables vs. the outcome for each instance:
 
 
 ```{r}
@@ -154,11 +154,12 @@ lm(observation ~ x_1 + x_2 + x_3 + x_4 + x_5 + x_6 + x_7 + x_8 + x_9 + x_10, dat
   gt()
 ```
 
-This is really pretty interesting.  Not only has the model seen through our trap and ignored `x_2`, but it's estimate of `x_1` is quite reasonable at 1.16 (true is 1.00).  Linear regression would not go report to the boss that `x_2` causes the outcomes, or even that `x_2` is associated with the outcome, but the naive engineer would based on the visuals!  This is really nice evidence to use linear regression where some would say correlation analysis would do fine!^[On a side note, we see that just by chance `x_6` was flagged as statistically significant. This would be expected to happen 1 out of 20 times and should be another consideration when selecting variables for a model, but isn't the main point of this post so we'll set that aside for now.]  
+This is really pretty interesting.  Not only has the model seen through our trap and ignored `x_2`, but it's estimate of `x_1` is quite reasonable at 1.04 (true is 1.00).  Linear regression would not go report to the boss that `x_2` causes the outcomes, or even that `x_2` is associated with the outcome, but the naive engineer would based on the visuals!  This is really nice evidence to use linear regression where some would say correlation analysis would do fine!^[On a side note, we see that just by chance `x_6` was flagged as statistically significant. This would be expected to happen 1 out of 20 times and should be another consideration when selecting variables for a model, but isn't the main point of this post so we'll set that aside for now.]  
 
-But maybe this is just because we diluted the effect of `x_2` too much.  Perhaps if we just reduced the noise, then we could increase the correlation between `x_2` and `x_1` (and also the outcome variable).  
+But maybe this is just because we diluted the effect of `x_2` too much.  Perhaps if we just reduced the noise, then we could increase the correlation between `x_2` and `x_1` and cause the regression to think `x_2` is important.  
 
 First, let's convert our pipeline into a function that takes a noise factor as an input and spits out the table of simulated observations.  Then a couple more helper functions to make the facet plot and do the inference. 
+
 ```{r}
 
 sim_fcn <- function(noise) {
@@ -215,7 +216,7 @@ inf_fcn <- function(tbl) {
 
 # Sensitivity to Magnitude of Noise
 
-With these helpers in hand, we can look at a few different scenarios for high, medium, and low noise.  Another way to view this would as high, medium, and low correlation between the true predictor `x_1` and the redundant `x_2`.  
+With these helpers in hand, we can look at a few different scenarios for high, medium, and low noise.  Another way to view this would as low, medium, and high correlation, respectively, between the true predictor `x_1` and the redundant `x_2`.  
 
 ## High Noise
 
@@ -245,15 +246,13 @@ low_noise_tbl %>% plt_fcn()
 low_noise_tbl %>% inf_fcn()
 ```
 
-Even in the high noise condition, the model isn't tempted to see `x_2` as important.  So is there any cost to pay for leaving all correlated variables in the model?  The astute observer might point out that the std. error of the estimate for $β_1$ seems to trend upwards when the noise is low.  Does this mean we are more uncertain about the estimate of the true predictor $x_1$ when it is correlated with another predictor like $x_2$?  Or was that just due to change and the nature of the random draws in the simulation?  After all, we only built 1 model for each scenario.
+Even in the low noise (large correlation) condition, the model isn't tempted to see `x_2` as important.  So is there any cost to pay for leaving all correlated variables in the model?  The astute observer might point out that the std. error of the estimate for $β_1$ seems to trend upwards when the noise is low.  Does this mean we are more uncertain about the estimate of the true predictor $x_1$ when it is correlated with another predictor like $x_2$?  Or was that just due to chance and the nature of the random draws in the simulation?  After all, we only built 1 model for each scenario.
 
 To explore this further we need a bigger experiment - or set of experiments - that looks at a range of correlation strengths between `x_1` and `x_2` and repeats each setting many times.  This will also provide a nice opportunity to practice with nested lists, a workflow that is challenging (for me) but also elegant and powerful.  Here's how we could go about it:
 
 *  Set up a preliminary tibble as before that has columns for the betas and the x's
 *  Set up a separate tibble with a list of the desired "noise"; this value is effectively the strength of the correlation between `x_1` and `x_2`. When noise is 0, the two variables are perfectly correlated.
 *  Use `crossing()` to generate all combinations of noise with the beta's and x's
-
-# Larger Simulation Looking at Various Correlation Strength Between `x_1` and `x_2`
 
 ## Set up the simulation parameters
 
@@ -307,7 +306,7 @@ gen_observations_fcn <- function(sd_row_number = 1, reps = 100) {
 
 ## Use the Function in a Loop to Repeat the Simulation
 
-Sincere apologies to the for-loop haters but I don't currently know a more elegant way to do this part.  First we establish the number of simulations we want - in this case 100 will do fine.  We then initialize a holder tibble; the data inside this one isn't important but we want the column names to match what comes out of the simulation loop so that we can `bind_rows` to build out the superset of simulation data.  The final step is to loop the simulation 100 times, generating 100 synthetic observations at a specified correlation each time through.  Inside the loop, after the 100 observations are generated at each condition, the model is built and the coefficients, standard error, and p-values for coefficients are extracted and stored.  When all is done, for every strength of correlation we should have 100 estimates based on 100 models of 100 data points generated under those specified conditions.
+Sincere apologies to the for-loop haters but I don't currently know a more elegant way to do this part.  First we establish the number of simulations we want - in this case 100 at each noise level will do fine.  We then initialize a holder tibble; the data inside this one isn't important but we want the column names to match what comes out of the simulation loop so that we can `bind_rows` to build out the superset of simulation data.  The final step is to loop the simulation 100 times, generating 100 synthetic observations at a specified correlation each time through.  Inside the loop, after the 100 observations are generated at each condition, the model is built and the coefficients, standard error, and p-values for coefficients are extracted and stored.  When all is done, for every strength of correlation we should have 100 estimates based on 100 models of 100 data points generated under those specified conditions.
 
 ```{r}
 n_sims <- 100
@@ -374,9 +373,9 @@ cln_sim_tbl %>%
   )
 ```
 
-The above plot shows that we can indeed trick the model.  When the correlation is high enough, the spread of the coefficient estimates get very wide.  Even though on average the estimate is still correct, the model is very uncertain about the value for any particular experiment.  And we usually only get to run 1 experiment in real life.
+The above plot shows that we can indeed trick the model.  When the correlation is high enough, the spread of the coefficient estimates get very wide.  Even though on average the estimate is still correct, the model is very uncertain about the value for any particular experiment and will occasionally think that `x_2` has a large estimated coefficient.  And we usually only get to run 1 experiment in real life.
 
-Based on these data, we should expect to see the standard error of the estimate grow large at high correlation.  Let's see if that's true:
+Based on these data, we should expect to see the standard error of the estimate to grow large at high correlation.  Let's see if that's true:
 
 ```{r}
 cln_sim_tbl %>%
@@ -410,7 +409,7 @@ cln_sim_tbl %>%
   theme(legend.title = element_blank()) +
   labs(
     y = "SD of Random Noise in Relationship Between x_1 and x_2",
-    x = "Standard Error of Coefficient Estimate",
+    x = "P-Value for Coefficient Estimate",
     title = "Variable Correlation Strength vs. P-Values for Coefficient Estimates",
     subtitle = "dotted line shows p = .05",
     caption = "Lower Noise is Higher Correlation"
@@ -419,7 +418,41 @@ cln_sim_tbl %>%
 
 Yep - as noise goes to 0 and the correlation approaches 1, the p-values get very unstable and the true effect of `x_1` can no longer be detected consistent relative to the null.  But the good news is that as long as the correlation isn't close to perfect, the model does its job quite well and the p-values for a true effect dive near 0. 
 
-In the end, we found out that we can trick the linear regression model, just not in the way we expected.  The average coefficient estimate remains stable even in the presence of highly correlated predictors, but it's the **uncertainty** about this estimate that pays the price. 
+Just to drive the point home, we could look at the actual correlation coefficients between `x_1` and `x_2` at the point that things start to go unstable.  From the above plot, it looks like the model starts to get confused at the time the the noise is around 0.6.  We can use our helper function from before to quickly make a single dataset at that noise level and then evaluate the correlation of `x_1` and `x_2` in that set:
+
+```{r}
+unstable_tbl <- sim_fcn(noise = 0.6)
+```
+
+Here's the correlation plot. We see that in this case, a correlation of around 0.8 is where things start to go unstable with the estimates.
+
+```{r}
+unstable_tbl %>% 
+  select(x_1:x_10) %>%
+  ggcorr(
+  high = "red",
+  low = "blue",
+  label = TRUE,
+  hjust = .75,
+  size = 3,
+  label_size = 3,
+  nbreaks = 4
+) +
+  labs(
+    title = "Correlation Matrix",
+    subtitle = "Pearson Method Using Pairwise Obervations"
+  )
+```
+
+
+Here's the variables plotted against the observation for the above scenario, with `x_1` and `x_2` correlated with each other at a 0.8 level.
+
+```{r}
+unstable_tbl %>% plt_fcn()
+```
+
+
+In the end, we found out that we can trick the linear regression model, just not in the way we expected.  We were never really able to get the model to think that `x_2` was important but we were able to make it uncertain about `x_1`.  The average coefficient estimate remains stable even in the presence of highly correlated predictors, but it's the **uncertainty** about the estimates that pays the price for correlated variables. So should we just leave them all in?  Like most things in statistics - it depends on the purpose of the model!
 
 Thank you for following along with this post if you've made it this far.  If you are interested in the math behind what we showed in the above simulations, please refer to this response on Cross Validated: https://stats.stackexchange.com/a/366579/31189 
 

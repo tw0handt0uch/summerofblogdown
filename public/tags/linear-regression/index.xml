@@ -36,7 +36,7 @@ library(GGally)&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(Y_i = \beta_0 + \beta_1 X_{i1} + \beta_2 X_{i2} + \ldots + \beta_p X_{ip} + \epsilon_i\)&lt;/span&gt;&lt;/p&gt;
 &lt;p&gt;for each observation &lt;span class=&#34;math inline&#34;&gt;\(i = 1, ... , n\)&lt;/span&gt;.&lt;/p&gt;
 &lt;p&gt;In the formula above we consider n observations of one dependent variable and &lt;span class=&#34;math inline&#34;&gt;\(p\)&lt;/span&gt; independent variables. Thus, &lt;span class=&#34;math inline&#34;&gt;\(Yi\)&lt;/span&gt; is the &lt;span class=&#34;math inline&#34;&gt;\(i\)&lt;/span&gt;th observation of the dependent variable, &lt;span class=&#34;math inline&#34;&gt;\(Xij\)&lt;/span&gt; is &lt;span class=&#34;math inline&#34;&gt;\(i\)&lt;/span&gt;th observation of the &lt;span class=&#34;math inline&#34;&gt;\(j\)&lt;/span&gt;th independent variable, &lt;span class=&#34;math inline&#34;&gt;\(j = 1, 2, ..., p\)&lt;/span&gt;. The values &lt;span class=&#34;math inline&#34;&gt;\(βj\)&lt;/span&gt; represent parameters to be estimated, and &lt;span class=&#34;math inline&#34;&gt;\(εi\)&lt;/span&gt; is the &lt;span class=&#34;math inline&#34;&gt;\(i\)&lt;/span&gt;th independent identically distributed normal error.&lt;a href=&#34;#fn1&#34; class=&#34;footnote-ref&#34; id=&#34;fnref1&#34;&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;Let’s start by setting up some placeholder columns to hold the beta coefficients and the values of the x’s (predictors variables). Thinking ahead, we’ll want to be working row-wise to combine the coefficients, x’s, and error in order to generate an observation y for each row. Note that the values for the x’s are just placeholders; we’ll assign them values after getting the structure of our dataframe into good shape. We’ll make 10 predictor variables total and 10 coefficients to go with them - a relatively large but still reasonable number of variables for a benchtop experiment in the medical device domain. The first coefficient is set to 1 so that the value of that variable will have a real, causal impact on the outcome. All other coefficients are set to zero, meaning they have no true effect with respect to generating the observations.&lt;/p&gt;
+&lt;p&gt;Let’s start by setting up some placeholder columns to hold the beta coefficients and the values of the x’s (predictors variables). Thinking ahead, we’ll want to be working row-wise to combine the coefficients, x’s, and error in order to generate an observation &lt;span class=&#34;math inline&#34;&gt;\(y\)&lt;/span&gt; for each row. Note that the values for the &lt;span class=&#34;math inline&#34;&gt;\(x\)&lt;/span&gt;`’s are just placeholders; we’ll assign them values after getting the structure of our dataframe into good shape. We’ll make 10 predictor variables total and 10 coefficients to go with them - a relatively large but still reasonable number of variables for a benchtop experiment in the medical device domain. The first coefficient is set to 1 so that the value of that variable will have a real, causal impact on the outcome. All other coefficients are set to zero, meaning they have no true effect with respect to generating the observations.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;betas_tbl &amp;lt;- tibble(
   var_prefix = rep(&amp;quot;b&amp;quot;, 10),
   var_suffix = seq(from = 1, to = 10, by = 1)
@@ -57,12 +57,12 @@ x_tbl &amp;lt;- tibble(
 
 betas_tbl %&amp;gt;%
   gt()&lt;/code&gt;&lt;/pre&gt;
-&lt;div id=&#34;nhcofwwhhu&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;div id=&#34;fkaurrzurb&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
 &lt;style&gt;html {
   font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
 }
 
-#nhcofwwhhu .gt_table {
+#fkaurrzurb .gt_table {
   display: table;
   border-collapse: collapse;
   margin-left: auto;
@@ -87,7 +87,7 @@ betas_tbl %&amp;gt;%
   border-left-color: #D3D3D3;
 }
 
-#nhcofwwhhu .gt_heading {
+#fkaurrzurb .gt_heading {
   background-color: #FFFFFF;
   text-align: center;
   border-bottom-color: #FFFFFF;
@@ -99,7 +99,7 @@ betas_tbl %&amp;gt;%
   border-right-color: #D3D3D3;
 }
 
-#nhcofwwhhu .gt_title {
+#fkaurrzurb .gt_title {
   color: #333333;
   font-size: 125%;
   font-weight: initial;
@@ -109,7 +109,7 @@ betas_tbl %&amp;gt;%
   border-bottom-width: 0;
 }
 
-#nhcofwwhhu .gt_subtitle {
+#fkaurrzurb .gt_subtitle {
   color: #333333;
   font-size: 85%;
   font-weight: initial;
@@ -119,13 +119,13 @@ betas_tbl %&amp;gt;%
   border-top-width: 0;
 }
 
-#nhcofwwhhu .gt_bottom_border {
+#fkaurrzurb .gt_bottom_border {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
 }
 
-#nhcofwwhhu .gt_col_headings {
+#fkaurrzurb .gt_col_headings {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -140,7 +140,7 @@ betas_tbl %&amp;gt;%
   border-right-color: #D3D3D3;
 }
 
-#nhcofwwhhu .gt_col_heading {
+#fkaurrzurb .gt_col_heading {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -160,7 +160,7 @@ betas_tbl %&amp;gt;%
   overflow-x: hidden;
 }
 
-#nhcofwwhhu .gt_column_spanner_outer {
+#fkaurrzurb .gt_column_spanner_outer {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -172,15 +172,15 @@ betas_tbl %&amp;gt;%
   padding-right: 4px;
 }
 
-#nhcofwwhhu .gt_column_spanner_outer:first-child {
+#fkaurrzurb .gt_column_spanner_outer:first-child {
   padding-left: 0;
 }
 
-#nhcofwwhhu .gt_column_spanner_outer:last-child {
+#fkaurrzurb .gt_column_spanner_outer:last-child {
   padding-right: 0;
 }
 
-#nhcofwwhhu .gt_column_spanner {
+#fkaurrzurb .gt_column_spanner {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
@@ -192,7 +192,7 @@ betas_tbl %&amp;gt;%
   width: 100%;
 }
 
-#nhcofwwhhu .gt_group_heading {
+#fkaurrzurb .gt_group_heading {
   padding: 8px;
   color: #333333;
   background-color: #FFFFFF;
@@ -214,7 +214,7 @@ betas_tbl %&amp;gt;%
   vertical-align: middle;
 }
 
-#nhcofwwhhu .gt_empty_group_heading {
+#fkaurrzurb .gt_empty_group_heading {
   padding: 0.5px;
   color: #333333;
   background-color: #FFFFFF;
@@ -229,15 +229,15 @@ betas_tbl %&amp;gt;%
   vertical-align: middle;
 }
 
-#nhcofwwhhu .gt_from_md &gt; :first-child {
+#fkaurrzurb .gt_from_md &gt; :first-child {
   margin-top: 0;
 }
 
-#nhcofwwhhu .gt_from_md &gt; :last-child {
+#fkaurrzurb .gt_from_md &gt; :last-child {
   margin-bottom: 0;
 }
 
-#nhcofwwhhu .gt_row {
+#fkaurrzurb .gt_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -256,7 +256,7 @@ betas_tbl %&amp;gt;%
   overflow-x: hidden;
 }
 
-#nhcofwwhhu .gt_stub {
+#fkaurrzurb .gt_stub {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -268,7 +268,7 @@ betas_tbl %&amp;gt;%
   padding-left: 12px;
 }
 
-#nhcofwwhhu .gt_summary_row {
+#fkaurrzurb .gt_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -278,7 +278,7 @@ betas_tbl %&amp;gt;%
   padding-right: 5px;
 }
 
-#nhcofwwhhu .gt_first_summary_row {
+#fkaurrzurb .gt_first_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -288,7 +288,7 @@ betas_tbl %&amp;gt;%
   border-top-color: #D3D3D3;
 }
 
-#nhcofwwhhu .gt_grand_summary_row {
+#fkaurrzurb .gt_grand_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -298,7 +298,7 @@ betas_tbl %&amp;gt;%
   padding-right: 5px;
 }
 
-#nhcofwwhhu .gt_first_grand_summary_row {
+#fkaurrzurb .gt_first_grand_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -308,11 +308,11 @@ betas_tbl %&amp;gt;%
   border-top-color: #D3D3D3;
 }
 
-#nhcofwwhhu .gt_striped {
+#fkaurrzurb .gt_striped {
   background-color: rgba(128, 128, 128, 0.05);
 }
 
-#nhcofwwhhu .gt_table_body {
+#fkaurrzurb .gt_table_body {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -321,7 +321,7 @@ betas_tbl %&amp;gt;%
   border-bottom-color: #D3D3D3;
 }
 
-#nhcofwwhhu .gt_footnotes {
+#fkaurrzurb .gt_footnotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -335,13 +335,13 @@ betas_tbl %&amp;gt;%
   border-right-color: #D3D3D3;
 }
 
-#nhcofwwhhu .gt_footnote {
+#fkaurrzurb .gt_footnote {
   margin: 0px;
   font-size: 90%;
   padding: 4px;
 }
 
-#nhcofwwhhu .gt_sourcenotes {
+#fkaurrzurb .gt_sourcenotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -355,41 +355,41 @@ betas_tbl %&amp;gt;%
   border-right-color: #D3D3D3;
 }
 
-#nhcofwwhhu .gt_sourcenote {
+#fkaurrzurb .gt_sourcenote {
   font-size: 90%;
   padding: 4px;
 }
 
-#nhcofwwhhu .gt_left {
+#fkaurrzurb .gt_left {
   text-align: left;
 }
 
-#nhcofwwhhu .gt_center {
+#fkaurrzurb .gt_center {
   text-align: center;
 }
 
-#nhcofwwhhu .gt_right {
+#fkaurrzurb .gt_right {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-#nhcofwwhhu .gt_font_normal {
+#fkaurrzurb .gt_font_normal {
   font-weight: normal;
 }
 
-#nhcofwwhhu .gt_font_bold {
+#fkaurrzurb .gt_font_bold {
   font-weight: bold;
 }
 
-#nhcofwwhhu .gt_font_italic {
+#fkaurrzurb .gt_font_italic {
   font-style: italic;
 }
 
-#nhcofwwhhu .gt_super {
+#fkaurrzurb .gt_super {
   font-size: 65%;
 }
 
-#nhcofwwhhu .gt_footnote_marks {
+#fkaurrzurb .gt_footnote_marks {
   font-style: italic;
   font-size: 65%;
 }
@@ -428,12 +428,12 @@ betas_tbl %&amp;gt;%
 &lt;/div&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;x_tbl %&amp;gt;%
   gt()&lt;/code&gt;&lt;/pre&gt;
-&lt;div id=&#34;bsrddvbtdy&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;div id=&#34;vtpnumbowj&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
 &lt;style&gt;html {
   font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
 }
 
-#bsrddvbtdy .gt_table {
+#vtpnumbowj .gt_table {
   display: table;
   border-collapse: collapse;
   margin-left: auto;
@@ -458,7 +458,7 @@ betas_tbl %&amp;gt;%
   border-left-color: #D3D3D3;
 }
 
-#bsrddvbtdy .gt_heading {
+#vtpnumbowj .gt_heading {
   background-color: #FFFFFF;
   text-align: center;
   border-bottom-color: #FFFFFF;
@@ -470,7 +470,7 @@ betas_tbl %&amp;gt;%
   border-right-color: #D3D3D3;
 }
 
-#bsrddvbtdy .gt_title {
+#vtpnumbowj .gt_title {
   color: #333333;
   font-size: 125%;
   font-weight: initial;
@@ -480,7 +480,7 @@ betas_tbl %&amp;gt;%
   border-bottom-width: 0;
 }
 
-#bsrddvbtdy .gt_subtitle {
+#vtpnumbowj .gt_subtitle {
   color: #333333;
   font-size: 85%;
   font-weight: initial;
@@ -490,13 +490,13 @@ betas_tbl %&amp;gt;%
   border-top-width: 0;
 }
 
-#bsrddvbtdy .gt_bottom_border {
+#vtpnumbowj .gt_bottom_border {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
 }
 
-#bsrddvbtdy .gt_col_headings {
+#vtpnumbowj .gt_col_headings {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -511,7 +511,7 @@ betas_tbl %&amp;gt;%
   border-right-color: #D3D3D3;
 }
 
-#bsrddvbtdy .gt_col_heading {
+#vtpnumbowj .gt_col_heading {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -531,7 +531,7 @@ betas_tbl %&amp;gt;%
   overflow-x: hidden;
 }
 
-#bsrddvbtdy .gt_column_spanner_outer {
+#vtpnumbowj .gt_column_spanner_outer {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -543,15 +543,15 @@ betas_tbl %&amp;gt;%
   padding-right: 4px;
 }
 
-#bsrddvbtdy .gt_column_spanner_outer:first-child {
+#vtpnumbowj .gt_column_spanner_outer:first-child {
   padding-left: 0;
 }
 
-#bsrddvbtdy .gt_column_spanner_outer:last-child {
+#vtpnumbowj .gt_column_spanner_outer:last-child {
   padding-right: 0;
 }
 
-#bsrddvbtdy .gt_column_spanner {
+#vtpnumbowj .gt_column_spanner {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
@@ -563,7 +563,7 @@ betas_tbl %&amp;gt;%
   width: 100%;
 }
 
-#bsrddvbtdy .gt_group_heading {
+#vtpnumbowj .gt_group_heading {
   padding: 8px;
   color: #333333;
   background-color: #FFFFFF;
@@ -585,7 +585,7 @@ betas_tbl %&amp;gt;%
   vertical-align: middle;
 }
 
-#bsrddvbtdy .gt_empty_group_heading {
+#vtpnumbowj .gt_empty_group_heading {
   padding: 0.5px;
   color: #333333;
   background-color: #FFFFFF;
@@ -600,15 +600,15 @@ betas_tbl %&amp;gt;%
   vertical-align: middle;
 }
 
-#bsrddvbtdy .gt_from_md &gt; :first-child {
+#vtpnumbowj .gt_from_md &gt; :first-child {
   margin-top: 0;
 }
 
-#bsrddvbtdy .gt_from_md &gt; :last-child {
+#vtpnumbowj .gt_from_md &gt; :last-child {
   margin-bottom: 0;
 }
 
-#bsrddvbtdy .gt_row {
+#vtpnumbowj .gt_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -627,7 +627,7 @@ betas_tbl %&amp;gt;%
   overflow-x: hidden;
 }
 
-#bsrddvbtdy .gt_stub {
+#vtpnumbowj .gt_stub {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -639,7 +639,7 @@ betas_tbl %&amp;gt;%
   padding-left: 12px;
 }
 
-#bsrddvbtdy .gt_summary_row {
+#vtpnumbowj .gt_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -649,7 +649,7 @@ betas_tbl %&amp;gt;%
   padding-right: 5px;
 }
 
-#bsrddvbtdy .gt_first_summary_row {
+#vtpnumbowj .gt_first_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -659,7 +659,7 @@ betas_tbl %&amp;gt;%
   border-top-color: #D3D3D3;
 }
 
-#bsrddvbtdy .gt_grand_summary_row {
+#vtpnumbowj .gt_grand_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -669,7 +669,7 @@ betas_tbl %&amp;gt;%
   padding-right: 5px;
 }
 
-#bsrddvbtdy .gt_first_grand_summary_row {
+#vtpnumbowj .gt_first_grand_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -679,11 +679,11 @@ betas_tbl %&amp;gt;%
   border-top-color: #D3D3D3;
 }
 
-#bsrddvbtdy .gt_striped {
+#vtpnumbowj .gt_striped {
   background-color: rgba(128, 128, 128, 0.05);
 }
 
-#bsrddvbtdy .gt_table_body {
+#vtpnumbowj .gt_table_body {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -692,7 +692,7 @@ betas_tbl %&amp;gt;%
   border-bottom-color: #D3D3D3;
 }
 
-#bsrddvbtdy .gt_footnotes {
+#vtpnumbowj .gt_footnotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -706,13 +706,13 @@ betas_tbl %&amp;gt;%
   border-right-color: #D3D3D3;
 }
 
-#bsrddvbtdy .gt_footnote {
+#vtpnumbowj .gt_footnote {
   margin: 0px;
   font-size: 90%;
   padding: 4px;
 }
 
-#bsrddvbtdy .gt_sourcenotes {
+#vtpnumbowj .gt_sourcenotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -726,41 +726,41 @@ betas_tbl %&amp;gt;%
   border-right-color: #D3D3D3;
 }
 
-#bsrddvbtdy .gt_sourcenote {
+#vtpnumbowj .gt_sourcenote {
   font-size: 90%;
   padding: 4px;
 }
 
-#bsrddvbtdy .gt_left {
+#vtpnumbowj .gt_left {
   text-align: left;
 }
 
-#bsrddvbtdy .gt_center {
+#vtpnumbowj .gt_center {
   text-align: center;
 }
 
-#bsrddvbtdy .gt_right {
+#vtpnumbowj .gt_right {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-#bsrddvbtdy .gt_font_normal {
+#vtpnumbowj .gt_font_normal {
   font-weight: normal;
 }
 
-#bsrddvbtdy .gt_font_bold {
+#vtpnumbowj .gt_font_bold {
   font-weight: bold;
 }
 
-#bsrddvbtdy .gt_font_italic {
+#vtpnumbowj .gt_font_italic {
   font-style: italic;
 }
 
-#bsrddvbtdy .gt_super {
+#vtpnumbowj .gt_super {
   font-size: 65%;
 }
 
-#bsrddvbtdy .gt_footnote_marks {
+#vtpnumbowj .gt_footnote_marks {
   font-style: italic;
   font-size: 65%;
 }
@@ -797,9 +797,9 @@ betas_tbl %&amp;gt;%
   
 &lt;/table&gt;
 &lt;/div&gt;
-&lt;p&gt;Now that we have placeholders set up to handle our eventual row-wise operations, we can proceed with populating the values for the observed variables &lt;span class=&#34;math inline&#34;&gt;\(X_{i}\)&lt;/span&gt; and the residual error &lt;span class=&#34;math inline&#34;&gt;\(εi\)&lt;/span&gt; and then eventually assembling the set of observations.&lt;a href=&#34;#fn2&#34; class=&#34;footnote-ref&#34; id=&#34;fnref2&#34;&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt; Datasets usually have many of observations, not just one, so after combining the columns using &lt;code&gt;bind_cols()&lt;/code&gt; we use &lt;code&gt;slice()&lt;/code&gt; to copy the setup structure many times, making a duplicate row for each instance (set by the &lt;code&gt;each&lt;/code&gt; argument). The setup is consistent with the tidy format for data structures, where each row is an observation.&lt;/p&gt;
-&lt;p&gt;After replicating the setup, we use &lt;code&gt;rowwise()&lt;/code&gt; to group by individual rows to allow our random number generation to be unique for each row (and therefore &lt;code&gt;each&lt;/code&gt; observation). The next step is to replace the &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; values with a random number from the standard normal distribution by mutating &lt;code&gt;across&lt;/code&gt; the &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; columns.&lt;/p&gt;
-&lt;p&gt;Now to the part where we try to trick the algorithm. The line &lt;code&gt;mutate(x_2 = x_1 + rnorm(n=1, mean = 0, sd = 1))&lt;/code&gt; replaces the randomly drawn &lt;span class=&#34;math inline&#34;&gt;\(X_2\)&lt;/span&gt; value from above with the exact value drawn for the one true predictor &lt;span class=&#34;math inline&#34;&gt;\(X_1\)&lt;/span&gt; plus a little noise. This is the critical step to our deception because we can see that &lt;span class=&#34;math inline&#34;&gt;\(X_2\)&lt;/span&gt; is still not involved with the data generation process since it gets multiplied to &lt;span class=&#34;math inline&#34;&gt;\(β_2\)&lt;/span&gt; which is zero before getting added into the observation. However, it will still be correlated with the true predictor &lt;span class=&#34;math inline&#34;&gt;\(X_1\)&lt;/span&gt; and also the observation &lt;span class=&#34;math inline&#34;&gt;\(Y_i\)&lt;/span&gt;.&lt;/p&gt;
+&lt;p&gt;Now that we have placeholders set up to handle our eventual row-wise operations, we can proceed with populating the values for the observed variables &lt;span class=&#34;math inline&#34;&gt;\(X_{i}\)&lt;/span&gt; and the residuals &lt;span class=&#34;math inline&#34;&gt;\(εi\)&lt;/span&gt; and then eventually assembling the set of observations.&lt;a href=&#34;#fn2&#34; class=&#34;footnote-ref&#34; id=&#34;fnref2&#34;&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt; After combining the columns using &lt;code&gt;bind_cols()&lt;/code&gt; we use &lt;code&gt;slice()&lt;/code&gt; to copy the setup structure many times, making a duplicate row for each instance (set by the &lt;code&gt;each&lt;/code&gt; argument). The setup is consistent with the tidy format for data structures, where each row is an observation.&lt;/p&gt;
+&lt;p&gt;After replicating the setup, we use &lt;code&gt;rowwise()&lt;/code&gt; to group by individual rows and allow our random number generation to be unique for each row. The next step is to replace the &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; values with a random number from the standard normal distribution by mutating &lt;code&gt;across&lt;/code&gt; the &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; columns.&lt;/p&gt;
+&lt;p&gt;Now to the part where we try to trick the algorithm. The line &lt;code&gt;mutate(x_2 = x_1 + rnorm(n=1, mean = 0, sd = 1))&lt;/code&gt; replaces the randomly drawn &lt;span class=&#34;math inline&#34;&gt;\(X_2\)&lt;/span&gt; value from above with the exact value drawn for the one true predictor &lt;span class=&#34;math inline&#34;&gt;\(X_1\)&lt;/span&gt; plus a little noise. This is the critical step to our deception because we can see that &lt;span class=&#34;math inline&#34;&gt;\(X_2\)&lt;/span&gt; is still not involved with the data generation process since it gets multiplied to &lt;span class=&#34;math inline&#34;&gt;\(β_2\)&lt;/span&gt; (zero) before getting added into the observation. However, it will still be correlated with the true predictor &lt;span class=&#34;math inline&#34;&gt;\(X_1\)&lt;/span&gt; and also the observation &lt;span class=&#34;math inline&#34;&gt;\(Y_i\)&lt;/span&gt;.&lt;/p&gt;
 &lt;p&gt;After laying the trap, we move on to combining the &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt;s and the &lt;span class=&#34;math inline&#34;&gt;\(β\)&lt;/span&gt;s before adding a residual error term through &lt;code&gt;resid = rnorm(1, mean = 0, sd = residual_sd))&lt;/code&gt;. The last step is to add up the &lt;code&gt;bx&lt;/code&gt; and &lt;code&gt;resid&lt;/code&gt; values to make the observation using &lt;code&gt;rowSums&lt;/code&gt;.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(08062021)
 
@@ -1443,7 +1443,7 @@ full_wide_tbl %&amp;gt;%
   
 &lt;/table&gt;
 &lt;/div&gt;
-&lt;p&gt;Perfect - n=100 observations organized as 1 in each row, with the generative components available for examination in the other rows. Let’s see what happens if we plot the predictor variables vs. the outcome for each instance:&lt;/p&gt;
+&lt;p&gt;Perfect. n=100 observations organized as 1 in each row, with the generative components available for examination in the other rows. Let’s see what happens if we plot the predictor variables vs. the outcome for each instance:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;full_wide_tbl %&amp;gt;%
   pivot_longer(cols = x_1:x_10, names_to = &amp;quot;var&amp;quot;, values_to = &amp;quot;val&amp;quot;) %&amp;gt;%
   mutate(var = as_factor(var)) %&amp;gt;%
@@ -1889,8 +1889,8 @@ full_wide_tbl %&amp;gt;%
   
 &lt;/table&gt;
 &lt;/div&gt;
-&lt;p&gt;This is really pretty interesting. Not only has the model seen through our trap and ignored &lt;code&gt;x_2&lt;/code&gt;, but it’s estimate of &lt;code&gt;x_1&lt;/code&gt; is quite reasonable at 1.16 (true is 1.00). Linear regression would not go report to the boss that &lt;code&gt;x_2&lt;/code&gt; causes the outcomes, or even that &lt;code&gt;x_2&lt;/code&gt; is associated with the outcome, but the naive engineer would based on the visuals! This is really nice evidence to use linear regression where some would say correlation analysis would do fine!&lt;a href=&#34;#fn3&#34; class=&#34;footnote-ref&#34; id=&#34;fnref3&#34;&gt;&lt;sup&gt;3&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;But maybe this is just because we diluted the effect of &lt;code&gt;x_2&lt;/code&gt; too much. Perhaps if we just reduced the noise, then we could increase the correlation between &lt;code&gt;x_2&lt;/code&gt; and &lt;code&gt;x_1&lt;/code&gt; (and also the outcome variable).&lt;/p&gt;
+&lt;p&gt;This is really pretty interesting. Not only has the model seen through our trap and ignored &lt;code&gt;x_2&lt;/code&gt;, but it’s estimate of &lt;code&gt;x_1&lt;/code&gt; is quite reasonable at 1.04 (true is 1.00). Linear regression would not go report to the boss that &lt;code&gt;x_2&lt;/code&gt; causes the outcomes, or even that &lt;code&gt;x_2&lt;/code&gt; is associated with the outcome, but the naive engineer would based on the visuals! This is really nice evidence to use linear regression where some would say correlation analysis would do fine!&lt;a href=&#34;#fn3&#34; class=&#34;footnote-ref&#34; id=&#34;fnref3&#34;&gt;&lt;sup&gt;3&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;But maybe this is just because we diluted the effect of &lt;code&gt;x_2&lt;/code&gt; too much. Perhaps if we just reduced the noise, then we could increase the correlation between &lt;code&gt;x_2&lt;/code&gt; and &lt;code&gt;x_1&lt;/code&gt; and cause the regression to think &lt;code&gt;x_2&lt;/code&gt; is important.&lt;/p&gt;
 &lt;p&gt;First, let’s convert our pipeline into a function that takes a noise factor as an input and spits out the table of simulated observations. Then a couple more helper functions to make the facet plot and do the inference.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;sim_fcn &amp;lt;- function(noise) {
   betas_tbl %&amp;gt;%
@@ -1945,7 +1945,7 @@ inf_fcn &amp;lt;- function(tbl) {
 &lt;/div&gt;
 &lt;div id=&#34;sensitivity-to-magnitude-of-noise&#34; class=&#34;section level1&#34;&gt;
 &lt;h1&gt;Sensitivity to Magnitude of Noise&lt;/h1&gt;
-&lt;p&gt;With these helpers in hand, we can look at a few different scenarios for high, medium, and low noise. Another way to view this would as high, medium, and low correlation between the true predictor &lt;code&gt;x_1&lt;/code&gt; and the redundant &lt;code&gt;x_2&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;With these helpers in hand, we can look at a few different scenarios for high, medium, and low noise. Another way to view this would as low, medium, and high correlation, respectively, between the true predictor &lt;code&gt;x_1&lt;/code&gt; and the redundant &lt;code&gt;x_2&lt;/code&gt;.&lt;/p&gt;
 &lt;div id=&#34;high-noise&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;High Noise&lt;/h2&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(1)
@@ -2014,7 +2014,7 @@ low_noise_tbl %&amp;gt;% plt_fcn()&lt;/code&gt;&lt;/pre&gt;
 ##  9 x_8            -0.13      0.09     -1.41    0.16 nope          
 ## 10 x_9             0.1       0.1       1.04    0.3  nope          
 ## 11 x_10            0.05      0.09      0.62    0.54 nope&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;Even in the high noise condition, the model isn’t tempted to see &lt;code&gt;x_2&lt;/code&gt; as important. So is there any cost to pay for leaving all correlated variables in the model? The astute observer might point out that the std. error of the estimate for &lt;span class=&#34;math inline&#34;&gt;\(β_1\)&lt;/span&gt; seems to trend upwards when the noise is low. Does this mean we are more uncertain about the estimate of the true predictor &lt;span class=&#34;math inline&#34;&gt;\(x_1\)&lt;/span&gt; when it is correlated with another predictor like &lt;span class=&#34;math inline&#34;&gt;\(x_2\)&lt;/span&gt;? Or was that just due to change and the nature of the random draws in the simulation? After all, we only built 1 model for each scenario.&lt;/p&gt;
+&lt;p&gt;Even in the low noise (large correlation) condition, the model isn’t tempted to see &lt;code&gt;x_2&lt;/code&gt; as important. So is there any cost to pay for leaving all correlated variables in the model? The astute observer might point out that the std. error of the estimate for &lt;span class=&#34;math inline&#34;&gt;\(β_1\)&lt;/span&gt; seems to trend upwards when the noise is low. Does this mean we are more uncertain about the estimate of the true predictor &lt;span class=&#34;math inline&#34;&gt;\(x_1\)&lt;/span&gt; when it is correlated with another predictor like &lt;span class=&#34;math inline&#34;&gt;\(x_2\)&lt;/span&gt;? Or was that just due to chance and the nature of the random draws in the simulation? After all, we only built 1 model for each scenario.&lt;/p&gt;
 &lt;p&gt;To explore this further we need a bigger experiment - or set of experiments - that looks at a range of correlation strengths between &lt;code&gt;x_1&lt;/code&gt; and &lt;code&gt;x_2&lt;/code&gt; and repeats each setting many times. This will also provide a nice opportunity to practice with nested lists, a workflow that is challenging (for me) but also elegant and powerful. Here’s how we could go about it:&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Set up a preliminary tibble as before that has columns for the betas and the x’s&lt;/li&gt;
@@ -2022,9 +2022,6 @@ low_noise_tbl %&amp;gt;% plt_fcn()&lt;/code&gt;&lt;/pre&gt;
 &lt;li&gt;Use &lt;code&gt;crossing()&lt;/code&gt; to generate all combinations of noise with the beta’s and x’s&lt;/li&gt;
 &lt;/ul&gt;
 &lt;/div&gt;
-&lt;/div&gt;
-&lt;div id=&#34;larger-simulation-looking-at-various-correlation-strength-between-x_1-and-x_2&#34; class=&#34;section level1&#34;&gt;
-&lt;h1&gt;Larger Simulation Looking at Various Correlation Strength Between &lt;code&gt;x_1&lt;/code&gt; and &lt;code&gt;x_2&lt;/code&gt;&lt;/h1&gt;
 &lt;div id=&#34;set-up-the-simulation-parameters&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;Set up the simulation parameters&lt;/h2&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;prelim_tbl &amp;lt;- betas_tbl %&amp;gt;%
@@ -2605,7 +2602,7 @@ setup_tbl %&amp;gt;%
 &lt;/div&gt;
 &lt;div id=&#34;use-the-function-in-a-loop-to-repeat-the-simulation&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;Use the Function in a Loop to Repeat the Simulation&lt;/h2&gt;
-&lt;p&gt;Sincere apologies to the for-loop haters but I don’t currently know a more elegant way to do this part. First we establish the number of simulations we want - in this case 100 will do fine. We then initialize a holder tibble; the data inside this one isn’t important but we want the column names to match what comes out of the simulation loop so that we can &lt;code&gt;bind_rows&lt;/code&gt; to build out the superset of simulation data. The final step is to loop the simulation 100 times, generating 100 synthetic observations at a specified correlation each time through. Inside the loop, after the 100 observations are generated at each condition, the model is built and the coefficients, standard error, and p-values for coefficients are extracted and stored. When all is done, for every strength of correlation we should have 100 estimates based on 100 models of 100 data points generated under those specified conditions.&lt;/p&gt;
+&lt;p&gt;Sincere apologies to the for-loop haters but I don’t currently know a more elegant way to do this part. First we establish the number of simulations we want - in this case 100 at each noise level will do fine. We then initialize a holder tibble; the data inside this one isn’t important but we want the column names to match what comes out of the simulation loop so that we can &lt;code&gt;bind_rows&lt;/code&gt; to build out the superset of simulation data. The final step is to loop the simulation 100 times, generating 100 synthetic observations at a specified correlation each time through. Inside the loop, after the 100 observations are generated at each condition, the model is built and the coefficients, standard error, and p-values for coefficients are extracted and stored. When all is done, for every strength of correlation we should have 100 estimates based on 100 models of 100 data points generated under those specified conditions.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;n_sims &amp;lt;- 100
 
 # original_tbl &amp;lt;- tidy(summary(lm(observation ~ ., data = full_wide_tbl))) %&amp;gt;%
@@ -3061,8 +3058,8 @@ cln_sim_tbl %&amp;gt;%
     caption = &amp;quot;Lower Noise is Higher Correlation&amp;quot;
   )&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;&lt;img src=&#34;/post/2021-08-04-linear-regression-is-smarter-than-i-thought-estimating-effect-sizes-for-variables-in-r_files/figure-html/unnamed-chunk-16-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
-&lt;p&gt;The above plot shows that we can indeed trick the model. When the correlation is high enough, the spread of the coefficient estimates get very wide. Even though on average the estimate is still correct, the model is very uncertain about the value for any particular experiment. And we usually only get to run 1 experiment in real life.&lt;/p&gt;
-&lt;p&gt;Based on these data, we should expect to see the standard error of the estimate grow large at high correlation. Let’s see if that’s true:&lt;/p&gt;
+&lt;p&gt;The above plot shows that we can indeed trick the model. When the correlation is high enough, the spread of the coefficient estimates get very wide. Even though on average the estimate is still correct, the model is very uncertain about the value for any particular experiment and will occasionally think that &lt;code&gt;x_2&lt;/code&gt; has a large estimated coefficient. And we usually only get to run 1 experiment in real life.&lt;/p&gt;
+&lt;p&gt;Based on these data, we should expect to see the standard error of the estimate to grow large at high correlation. Let’s see if that’s true:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;cln_sim_tbl %&amp;gt;%
   #  mutate(error_sd = as_factor(error_sd)) %&amp;gt;%
   ggplot(aes(x = std.error, y = error_sd)) +
@@ -3091,14 +3088,36 @@ cln_sim_tbl %&amp;gt;%
   theme(legend.title = element_blank()) +
   labs(
     y = &amp;quot;SD of Random Noise in Relationship Between x_1 and x_2&amp;quot;,
-    x = &amp;quot;Standard Error of Coefficient Estimate&amp;quot;,
+    x = &amp;quot;P-Value for Coefficient Estimate&amp;quot;,
     title = &amp;quot;Variable Correlation Strength vs. P-Values for Coefficient Estimates&amp;quot;,
     subtitle = &amp;quot;dotted line shows p = .05&amp;quot;,
     caption = &amp;quot;Lower Noise is Higher Correlation&amp;quot;
   )&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;&lt;img src=&#34;/post/2021-08-04-linear-regression-is-smarter-than-i-thought-estimating-effect-sizes-for-variables-in-r_files/figure-html/unnamed-chunk-18-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;Yep - as noise goes to 0 and the correlation approaches 1, the p-values get very unstable and the true effect of &lt;code&gt;x_1&lt;/code&gt; can no longer be detected consistent relative to the null. But the good news is that as long as the correlation isn’t close to perfect, the model does its job quite well and the p-values for a true effect dive near 0.&lt;/p&gt;
-&lt;p&gt;In the end, we found out that we can trick the linear regression model, just not in the way we expected. The average coefficient estimate remains stable even in the presence of highly correlated predictors, but it’s the &lt;strong&gt;uncertainty&lt;/strong&gt; about this estimate that pays the price.&lt;/p&gt;
+&lt;p&gt;Just to drive the point home, we could look at the actual correlation coefficients between &lt;code&gt;x_1&lt;/code&gt; and &lt;code&gt;x_2&lt;/code&gt; at the point that things start to go unstable. From the above plot, it looks like the model starts to get confused at the time the the noise is around 0.6. We can use our helper function from before to quickly make a single dataset at that noise level and then evaluate the correlation of &lt;code&gt;x_1&lt;/code&gt; and &lt;code&gt;x_2&lt;/code&gt; in that set:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;unstable_tbl &amp;lt;- sim_fcn(noise = 0.6)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Here’s the correlation plot. We see that in this case, a correlation of around 0.8 is where things start to go unstable with the estimates.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;unstable_tbl %&amp;gt;% 
+  select(x_1:x_10) %&amp;gt;%
+  ggcorr(
+  high = &amp;quot;red&amp;quot;,
+  low = &amp;quot;blue&amp;quot;,
+  label = TRUE,
+  hjust = .75,
+  size = 3,
+  label_size = 3,
+  nbreaks = 4
+) +
+  labs(
+    title = &amp;quot;Correlation Matrix&amp;quot;,
+    subtitle = &amp;quot;Pearson Method Using Pairwise Obervations&amp;quot;
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-08-04-linear-regression-is-smarter-than-i-thought-estimating-effect-sizes-for-variables-in-r_files/figure-html/unnamed-chunk-20-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Here’s the variables plotted against the observation for the above scenario, with &lt;code&gt;x_1&lt;/code&gt; and &lt;code&gt;x_2&lt;/code&gt; correlated with each other at a 0.8 level.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;unstable_tbl %&amp;gt;% plt_fcn()&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-08-04-linear-regression-is-smarter-than-i-thought-estimating-effect-sizes-for-variables-in-r_files/figure-html/unnamed-chunk-21-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;In the end, we found out that we can trick the linear regression model, just not in the way we expected. We were never really able to get the model to think that &lt;code&gt;x_2&lt;/code&gt; was important but we were able to make it uncertain about &lt;code&gt;x_1&lt;/code&gt;. The average coefficient estimate remains stable even in the presence of highly correlated predictors, but it’s the &lt;strong&gt;uncertainty&lt;/strong&gt; about the estimates that pays the price for correlated variables. So should we just leave them all in? Like most things in statistics - it depends on the purpose of the model!&lt;/p&gt;
 &lt;p&gt;Thank you for following along with this post if you’ve made it this far. If you are interested in the math behind what we showed in the above simulations, please refer to this response on Cross Validated: &lt;a href=&#34;https://stats.stackexchange.com/a/366579/31189&#34; class=&#34;uri&#34;&gt;https://stats.stackexchange.com/a/366579/31189&lt;/a&gt;&lt;/p&gt;
 &lt;/div&gt;
 &lt;/div&gt;
