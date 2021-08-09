@@ -55,7 +55,7 @@ betas_tbl <- tibble(
   var_suffix = seq(from = 1, to = 10, by = 1)
 ) %>%
   mutate(var = str_glue("{var_prefix}_{var_suffix}") %>% as_factor()) %>%
-  dplyr::select(var) %>%
+  select(var) %>%
   mutate(case_1 = c(1, rep(0, 9))) %>%
   pivot_wider(names_from = "var", values_from = "case_1")
 
@@ -64,7 +64,7 @@ x_tbl <- tibble(
   var_suffix = seq(from = 1, to = 10, by = 1)
 ) %>%
   mutate(var = str_glue("{var_prefix}_{var_suffix}") %>% as_factor()) %>%
-  dplyr::select(var) %>%
+  select(var) %>%
   mutate(case_1 = rep(0, 10)) %>%
   pivot_wider(names_from = "var", values_from = "case_1")
 
@@ -96,7 +96,7 @@ number_of_obserations <- 100 # number of observations we want in the dataset
 
 full_wide_tbl <- betas_tbl %>%
   bind_cols(x_tbl) %>%
-  dplyr::slice(rep(1:n(), each = number_of_obserations)) %>% # copy the setup once for each desired observation in the dataset
+  slice(rep(1:n(), each = number_of_obserations)) %>% # copy the setup once for each desired observation in the dataset
   rowwise() %>%
   mutate(across(x_1:x_10, ~ rnorm(1, mean = 0, sd = 1))) %>% # assign x values
   mutate(x_2 = x_1 + rnorm(n = 1, mean = 0, sd = 1)) %>% # modify X_2 to match X_1 plus some noise
@@ -165,7 +165,7 @@ First, let's convert our pipeline into a function that takes a noise factor as a
 sim_fcn <- function(noise) {
   betas_tbl %>%
     bind_cols(x_tbl) %>%
-    dplyr::slice(rep(1:n(), each = number_of_obserations)) %>%
+    slice(rep(1:n(), each = number_of_obserations)) %>%
     rowwise() %>%
     mutate(across(x_1:x_10, ~ rnorm(1, mean = 0, sd = 1))) %>%
     mutate(x_2 = x_1 + rnorm(n = 1, mean = 0, sd = noise)) %>% # control the strength of the correlation between x_1 and x_2
@@ -267,7 +267,7 @@ error_se_tbl <- tibble(
 setup_tbl <- prelim_tbl %>%
   crossing(error_se_tbl) %>%
   mutate(row_id = row_number()) %>%
-  dplyr::select(row_id, error_sd, everything())
+  select(row_id, error_sd, everything())
 
 setup_tbl %>%
   gt_preview()
@@ -319,7 +319,7 @@ n_sims <- 100
 #     rowwise() %>%
 #     mutate(observations_tbl = map(row_id, ~ gen_observations_fcn(.x, reps = 100))) %>%
 #     ungroup() %>%
-#     dplyr::select(observations_tbl) %>%
+#     select(observations_tbl) %>%
 #     unnest() %>%
 #     mutate(observation = rowSums(select(., matches("bx|resid")))) %>%
 #     group_by(error_sd) %>%
@@ -454,7 +454,7 @@ unstable_tbl %>% plt_fcn()
 
 In the end, we found out that we can trick the linear regression model, just not in the way we expected.  We were never really able to get the model to think that `x_2` was important but we were able to make it uncertain about `x_1`.  The average coefficient estimate remains stable even in the presence of highly correlated predictors, but it's the **uncertainty** about the estimates that pays the price for correlated variables. So should we just leave them all in?  Like most things in statistics - it depends on the purpose of the model!
 
-Thank you for following along with this post if you've made it this far.  If you are interested in the math behind what we showed in the above simulations, please refer to this response on Cross Validated: https://stats.stackexchange.com/a/366579/31189 
+Thank you for following along with this post if you've made it this far.  If you prefer learning concepts from mathematical principles rather than simulation, please refer to [this response on Cross Validated](https://stats.stackexchange.com/a/366579/31189) for some explanation of the the bahavior we just saw.   You could check out  [variance inflation factor](https://www.google.com/search?q=variance+inflation+factor&rlz=1C1GCEA_enUS819US819&oq=variance+inflation+factor&aqs=chrome..69i57j0i512l9.3656j0j15&sourceid=chrome&ie=UTF-8) which is the same idea presented a different way.
 
 # Session Info
 
