@@ -243,7 +243,7 @@ set.seed(3)
 low_noise_tbl <- sim_fcn(noise = .1)
 
 low_noise_tbl %>% plt_fcn()
-low_noise_tbl %>% inf_fcn()
+#low_noise_tbl %>% inf_fcn()
 ```
 
 Even in the low noise (large correlation) condition, the model isn't tempted to see `x_2` as important.  So is there any cost to pay for leaving all correlated variables in the model?  The astute observer might point out that the std. error of the estimate for $β_1$ seems to trend upwards when the noise is low.  Does this mean we are more uncertain about the estimate of the true predictor $x_1$ when it is correlated with another predictor like $x_2$?  Or was that just due to chance and the nature of the random draws in the simulation?  After all, we only built 1 model for each scenario.

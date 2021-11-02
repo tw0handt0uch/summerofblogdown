@@ -13,8 +13,6 @@ slug: linear-regression-is-smarter-than-i-thought-estimating-effect-sizes-for-va
 ---
 
 <script src="/rmarkdown-libs/header-attrs/header-attrs.js"></script>
-<link href="/rmarkdown-libs/anchor-sections/anchor-sections.css" rel="stylesheet" />
-<script src="/rmarkdown-libs/anchor-sections/anchor-sections.js"></script>
 
 
 <p>In this post we will try to trick linear regression into thinking that a redundant variable is statistically significant. By redundant, I mean a candidate predictor variable that in reality is just noise (no effect on the outcome) but that we might include in an experiment because we don’t know if it is important or not. The trick is that we can set up the data generating process such that a redundant variable is highly correlated with the response. In such cases, the naive intuition is that the model would get “confused” about the importance of this variable and perhaps identify it as significant, just as a casual observer might when viewing plots of variable vs. outcome, given that rise and fall together.</p>
@@ -51,12 +49,12 @@ x_tbl &lt;- tibble(
 
 betas_tbl %&gt;%
   gt()</code></pre>
-<div id="jyxqcuthqw" style="overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<div id="lwhgcyvhal" style="overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 <style>html {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
 }
 
-#jyxqcuthqw .gt_table {
+#lwhgcyvhal .gt_table {
   display: table;
   border-collapse: collapse;
   margin-left: auto;
@@ -81,7 +79,7 @@ betas_tbl %&gt;%
   border-left-color: #D3D3D3;
 }
 
-#jyxqcuthqw .gt_heading {
+#lwhgcyvhal .gt_heading {
   background-color: #FFFFFF;
   text-align: center;
   border-bottom-color: #FFFFFF;
@@ -93,7 +91,7 @@ betas_tbl %&gt;%
   border-right-color: #D3D3D3;
 }
 
-#jyxqcuthqw .gt_title {
+#lwhgcyvhal .gt_title {
   color: #333333;
   font-size: 125%;
   font-weight: initial;
@@ -103,7 +101,7 @@ betas_tbl %&gt;%
   border-bottom-width: 0;
 }
 
-#jyxqcuthqw .gt_subtitle {
+#lwhgcyvhal .gt_subtitle {
   color: #333333;
   font-size: 85%;
   font-weight: initial;
@@ -113,13 +111,13 @@ betas_tbl %&gt;%
   border-top-width: 0;
 }
 
-#jyxqcuthqw .gt_bottom_border {
+#lwhgcyvhal .gt_bottom_border {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
 }
 
-#jyxqcuthqw .gt_col_headings {
+#lwhgcyvhal .gt_col_headings {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -134,7 +132,7 @@ betas_tbl %&gt;%
   border-right-color: #D3D3D3;
 }
 
-#jyxqcuthqw .gt_col_heading {
+#lwhgcyvhal .gt_col_heading {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -154,7 +152,7 @@ betas_tbl %&gt;%
   overflow-x: hidden;
 }
 
-#jyxqcuthqw .gt_column_spanner_outer {
+#lwhgcyvhal .gt_column_spanner_outer {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -166,15 +164,15 @@ betas_tbl %&gt;%
   padding-right: 4px;
 }
 
-#jyxqcuthqw .gt_column_spanner_outer:first-child {
+#lwhgcyvhal .gt_column_spanner_outer:first-child {
   padding-left: 0;
 }
 
-#jyxqcuthqw .gt_column_spanner_outer:last-child {
+#lwhgcyvhal .gt_column_spanner_outer:last-child {
   padding-right: 0;
 }
 
-#jyxqcuthqw .gt_column_spanner {
+#lwhgcyvhal .gt_column_spanner {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
@@ -186,7 +184,7 @@ betas_tbl %&gt;%
   width: 100%;
 }
 
-#jyxqcuthqw .gt_group_heading {
+#lwhgcyvhal .gt_group_heading {
   padding: 8px;
   color: #333333;
   background-color: #FFFFFF;
@@ -208,7 +206,7 @@ betas_tbl %&gt;%
   vertical-align: middle;
 }
 
-#jyxqcuthqw .gt_empty_group_heading {
+#lwhgcyvhal .gt_empty_group_heading {
   padding: 0.5px;
   color: #333333;
   background-color: #FFFFFF;
@@ -223,15 +221,15 @@ betas_tbl %&gt;%
   vertical-align: middle;
 }
 
-#jyxqcuthqw .gt_from_md > :first-child {
+#lwhgcyvhal .gt_from_md > :first-child {
   margin-top: 0;
 }
 
-#jyxqcuthqw .gt_from_md > :last-child {
+#lwhgcyvhal .gt_from_md > :last-child {
   margin-bottom: 0;
 }
 
-#jyxqcuthqw .gt_row {
+#lwhgcyvhal .gt_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -250,7 +248,7 @@ betas_tbl %&gt;%
   overflow-x: hidden;
 }
 
-#jyxqcuthqw .gt_stub {
+#lwhgcyvhal .gt_stub {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -262,7 +260,7 @@ betas_tbl %&gt;%
   padding-left: 12px;
 }
 
-#jyxqcuthqw .gt_summary_row {
+#lwhgcyvhal .gt_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -272,7 +270,7 @@ betas_tbl %&gt;%
   padding-right: 5px;
 }
 
-#jyxqcuthqw .gt_first_summary_row {
+#lwhgcyvhal .gt_first_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -282,7 +280,7 @@ betas_tbl %&gt;%
   border-top-color: #D3D3D3;
 }
 
-#jyxqcuthqw .gt_grand_summary_row {
+#lwhgcyvhal .gt_grand_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -292,7 +290,7 @@ betas_tbl %&gt;%
   padding-right: 5px;
 }
 
-#jyxqcuthqw .gt_first_grand_summary_row {
+#lwhgcyvhal .gt_first_grand_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -302,11 +300,11 @@ betas_tbl %&gt;%
   border-top-color: #D3D3D3;
 }
 
-#jyxqcuthqw .gt_striped {
+#lwhgcyvhal .gt_striped {
   background-color: rgba(128, 128, 128, 0.05);
 }
 
-#jyxqcuthqw .gt_table_body {
+#lwhgcyvhal .gt_table_body {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -315,7 +313,7 @@ betas_tbl %&gt;%
   border-bottom-color: #D3D3D3;
 }
 
-#jyxqcuthqw .gt_footnotes {
+#lwhgcyvhal .gt_footnotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -329,13 +327,13 @@ betas_tbl %&gt;%
   border-right-color: #D3D3D3;
 }
 
-#jyxqcuthqw .gt_footnote {
+#lwhgcyvhal .gt_footnote {
   margin: 0px;
   font-size: 90%;
   padding: 4px;
 }
 
-#jyxqcuthqw .gt_sourcenotes {
+#lwhgcyvhal .gt_sourcenotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -349,41 +347,41 @@ betas_tbl %&gt;%
   border-right-color: #D3D3D3;
 }
 
-#jyxqcuthqw .gt_sourcenote {
+#lwhgcyvhal .gt_sourcenote {
   font-size: 90%;
   padding: 4px;
 }
 
-#jyxqcuthqw .gt_left {
+#lwhgcyvhal .gt_left {
   text-align: left;
 }
 
-#jyxqcuthqw .gt_center {
+#lwhgcyvhal .gt_center {
   text-align: center;
 }
 
-#jyxqcuthqw .gt_right {
+#lwhgcyvhal .gt_right {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-#jyxqcuthqw .gt_font_normal {
+#lwhgcyvhal .gt_font_normal {
   font-weight: normal;
 }
 
-#jyxqcuthqw .gt_font_bold {
+#lwhgcyvhal .gt_font_bold {
   font-weight: bold;
 }
 
-#jyxqcuthqw .gt_font_italic {
+#lwhgcyvhal .gt_font_italic {
   font-style: italic;
 }
 
-#jyxqcuthqw .gt_super {
+#lwhgcyvhal .gt_super {
   font-size: 65%;
 }
 
-#jyxqcuthqw .gt_footnote_marks {
+#lwhgcyvhal .gt_footnote_marks {
   font-style: italic;
   font-size: 65%;
 }
@@ -422,12 +420,12 @@ betas_tbl %&gt;%
 </div>
 <pre class="r"><code>x_tbl %&gt;%
   gt()</code></pre>
-<div id="dichzlvkqk" style="overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<div id="hodhpgkqvr" style="overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 <style>html {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
 }
 
-#dichzlvkqk .gt_table {
+#hodhpgkqvr .gt_table {
   display: table;
   border-collapse: collapse;
   margin-left: auto;
@@ -452,7 +450,7 @@ betas_tbl %&gt;%
   border-left-color: #D3D3D3;
 }
 
-#dichzlvkqk .gt_heading {
+#hodhpgkqvr .gt_heading {
   background-color: #FFFFFF;
   text-align: center;
   border-bottom-color: #FFFFFF;
@@ -464,7 +462,7 @@ betas_tbl %&gt;%
   border-right-color: #D3D3D3;
 }
 
-#dichzlvkqk .gt_title {
+#hodhpgkqvr .gt_title {
   color: #333333;
   font-size: 125%;
   font-weight: initial;
@@ -474,7 +472,7 @@ betas_tbl %&gt;%
   border-bottom-width: 0;
 }
 
-#dichzlvkqk .gt_subtitle {
+#hodhpgkqvr .gt_subtitle {
   color: #333333;
   font-size: 85%;
   font-weight: initial;
@@ -484,13 +482,13 @@ betas_tbl %&gt;%
   border-top-width: 0;
 }
 
-#dichzlvkqk .gt_bottom_border {
+#hodhpgkqvr .gt_bottom_border {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
 }
 
-#dichzlvkqk .gt_col_headings {
+#hodhpgkqvr .gt_col_headings {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -505,7 +503,7 @@ betas_tbl %&gt;%
   border-right-color: #D3D3D3;
 }
 
-#dichzlvkqk .gt_col_heading {
+#hodhpgkqvr .gt_col_heading {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -525,7 +523,7 @@ betas_tbl %&gt;%
   overflow-x: hidden;
 }
 
-#dichzlvkqk .gt_column_spanner_outer {
+#hodhpgkqvr .gt_column_spanner_outer {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -537,15 +535,15 @@ betas_tbl %&gt;%
   padding-right: 4px;
 }
 
-#dichzlvkqk .gt_column_spanner_outer:first-child {
+#hodhpgkqvr .gt_column_spanner_outer:first-child {
   padding-left: 0;
 }
 
-#dichzlvkqk .gt_column_spanner_outer:last-child {
+#hodhpgkqvr .gt_column_spanner_outer:last-child {
   padding-right: 0;
 }
 
-#dichzlvkqk .gt_column_spanner {
+#hodhpgkqvr .gt_column_spanner {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
@@ -557,7 +555,7 @@ betas_tbl %&gt;%
   width: 100%;
 }
 
-#dichzlvkqk .gt_group_heading {
+#hodhpgkqvr .gt_group_heading {
   padding: 8px;
   color: #333333;
   background-color: #FFFFFF;
@@ -579,7 +577,7 @@ betas_tbl %&gt;%
   vertical-align: middle;
 }
 
-#dichzlvkqk .gt_empty_group_heading {
+#hodhpgkqvr .gt_empty_group_heading {
   padding: 0.5px;
   color: #333333;
   background-color: #FFFFFF;
@@ -594,15 +592,15 @@ betas_tbl %&gt;%
   vertical-align: middle;
 }
 
-#dichzlvkqk .gt_from_md > :first-child {
+#hodhpgkqvr .gt_from_md > :first-child {
   margin-top: 0;
 }
 
-#dichzlvkqk .gt_from_md > :last-child {
+#hodhpgkqvr .gt_from_md > :last-child {
   margin-bottom: 0;
 }
 
-#dichzlvkqk .gt_row {
+#hodhpgkqvr .gt_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -621,7 +619,7 @@ betas_tbl %&gt;%
   overflow-x: hidden;
 }
 
-#dichzlvkqk .gt_stub {
+#hodhpgkqvr .gt_stub {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -633,7 +631,7 @@ betas_tbl %&gt;%
   padding-left: 12px;
 }
 
-#dichzlvkqk .gt_summary_row {
+#hodhpgkqvr .gt_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -643,7 +641,7 @@ betas_tbl %&gt;%
   padding-right: 5px;
 }
 
-#dichzlvkqk .gt_first_summary_row {
+#hodhpgkqvr .gt_first_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -653,7 +651,7 @@ betas_tbl %&gt;%
   border-top-color: #D3D3D3;
 }
 
-#dichzlvkqk .gt_grand_summary_row {
+#hodhpgkqvr .gt_grand_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -663,7 +661,7 @@ betas_tbl %&gt;%
   padding-right: 5px;
 }
 
-#dichzlvkqk .gt_first_grand_summary_row {
+#hodhpgkqvr .gt_first_grand_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -673,11 +671,11 @@ betas_tbl %&gt;%
   border-top-color: #D3D3D3;
 }
 
-#dichzlvkqk .gt_striped {
+#hodhpgkqvr .gt_striped {
   background-color: rgba(128, 128, 128, 0.05);
 }
 
-#dichzlvkqk .gt_table_body {
+#hodhpgkqvr .gt_table_body {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -686,7 +684,7 @@ betas_tbl %&gt;%
   border-bottom-color: #D3D3D3;
 }
 
-#dichzlvkqk .gt_footnotes {
+#hodhpgkqvr .gt_footnotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -700,13 +698,13 @@ betas_tbl %&gt;%
   border-right-color: #D3D3D3;
 }
 
-#dichzlvkqk .gt_footnote {
+#hodhpgkqvr .gt_footnote {
   margin: 0px;
   font-size: 90%;
   padding: 4px;
 }
 
-#dichzlvkqk .gt_sourcenotes {
+#hodhpgkqvr .gt_sourcenotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -720,41 +718,41 @@ betas_tbl %&gt;%
   border-right-color: #D3D3D3;
 }
 
-#dichzlvkqk .gt_sourcenote {
+#hodhpgkqvr .gt_sourcenote {
   font-size: 90%;
   padding: 4px;
 }
 
-#dichzlvkqk .gt_left {
+#hodhpgkqvr .gt_left {
   text-align: left;
 }
 
-#dichzlvkqk .gt_center {
+#hodhpgkqvr .gt_center {
   text-align: center;
 }
 
-#dichzlvkqk .gt_right {
+#hodhpgkqvr .gt_right {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-#dichzlvkqk .gt_font_normal {
+#hodhpgkqvr .gt_font_normal {
   font-weight: normal;
 }
 
-#dichzlvkqk .gt_font_bold {
+#hodhpgkqvr .gt_font_bold {
   font-weight: bold;
 }
 
-#dichzlvkqk .gt_font_italic {
+#hodhpgkqvr .gt_font_italic {
   font-style: italic;
 }
 
-#dichzlvkqk .gt_super {
+#hodhpgkqvr .gt_super {
   font-size: 65%;
 }
 
-#dichzlvkqk .gt_footnote_marks {
+#hodhpgkqvr .gt_footnote_marks {
   font-style: italic;
   font-size: 65%;
 }
@@ -1993,21 +1991,7 @@ low_noise_tbl &lt;- sim_fcn(noise = .1)
 
 low_noise_tbl %&gt;% plt_fcn()</code></pre>
 <p><img src="/post/2021-08-04-linear-regression-is-smarter-than-i-thought-estimating-effect-sizes-for-variables-in-r_files/figure-html/unnamed-chunk-10-1.png" width="100%" height="500px" /></p>
-<pre class="r"><code>low_noise_tbl %&gt;% inf_fcn()</code></pre>
-<pre><code>## # A tibble: 11 x 6
-##    term        estimate std.error statistic p.value `significant?`
-##    &lt;chr&gt;          &lt;dbl&gt;     &lt;dbl&gt;     &lt;dbl&gt;   &lt;dbl&gt; &lt;chr&gt;         
-##  1 (Intercept)    -0.27      0.09     -2.88    0    heck_yes      
-##  2 x_1             1.14      0.79      1.43    0.16 nope          
-##  3 x_2            -0.02      0.77     -0.02    0.98 nope          
-##  4 x_3             0.08      0.09      0.8     0.42 nope          
-##  5 x_4            -0.11      0.09     -1.28    0.2  nope          
-##  6 x_5             0.06      0.08      0.75    0.46 nope          
-##  7 x_6             0.02      0.11      0.21    0.83 nope          
-##  8 x_7            -0.12      0.1      -1.16    0.25 nope          
-##  9 x_8            -0.13      0.09     -1.41    0.16 nope          
-## 10 x_9             0.1       0.1       1.04    0.3  nope          
-## 11 x_10            0.05      0.09      0.62    0.54 nope</code></pre>
+<pre class="r"><code>#low_noise_tbl %&gt;% inf_fcn()</code></pre>
 <p>Even in the low noise (large correlation) condition, the model isn’t tempted to see <code>x_2</code> as important. So is there any cost to pay for leaving all correlated variables in the model? The astute observer might point out that the std. error of the estimate for <span class="math inline">\(β_1\)</span> seems to trend upwards when the noise is low. Does this mean we are more uncertain about the estimate of the true predictor <span class="math inline">\(x_1\)</span> when it is correlated with another predictor like <span class="math inline">\(x_2\)</span>? Or was that just due to chance and the nature of the random draws in the simulation? After all, we only built 1 model for each scenario.</p>
 <p>To explore this further we need a bigger experiment - or set of experiments - that looks at a range of correlation strengths between <code>x_1</code> and <code>x_2</code> and repeats each setting many times. This will also provide a nice opportunity to practice with nested lists, a workflow that is challenging (for me) but also elegant and powerful. Here’s how we could go about it:</p>
 <ul>
@@ -3137,26 +3121,27 @@ cln_sim_tbl %&gt;%
 ## other attached packages:
 ##  [1] GGally_2.0.0    gt_0.2.2        broom_0.7.8     here_1.0.0     
 ##  [5] forcats_0.5.0   stringr_1.4.0   dplyr_1.0.7     purrr_0.3.4    
-##  [9] readr_1.4.0     tidyr_1.1.3     tibble_3.1.2    ggplot2_3.3.5  
+##  [9] readr_1.4.0     tidyr_1.1.3     tibble_3.1.4    ggplot2_3.3.5  
 ## [13] tidyverse_1.3.0
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] Rcpp_1.0.5         lattice_0.20-41    lubridate_1.7.9.2  assertthat_0.2.1  
-##  [5] rprojroot_2.0.2    digest_0.6.27      utf8_1.2.1         R6_2.5.0          
-##  [9] cellranger_1.1.0   plyr_1.8.6         backports_1.2.0    reprex_0.3.0      
-## [13] evaluate_0.14      httr_1.4.2         blogdown_0.15      pillar_1.6.1      
-## [17] rlang_0.4.11       readxl_1.3.1       rstudioapi_0.13    Matrix_1.2-18     
-## [21] checkmate_2.0.0    rmarkdown_2.5      labeling_0.4.2     splines_4.0.3     
-## [25] munsell_0.5.0      compiler_4.0.3     modelr_0.1.8       xfun_0.19         
-## [29] pkgconfig_2.0.3    mgcv_1.8-33        htmltools_0.5.0    tidyselect_1.1.1  
-## [33] bookdown_0.21      reshape_0.8.8      fansi_0.5.0        crayon_1.4.1      
-## [37] dbplyr_2.0.0       withr_2.3.0        grid_4.0.3         nlme_3.1-150      
-## [41] jsonlite_1.7.1     gtable_0.3.0       lifecycle_1.0.0    DBI_1.1.0         
-## [45] magrittr_2.0.1     scales_1.1.1       cli_3.0.1          stringi_1.5.3     
-## [49] farver_2.0.3       fs_1.5.0           xml2_1.3.2         ellipsis_0.3.2    
-## [53] generics_0.1.0     vctrs_0.3.8        RColorBrewer_1.1-2 tools_4.0.3       
-## [57] glue_1.4.2         hms_0.5.3          yaml_2.2.1         colorspace_2.0-0  
-## [61] rvest_0.3.6        knitr_1.30         haven_2.3.1        sass_0.3.1</code></pre>
+##  [1] Rcpp_1.0.7         lattice_0.20-41    lubridate_1.7.9.2  assertthat_0.2.1  
+##  [5] rprojroot_2.0.2    digest_0.6.28      utf8_1.2.2         plyr_1.8.6        
+##  [9] R6_2.5.1           cellranger_1.1.0   backports_1.2.0    reprex_0.3.0      
+## [13] evaluate_0.14      highr_0.9          httr_1.4.2         blogdown_0.15     
+## [17] pillar_1.6.2       rlang_0.4.11       readxl_1.3.1       rstudioapi_0.13   
+## [21] jquerylib_0.1.4    Matrix_1.2-18      checkmate_2.0.0    rmarkdown_2.11    
+## [25] labeling_0.4.2     splines_4.0.3      munsell_0.5.0      compiler_4.0.3    
+## [29] modelr_0.1.8       xfun_0.26          pkgconfig_2.0.3    mgcv_1.8-33       
+## [33] htmltools_0.5.2    tidyselect_1.1.1   bookdown_0.21      reshape_0.8.8     
+## [37] fansi_0.5.0        crayon_1.4.1       dbplyr_2.0.0       withr_2.4.2       
+## [41] grid_4.0.3         nlme_3.1-150       jsonlite_1.7.2     gtable_0.3.0      
+## [45] lifecycle_1.0.1    DBI_1.1.0          magrittr_2.0.1     scales_1.1.1      
+## [49] cli_3.0.1          stringi_1.7.4      farver_2.1.0       fs_1.5.0          
+## [53] xml2_1.3.2         bslib_0.3.0        ellipsis_0.3.2     generics_0.1.0    
+## [57] vctrs_0.3.8        RColorBrewer_1.1-2 tools_4.0.3        glue_1.4.2        
+## [61] hms_0.5.3          fastmap_1.1.0      yaml_2.2.1         colorspace_2.0-2  
+## [65] rvest_0.3.6        knitr_1.34         haven_2.3.1        sass_0.4.0</code></pre>
 </div>
 <div class="footnotes">
 <hr />
