@@ -6,10 +6,2015 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>&amp;copy; 2019. All rights reserved.</copyright>
-    <lastBuildDate>Wed, 04 Aug 2021 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Sat, 27 Nov 2021 00:00:00 +0000</lastBuildDate>
     
         <atom:link href="/post/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>Durability Testing of Stents Using Sensitivity-Based Methods in R</title>
+      <link>/post/evaluating-the-gonogo-package-for-sensitivity-testing-in-r/</link>
+      <pubDate>Sat, 27 Nov 2021 00:00:00 +0000</pubDate>
+      
+      <guid>/post/evaluating-the-gonogo-package-for-sensitivity-testing-in-r/</guid>
+      <description>
+&lt;script src=&#34;/rmarkdown-libs/header-attrs/header-attrs.js&#34;&gt;&lt;/script&gt;
+
+
+&lt;p&gt;The current industry protocol for durability testing of vascular stents and frames involves testing many implants simultaneously at a range of different stimulus magnitudes (typically strain or stress). The test levels are spread out like a grid across the stimulus range of interest. Each implant is tested to failure or run-out at its specified level and a model is fit to the data using methods similar to those described in Meeker and Escobar.&lt;a href=&#34;#fn1&#34; class=&#34;footnote-ref&#34; id=&#34;fnref1&#34;&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt; An example of a completed durability test of this type is shown below.&lt;a href=&#34;#fn2&#34; class=&#34;footnote-ref&#34; id=&#34;fnref2&#34;&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt; Of interest to the designer is the distribution of stimulus levels that would be expected to cause a failure at a specified cycle count like 400 million.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-11-27-evaluating-the-gonogo-package-for-sensitivity-testing-in-r_files/sn_1.png&#34; style=&#34;width:100.0%&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;This methodology works well if you have a large budget and is accepted by FDA. However, blanketing the parameter space with enough samples to fit a robust model can be very costly and requires enough lab equipment to do many tests in parallel. I recently learned that there is another way that has the potential to significantly reduce test burden and allows for some unique advantages. I will attempt to describe it below.&lt;/p&gt;
+&lt;p&gt;Sensitivity testing represents a different paradigm in which samples are tested sequentially rather than in parallel. In such testing, the outcome of the first test informs the stimulus level of the second test and so on. When an implant fails at a given stimulus, the next part is tested at a lower level. When it passes, the stimulus on the next is increased. In this way, the latent distribution of part strength is converged upon with each additional test providing improved precision.&lt;/p&gt;
+&lt;p&gt;The key questions that must be answered to execute a sequential sensitivity test:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;“How to specify the test levels for subsequent runs in a principled and efficient way?”&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;“How to estimate the underlying failure strength distribution when the threshold for failure is not directly assessed on each run?”&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Neyer was the first to present a D-Optimal answer to the first question.&lt;a href=&#34;#fn3&#34; class=&#34;footnote-ref&#34; id=&#34;fnref3&#34;&gt;&lt;sup&gt;3&lt;/sup&gt;&lt;/a&gt; Implementation of the algorithm for determining sequential levels that minimize the test burden and converge on the true underlying strength distribution quickly is not trivial and historically has remained unavailable outside of pricey commercial software.&lt;a href=&#34;#fn4&#34; class=&#34;footnote-ref&#34; id=&#34;fnref4&#34;&gt;&lt;sup&gt;4&lt;/sup&gt;&lt;/a&gt; Fortunately, generous and diligent researchers have recently created an open source tool in R called “gonogo” which can execute sequential testing according to the D-optimal Neyer algorithm (or its improved direct descendants).&lt;a href=&#34;#fn5&#34; class=&#34;footnote-ref&#34; id=&#34;fnref5&#34;&gt;&lt;sup&gt;5&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;In the remainder of this post I will show how to use gonogo to determine the underlying strength distribution of hypothetical vascular implant and visualize uncertainty about the estimate.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;#load-libraries&#34;&gt;Load Libraries&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#accessing-gonogo-functions&#34;&gt;Accessing gonogo Functions&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#simulating-a-sequential-sensitivity-experiment&#34;&gt;Simulating A Sequential Sensitivity Experiment&lt;/a&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;#simulate-the-strength-of-each-part&#34;&gt;Simulate the Strength of Each Part&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#see-test-levels-and-input-test-results&#34;&gt;See Test Levels and Input Test Results&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#confidence,-reliability,-and-visualization&#34;&gt;Confidence, Reliability, and Visualization&lt;/a&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;#extract-a-tibble-of-2-sided,-pointwise-confidence-limits-about-all-quantiles&#34;&gt;Extract a tibble of 2-sided, pointwise confidence limits about all quantiles&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#extract-a-point-estimate-for-the-lower-2-sided-confidence-limit-for-the-.10-quantile.&#34;&gt;Extract a point estimate for the lower 2-sided confidence limit for the .10 quantile.&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#plot-cdf&#34;&gt;Plot CDF&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#normal-probability-plot&#34;&gt;Normal Probability Plot&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#conclusion-and-thanks&#34;&gt;Conclusion and Thanks&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#session-info&#34;&gt;Session Info&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div id=&#34;load-libraries&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Load Libraries&lt;/h1&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(tidyverse)
+library(gt)
+library(plotly)
+library(ggrepel)
+library(here)
+library(gonogo)
+library(ggalt)&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;accessing-gonogo-functions&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Accessing gonogo Functions&lt;/h1&gt;
+&lt;p&gt;The functions in gonogo can be accessed in 2 ways:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;Install and load the gonogo package using the instructions listed &lt;a href=&#34;https://rdrr.io/github/joncutting/gonogo/f/README.md&#34;&gt;HERE&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Download and source the gonogo script from Jeff Wu’s site &lt;a href=&#34;https://www2.isye.gatech.edu/~jeffwu/sensitivitytesting/&#34;&gt;HERE&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;I will be using the code sourced from Jeff’s site as the functions are more readily editable.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;source(here(&amp;quot;gonogoRiley.R&amp;quot;))&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;simulating-a-sequential-sensitivity-experiment&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Simulating A Sequential Sensitivity Experiment&lt;/h1&gt;
+&lt;p&gt;There are some nice built-in simulation features in gonogo using the gonogoSim function. For our walkthrough though we’ll simulate the data manually to have better visibility of what’s happening under the hood.&lt;/p&gt;
+&lt;p&gt;Suppose we have a part budget of n=25 stents from manufacturing and our goal is to estimate the underlying distribution of stress amplitude that causes fatigue fracture. First, let’s simulate the failure strength of the 25 parts using a known distribution (which is only available in the simulation). We’ll assume failure stress amplitude for these parts is normally distributed with a mean of 600 MPa and standard deviation of 13 MPa.&lt;/p&gt;
+&lt;div id=&#34;simulate-the-strength-of-each-part&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Simulate the Strength of Each Part&lt;/h2&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(805)
+stent_strength_tbl &amp;lt;- tibble(part_strength_mpa = rnorm(n = 25, mean = 600, sd = 13))
+
+stent_strength_tbl %&amp;gt;%
+  gt_preview()&lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;rafodmysgk&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;style&gt;html {
+  font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
+}
+
+#rafodmysgk .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#rafodmysgk .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#rafodmysgk .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#rafodmysgk .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#rafodmysgk .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#rafodmysgk .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#rafodmysgk .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#rafodmysgk .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#rafodmysgk .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#rafodmysgk .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#rafodmysgk .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#rafodmysgk .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#rafodmysgk .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#rafodmysgk .gt_from_md &gt; :first-child {
+  margin-top: 0;
+}
+
+#rafodmysgk .gt_from_md &gt; :last-child {
+  margin-bottom: 0;
+}
+
+#rafodmysgk .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#rafodmysgk .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#rafodmysgk .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#rafodmysgk .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#rafodmysgk .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#rafodmysgk .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#rafodmysgk .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#rafodmysgk .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#rafodmysgk .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#rafodmysgk .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#rafodmysgk .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#rafodmysgk .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#rafodmysgk .gt_left {
+  text-align: left;
+}
+
+#rafodmysgk .gt_center {
+  text-align: center;
+}
+
+#rafodmysgk .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#rafodmysgk .gt_font_normal {
+  font-weight: normal;
+}
+
+#rafodmysgk .gt_font_bold {
+  font-weight: bold;
+}
+
+#rafodmysgk .gt_font_italic {
+  font-style: italic;
+}
+
+#rafodmysgk .gt_super {
+  font-size: 65%;
+}
+
+#rafodmysgk .gt_footnote_marks {
+  font-style: italic;
+  font-size: 65%;
+}
+&lt;/style&gt;
+&lt;table class=&#34;gt_table&#34;&gt;
+  
+  &lt;thead class=&#34;gt_col_headings&#34;&gt;
+    &lt;tr&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_left&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;part_strength_mpa&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody class=&#34;gt_table_body&#34;&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;602.0110&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;2&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;585.2761&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;603.3943&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;4&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;569.8526&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;5&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;601.5328&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier; font-size: x-small; background-color: #E4E4E4;&#34;&gt;6..24&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;25&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;600.9657&lt;/td&gt;&lt;/tr&gt;
+  &lt;/tbody&gt;
+  
+  
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;see-test-levels-and-input-test-results&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;See Test Levels and Input Test Results&lt;/h2&gt;
+&lt;p&gt;The gonogo() function will initiate the test plan for sequential testing that prescribes test levels based on the outcome of each run. This operation happens in the console as shown in the screenshot below.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-11-27-evaluating-the-gonogo-package-for-sensitivity-testing-in-r_files/sn_console.png&#34; style=&#34;width:100.0%&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We’ll use the Neyer option by setting the “test” argument equal to 2. One key feature of sequential testing is that high and low initial guesses for the mean must be provided at the onset of testing along with an initial guess for the standard deviation. These guesses help set the scale. We’ll provide vague guesses that would be reasonable given our domain knowledge of cobalt-based alloys and their fatigue properties.&lt;/p&gt;
+&lt;p&gt;If we were really running the test on physical parts we’d want to set up a test at the prescribed stimulus level, then report the result to the console by inputing 2 numbers: the level you actually ran the test at (should be the same as what was recommended) and the outcome (1 for failure or 0 for survival) separated by a single space. After the results from the first test are entered, the recommended level of the next test is presented. When all runs are complete, the results are stored in the assigned object.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# z &amp;lt;- gonogo(mlo = 500, mhi = 700, sg = 10, test = 2, reso = 1) #input results in console&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The resulting object z is a list that has a lot of information. The following code will pull the run history and clean it up nicely with tools and formatting from gt package.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;z$d0 %&amp;gt;%
+  gt() %&amp;gt;%
+  cols_align(&amp;quot;center&amp;quot;) %&amp;gt;%
+  opt_row_striping(row_striping = TRUE) %&amp;gt;%
+  tab_header(
+    title = &amp;quot;Run History of Sensitivity Test of n=25 Stents&amp;quot;,
+    subtitle = &amp;quot;X and EX are Stimulus Levels, Y = Outcome (1 = part failed, 0 = part survived)&amp;quot;
+  ) %&amp;gt;%
+  cols_width(everything() ~ px(100)) %&amp;gt;%
+  tab_style(
+    style = list(
+      cell_text(weight = &amp;quot;bold&amp;quot;)
+    ),
+    locations = cells_column_labels(columns = everything())
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;dfbppuzvmd&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;style&gt;html {
+  font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
+}
+
+#dfbppuzvmd .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#dfbppuzvmd .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#dfbppuzvmd .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#dfbppuzvmd .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#dfbppuzvmd .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#dfbppuzvmd .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#dfbppuzvmd .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#dfbppuzvmd .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#dfbppuzvmd .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#dfbppuzvmd .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#dfbppuzvmd .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#dfbppuzvmd .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#dfbppuzvmd .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#dfbppuzvmd .gt_from_md &gt; :first-child {
+  margin-top: 0;
+}
+
+#dfbppuzvmd .gt_from_md &gt; :last-child {
+  margin-bottom: 0;
+}
+
+#dfbppuzvmd .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#dfbppuzvmd .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#dfbppuzvmd .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#dfbppuzvmd .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#dfbppuzvmd .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#dfbppuzvmd .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#dfbppuzvmd .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#dfbppuzvmd .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#dfbppuzvmd .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#dfbppuzvmd .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#dfbppuzvmd .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#dfbppuzvmd .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#dfbppuzvmd .gt_left {
+  text-align: left;
+}
+
+#dfbppuzvmd .gt_center {
+  text-align: center;
+}
+
+#dfbppuzvmd .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#dfbppuzvmd .gt_font_normal {
+  font-weight: normal;
+}
+
+#dfbppuzvmd .gt_font_bold {
+  font-weight: bold;
+}
+
+#dfbppuzvmd .gt_font_italic {
+  font-style: italic;
+}
+
+#dfbppuzvmd .gt_super {
+  font-size: 65%;
+}
+
+#dfbppuzvmd .gt_footnote_marks {
+  font-style: italic;
+  font-size: 65%;
+}
+&lt;/style&gt;
+&lt;table class=&#34;gt_table&#34; style=&#34;table-layout: fixed;; width: 0px&#34;&gt;
+  &lt;colgroup&gt;
+    &lt;col style=&#34;width:100px;&#34;/&gt;
+    &lt;col style=&#34;width:100px;&#34;/&gt;
+    &lt;col style=&#34;width:100px;&#34;/&gt;
+    &lt;col style=&#34;width:100px;&#34;/&gt;
+    &lt;col style=&#34;width:100px;&#34;/&gt;
+    &lt;col style=&#34;width:100px;&#34;/&gt;
+    &lt;col style=&#34;width:100px;&#34;/&gt;
+  &lt;/colgroup&gt;
+  &lt;thead class=&#34;gt_header&#34;&gt;
+    &lt;tr&gt;
+      &lt;th colspan=&#34;7&#34; class=&#34;gt_heading gt_title gt_font_normal&#34; style&gt;Run History of Sensitivity Test of n=25 Stents&lt;/th&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;th colspan=&#34;7&#34; class=&#34;gt_heading gt_subtitle gt_font_normal gt_bottom_border&#34; style&gt;X and EX are Stimulus Levels, Y = Outcome (1 = part failed, 0 = part survived)&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;thead class=&#34;gt_col_headings&#34;&gt;
+    &lt;tr&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34; style=&#34;font-weight: bold;&#34;&gt;X&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34; style=&#34;font-weight: bold;&#34;&gt;Y&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34; style=&#34;font-weight: bold;&#34;&gt;COUNT&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34; style=&#34;font-weight: bold;&#34;&gt;RX&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34; style=&#34;font-weight: bold;&#34;&gt;EX&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34; style=&#34;font-weight: bold;&#34;&gt;TX&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34; style=&#34;font-weight: bold;&#34;&gt;ID&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody class=&#34;gt_table_body&#34;&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;600&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;600&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;600.0000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;600&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;B0&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;650&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;650&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;650.0000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;650&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;B1&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;625&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;625&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;625.0000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;625&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;B3&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;612&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;612&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;612.5000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;612&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;B3&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;606&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;606&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;606.0000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;606&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;B3&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;590&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;590&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;589.7220&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;590&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;B4&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;593&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;593&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;592.5733&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;593&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;B4&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;611&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;611&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;610.7146&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;611&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;B4&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;617&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;617&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;616.8731&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;617&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;II1&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;599&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;599&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;599.4648&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;599&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;II2&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;590&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;590&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;590.4793&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;590&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;II2&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;616&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;616&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;615.7384&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;616&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;II2&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;593&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;593&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;592.9877&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;593&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;II2&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;584&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;584&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;583.6982&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;584&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;II2&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;585&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;585&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;585.3147&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;585&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;II2&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;615&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;615&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;615.2118&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;615&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;II2&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;587&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;587&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;587.4391&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;587&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;II2&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;613&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;613&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;613.3351&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;613&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;II2&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;612&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;612&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;612.3336&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;612&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;II2&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;589&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;589&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;589.3771&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;589&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;II2&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;611&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;611&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;611.0667&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;611&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;II2&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;590&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;590&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;590.4844&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;590&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;II2&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;610&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;610&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;610.0713&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;610&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;II2&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;591&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;591&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;591.3679&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;591&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center gt_striped&#34;&gt;II2&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;609&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;609&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;609.2816&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;609&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;II2&lt;/td&gt;&lt;/tr&gt;
+  &lt;/tbody&gt;
+  
+  
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;p&gt;Gonogo has some really convenient built-in visualization tools. The run history can be plotted using gonogo’s ptest function with argument plt=1.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;ptest(z, plt = 1)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-11-27-evaluating-the-gonogo-package-for-sensitivity-testing-in-r_files/figure-html/unnamed-chunk-8-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;## NULL&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The values we really care about are the estimates of the mean and sd of the latent failure strength distribution. Numerical MLE’s for these parameters can be quickly extracted as follows:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;z$musig&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## [1] 600.383131   7.894673&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;strong&gt;We see that these are quite close to the true parameters of mean = 600 MPa, sd = 13 MPa!&lt;/strong&gt; That really impressive for only 25 parts and vague initial guesses.&lt;/p&gt;
+&lt;p&gt;I like to occasionally look under the hood and see how the outputs are generated. I don’t always understand it but it helps me learn. In this case, the calculations to extract an estimate are pretty simple. gonogo is using a glm with probit link function. The results are replicated here with manual calculations.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;xglm &amp;lt;- glm(Y ~ X, family = binomial(link = probit), data = z$d0)
+
+ab &amp;lt;- as.vector(xglm$coef)
+muhat &amp;lt;- -ab[1] / ab[2]
+sighat &amp;lt;- 1 / ab[2]
+
+tibble(
+  true_parameter = c(600, 13),
+  gonogo_estimate = c(muhat, sighat)
+) %&amp;gt;%
+  mutate(gonogo_estimate = gonogo_estimate %&amp;gt;% round(1)) %&amp;gt;%
+  gt()&lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;zloacqoqqs&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;style&gt;html {
+  font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
+}
+
+#zloacqoqqs .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#zloacqoqqs .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#zloacqoqqs .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#zloacqoqqs .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#zloacqoqqs .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#zloacqoqqs .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#zloacqoqqs .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#zloacqoqqs .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#zloacqoqqs .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#zloacqoqqs .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#zloacqoqqs .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#zloacqoqqs .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#zloacqoqqs .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#zloacqoqqs .gt_from_md &gt; :first-child {
+  margin-top: 0;
+}
+
+#zloacqoqqs .gt_from_md &gt; :last-child {
+  margin-bottom: 0;
+}
+
+#zloacqoqqs .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#zloacqoqqs .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#zloacqoqqs .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#zloacqoqqs .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#zloacqoqqs .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#zloacqoqqs .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#zloacqoqqs .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#zloacqoqqs .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#zloacqoqqs .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#zloacqoqqs .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#zloacqoqqs .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#zloacqoqqs .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#zloacqoqqs .gt_left {
+  text-align: left;
+}
+
+#zloacqoqqs .gt_center {
+  text-align: center;
+}
+
+#zloacqoqqs .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#zloacqoqqs .gt_font_normal {
+  font-weight: normal;
+}
+
+#zloacqoqqs .gt_font_bold {
+  font-weight: bold;
+}
+
+#zloacqoqqs .gt_font_italic {
+  font-style: italic;
+}
+
+#zloacqoqqs .gt_super {
+  font-size: 65%;
+}
+
+#zloacqoqqs .gt_footnote_marks {
+  font-style: italic;
+  font-size: 65%;
+}
+&lt;/style&gt;
+&lt;table class=&#34;gt_table&#34;&gt;
+  
+  &lt;thead class=&#34;gt_col_headings&#34;&gt;
+    &lt;tr&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;true_parameter&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;gonogo_estimate&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody class=&#34;gt_table_body&#34;&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_right&#34;&gt;600&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;600.4&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_right&#34;&gt;13&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;7.9&lt;/td&gt;&lt;/tr&gt;
+  &lt;/tbody&gt;
+  
+  
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;confidence-reliability-and-visualization&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Confidence, Reliability, and Visualization&lt;/h1&gt;
+&lt;p&gt;We just identified the MLE’s for the latent strength distribution. But anytime we’re working with medical devices we have to be conservative and respect the uncertainty in our methods. We don’t want to use the mean of the distribution to describe a design. Instead, we identify a lower quantile of interest and then put a confidence interval on that to be extra conservative.&lt;a href=&#34;#fn6&#34; class=&#34;footnote-ref&#34; id=&#34;fnref6&#34;&gt;&lt;sup&gt;6&lt;/sup&gt;&lt;/a&gt; gonogo has some great tools and functions for helping us achieve these goals. I prefer to use the tidyverse framework for my data analysis and visualization so I combine the built in functions from gonogo with some helper functions that I wrote to keep things tidy. I present them here with some description of what they do but not much explanation of how they work. Sorry.&lt;/p&gt;
+&lt;p&gt;I will note however that gonogo provides options for obtaining multiple forms of confidence intervals: Fisher Matrix, GLM, and Likelihood-Based. For additional information on how it calculates each type, refer to &lt;a href=&#34;https://www2.isye.gatech.edu/~jeffwu/sensitivitytesting/gonogo.pdf&#34;&gt;THIS DOCUMENTATION&lt;/a&gt;. In the tests I ran, GLM and LR based CIs performed almost the same; FM was different. I use GLM below for my purposes.&lt;/p&gt;
+&lt;p&gt;In the following work, I assume we care about the 95% confidence bound on the .10 quantile. gonogo calculates all intervals as 2-sided, so to get the 95% confidence bound (1-sided) we request the 90% 2-sided limits.&lt;/p&gt;
+&lt;div id=&#34;extract-a-tibble-of-2-sided-pointwise-confidence-limits-about-all-quantiles&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Extract a tibble of 2-sided, pointwise confidence limits about all quantiles&lt;/h2&gt;
+&lt;p&gt;This first function takes the output from the gonogo function and calculates 2-sided .90 confidence bounds on the various quantiles. The lims() function is from gonogo.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# helper function
+
+conf_limits_fcn &amp;lt;- function(tbl, conf = .9) {
+  conf_limits_tbl_full &amp;lt;- lims(ctyp = 2, dat = tbl, conf = conf, P = seq(from = .01, to = .99, by = .01)) %&amp;gt;%
+    as_tibble() %&amp;gt;%
+    rename(
+      ciq_lower = V1,
+      estimate_q = V2,
+      ciq_upper = V3,
+      ip_lower = V4,
+      estimate_p = V5,
+      cip_upper = V6
+    )
+}
+
+rileysim_conf_tbl &amp;lt;- conf_limits_fcn(z$d0)
+
+rileysim_conf_tbl %&amp;gt;%
+  gt_preview()&lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;zqnuibzgwa&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;style&gt;html {
+  font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
+}
+
+#zqnuibzgwa .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#zqnuibzgwa .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#zqnuibzgwa .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#zqnuibzgwa .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#zqnuibzgwa .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#zqnuibzgwa .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#zqnuibzgwa .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#zqnuibzgwa .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#zqnuibzgwa .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#zqnuibzgwa .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#zqnuibzgwa .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#zqnuibzgwa .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#zqnuibzgwa .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#zqnuibzgwa .gt_from_md &gt; :first-child {
+  margin-top: 0;
+}
+
+#zqnuibzgwa .gt_from_md &gt; :last-child {
+  margin-bottom: 0;
+}
+
+#zqnuibzgwa .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#zqnuibzgwa .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#zqnuibzgwa .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#zqnuibzgwa .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#zqnuibzgwa .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#zqnuibzgwa .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#zqnuibzgwa .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#zqnuibzgwa .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#zqnuibzgwa .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#zqnuibzgwa .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#zqnuibzgwa .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#zqnuibzgwa .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#zqnuibzgwa .gt_left {
+  text-align: left;
+}
+
+#zqnuibzgwa .gt_center {
+  text-align: center;
+}
+
+#zqnuibzgwa .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#zqnuibzgwa .gt_font_normal {
+  font-weight: normal;
+}
+
+#zqnuibzgwa .gt_font_bold {
+  font-weight: bold;
+}
+
+#zqnuibzgwa .gt_font_italic {
+  font-style: italic;
+}
+
+#zqnuibzgwa .gt_super {
+  font-size: 65%;
+}
+
+#zqnuibzgwa .gt_footnote_marks {
+  font-style: italic;
+  font-size: 65%;
+}
+&lt;/style&gt;
+&lt;table class=&#34;gt_table&#34;&gt;
+  
+  &lt;thead class=&#34;gt_col_headings&#34;&gt;
+    &lt;tr&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_left&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;ciq_lower&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;estimate_q&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;ciq_upper&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;ip_lower&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;estimate_p&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;cip_upper&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody class=&#34;gt_table_body&#34;&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;566.0095&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;582.0174&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;590.1744&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.000057&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.01&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.127107&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;2&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;569.7538&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;584.1695&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;591.6789&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.000283&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.02&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.165152&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;572.1145&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;585.5349&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;592.6478&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.000714&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.03&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.193273&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;4&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;573.8819&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;586.5620&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;593.3851&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.001369&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.04&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.216580&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;5&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;575.3128&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;587.3975&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;593.9914&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.002260&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.05&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.236954&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier; font-size: x-small; background-color: #E4E4E4;&#34;&gt;6..98&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;99&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;610.9205&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;618.7489&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;633.9138&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.884141&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.99&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.999923&lt;/td&gt;&lt;/tr&gt;
+  &lt;/tbody&gt;
+  
+  
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;extract-a-point-estimate-for-the-lower-2-sided-confidence-limit-for-the-.10-quantile.&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Extract a point estimate for the lower 2-sided confidence limit for the .10 quantile.&lt;/h2&gt;
+&lt;p&gt;We present results to FDA using the terminology “confidence and reliability”. By extracting the lower end of the 2-sided 90% confidence band on the .10 quantile, we obtain an estimate of the 95/90 tolerance bound i.e. a bound above which we would expect 90% or more of the population to lie, with 95% confidence. This would be a conservative estimate of the endurance limit for this stent design.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;lower_conf_fcn &amp;lt;- function(tbl, percentile) {
+  lower_scalar &amp;lt;- tbl %&amp;gt;%
+    mutate(qprobs = qnorm(estimate_p)) %&amp;gt;%
+    arrange(qprobs) %&amp;gt;%
+    filter(estimate_p == percentile) %&amp;gt;%
+    mutate(ciq_lower = ciq_lower %&amp;gt;% round(1)) %&amp;gt;%
+    pluck(1)
+
+  lower_qnorm &amp;lt;- tbl %&amp;gt;%
+    mutate(qprobs = qnorm(estimate_p)) %&amp;gt;%
+    arrange(qprobs) %&amp;gt;%
+    filter(estimate_p == percentile) %&amp;gt;%
+    pluck(7)
+
+  lower_tbl &amp;lt;- tibble(
+    estimate_q = lower_scalar,
+    estimate_p = percentile,
+    qprobs = lower_qnorm
+  )
+
+  return(lower_tbl)
+}
+
+lower_conf_fcn(rileysim_conf_tbl, percentile = .1) %&amp;gt;% pluck(1)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## [1] 580.2&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;plot-cdf&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Plot CDF&lt;/h2&gt;
+&lt;p&gt;Now some plotting functions to help visualize things. First, we use our confidence limit dataframe from above to construct a cdf of failure strength. With some clever use of geom_label_repel() and str_glue() we can embed our data right onto the plot for easy communication. The estimated endurance limit from our test sequence is 580 MPa.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;plot_cdf_fcn &amp;lt;- function(tbl, percentile = .1, units = &amp;quot;MPa&amp;quot;) {
+  tbl %&amp;gt;%
+    ggplot(aes(x = ciq_lower, y = estimate_p)) +
+    geom_line(size = 1.3) +
+    geom_line(aes(x = ciq_upper, y = estimate_p), size = 1.3) +
+    geom_line(aes(x = estimate_q, y = estimate_p), linetype = 2) +
+    geom_ribbon(aes(xmin = ciq_lower, xmax = ciq_upper), alpha = .1, fill = &amp;quot;purple&amp;quot;) +
+    geom_point(data = lower_conf_fcn(tbl, percentile = percentile), aes(estimate_q, estimate_p), color = &amp;quot;purple&amp;quot;, size = 2) +
+    geom_label_repel(
+      data = lower_conf_fcn(tbl, percentile = percentile),
+      aes(estimate_q, estimate_p),
+      label = str_glue(&amp;quot;1-sided, 95% Confidence Bound:\n{lower_conf_fcn(rileysim_conf_tbl, percentile = .1) %&amp;gt;% pluck(1)} {units}&amp;quot;),
+      fill = &amp;quot;#8bd646ff&amp;quot;,
+      color = &amp;quot;black&amp;quot;,
+      segment.color = &amp;quot;black&amp;quot;,
+      segment.size = .5,
+      nudge_y = .13,
+      nudge_x = -25
+    ) +
+    geom_segment(data = tbl %&amp;gt;%
+      filter(estimate_p == percentile), aes(x = ciq_lower, xend = ciq_upper, y = estimate_p, yend = estimate_p), linetype = 3) +
+    theme_bw() +
+    labs(
+      x = &amp;quot;Stress (MPa)&amp;quot;,
+      y = &amp;quot;Percentile&amp;quot;,
+      caption = &amp;quot;Dotted line is estimate of failure strength distribution\nConfidence bands are 2-sided 90% (i.e. 1-sided 95 for lower)&amp;quot;,
+      title = &amp;quot;Sensitivity Testing of Stent Durability&amp;quot;,
+      subtitle = str_glue(&amp;quot;placeholder&amp;quot;)
+    )
+}
+
+a &amp;lt;- plot_cdf_fcn(tbl = rileysim_conf_tbl, percentile = .1)
+
+a +
+  labs(subtitle = str_glue(&amp;quot;Estimates: Mean = {muhat %&amp;gt;% round(1)} MPa, Sigma = {sighat %&amp;gt;% round(1)} MPa&amp;quot;))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-11-27-evaluating-the-gonogo-package-for-sensitivity-testing-in-r_files/figure-html/unnamed-chunk-13-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;normal-probability-plot&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Normal Probability Plot&lt;/h2&gt;
+&lt;p&gt;Engineers in my industry have an unhealthy obsession to normal probability plots. Personally I don’t like them, but Minitab presents them by default and engineers in my industry will look for data in this format. As part of this project I taught myself how to convert distributional data from a CFD into a normal probability plot. I show the helper function here and the result.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;norm_probability_plt_fcn &amp;lt;- function(tbl, percentile, units = &amp;quot;MPa&amp;quot;) {
+  conf_tbl &amp;lt;- tbl %&amp;gt;%
+    mutate(qprobs = qnorm(estimate_p)) %&amp;gt;%
+    arrange(qprobs)
+
+  probs_of_interest &amp;lt;- c(0.01, 0.05, seq(0.1, 0.9, by = 0.1), 0.95, 0.99)
+
+  probs_of_interest_tbl &amp;lt;- conf_tbl %&amp;gt;%
+    filter(estimate_p %in% probs_of_interest)
+
+  conf_tbl %&amp;gt;%
+    ggplot() +
+    geom_line(aes(x = ciq_lower, y = qprobs), size = 1.3) +
+    geom_line(aes(x = ciq_upper, y = qprobs), size = 1.3) +
+    geom_line(aes(x = estimate_q, y = qprobs), linetype = 2) +
+    geom_ribbon(aes(xmin = ciq_lower, xmax = ciq_upper, y = qprobs), alpha = .1, fill = &amp;quot;purple&amp;quot;) +
+    geom_point(data = lower_conf_fcn(tbl, percentile = percentile), aes(estimate_q, qprobs), color = &amp;quot;purple&amp;quot;, size = 2) +
+    geom_label_repel(
+      data = lower_conf_fcn(tbl, percentile = percentile),
+      aes(estimate_q, qprobs),
+      label = str_glue(&amp;quot;1-sided, 95% Confidence Bound:\n{lower_conf_fcn(rileysim_conf_tbl, percentile = .1) %&amp;gt;% pluck(1)} {units}&amp;quot;),
+      fill = &amp;quot;#8bd646ff&amp;quot;,
+      color = &amp;quot;black&amp;quot;,
+      segment.color = &amp;quot;black&amp;quot;,
+      segment.size = .5,
+      nudge_y = 1,
+      nudge_x = -20
+    ) +
+    geom_segment(data = conf_tbl %&amp;gt;%
+      filter(estimate_p == percentile), aes(x = ciq_lower, xend = ciq_upper, y = qprobs, yend = qprobs), linetype = 3) +
+    scale_y_continuous(limits = range(conf_tbl$qprobs), breaks = probs_of_interest_tbl$qprobs, labels = 100 * probs_of_interest_tbl$estimate_p) +
+    theme_bw() +
+    labs(
+      x = &amp;quot;Stress (MPa)&amp;quot;,
+      y = &amp;quot;Percentile&amp;quot;,
+      caption = &amp;quot;Dotted line is estimate of failure strength distribution\nConfidence bands are 2-sided 90%&amp;quot;,
+      title = &amp;quot;Sensitivity Testing of Stent Durability&amp;quot;,
+      subtitle = str_glue(&amp;quot;TBD_2&amp;quot;)
+    )
+}
+
+b &amp;lt;- norm_probability_plt_fcn(rileysim_conf_tbl, percentile = .1)
+
+b +
+  labs(subtitle = str_glue(&amp;quot;Estimates: Mean = {muhat %&amp;gt;% round(1)} MPa, Sigma = {sighat %&amp;gt;% round(1)} MPa&amp;quot;))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-11-27-evaluating-the-gonogo-package-for-sensitivity-testing-in-r_files/figure-html/unnamed-chunk-14-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;conclusion-and-thanks&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Conclusion and Thanks&lt;/h1&gt;
+&lt;p&gt;There you have it! A way to determine failure strength distributions using principled, sequential testing techniques guided by gonogo. If you’ve made it this far I really appreciate your attention. I would like to thank &lt;strong&gt;Paul Roediger&lt;/strong&gt; for producing this amazing toolkit and for graciously offering your time to help me troubleshoot and work through some challenges on this project earlier this year. I’ll always be grateful to the open source community for making these things possible.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;session-info&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Session Info&lt;/h1&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;sessionInfo()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## R version 4.0.3 (2020-10-10)
+## Platform: x86_64-w64-mingw32/x64 (64-bit)
+## Running under: Windows 10 x64 (build 18363)
+## 
+## Matrix products: default
+## 
+## locale:
+## [1] LC_COLLATE=English_United States.1252 
+## [2] LC_CTYPE=English_United States.1252   
+## [3] LC_MONETARY=English_United States.1252
+## [4] LC_NUMERIC=C                          
+## [5] LC_TIME=English_United States.1252    
+## 
+## attached base packages:
+## [1] stats     graphics  grDevices utils     datasets  methods   base     
+## 
+## other attached packages:
+##  [1] ggalt_0.4.0     gonogo_0.1.0    here_1.0.0      ggrepel_0.8.2  
+##  [5] plotly_4.9.2.1  gt_0.2.2        forcats_0.5.0   stringr_1.4.0  
+##  [9] dplyr_1.0.7     purrr_0.3.4     readr_1.4.0     tidyr_1.1.3    
+## [13] tibble_3.1.4    ggplot2_3.3.5   tidyverse_1.3.0
+## 
+## loaded via a namespace (and not attached):
+##  [1] fs_1.5.0           lubridate_1.7.9.2  ash_1.0-15         RColorBrewer_1.1-2
+##  [5] httr_1.4.2         rprojroot_2.0.2    tools_4.0.3        backports_1.2.0   
+##  [9] bslib_0.3.0        utf8_1.2.2         R6_2.5.1           KernSmooth_2.23-18
+## [13] DBI_1.1.0          lazyeval_0.2.2     colorspace_2.0-2   withr_2.4.2       
+## [17] tidyselect_1.1.1   compiler_4.0.3     extrafontdb_1.0    cli_3.0.1         
+## [21] rvest_0.3.6        xml2_1.3.2         labeling_0.4.2     bookdown_0.21     
+## [25] sass_0.4.0         scales_1.1.1       checkmate_2.0.0    proj4_1.0-10      
+## [29] digest_0.6.28      rmarkdown_2.11     pkgconfig_2.0.3    htmltools_0.5.2   
+## [33] extrafont_0.17     dbplyr_2.0.0       fastmap_1.1.0      highr_0.9         
+## [37] maps_3.3.0         htmlwidgets_1.5.4  rlang_0.4.11       readxl_1.3.1      
+## [41] rstudioapi_0.13    jquerylib_0.1.4    generics_0.1.0     farver_2.1.0      
+## [45] jsonlite_1.7.2     magrittr_2.0.1     Rcpp_1.0.7         munsell_0.5.0     
+## [49] fansi_0.5.0        lifecycle_1.0.1    stringi_1.7.4      yaml_2.2.1        
+## [53] MASS_7.3-53        grid_4.0.3         crayon_1.4.1       haven_2.3.1       
+## [57] hms_0.5.3          knitr_1.34         pillar_1.6.2       reprex_0.3.0      
+## [61] glue_1.4.2         evaluate_0.14      blogdown_0.15      data.table_1.14.0 
+## [65] modelr_0.1.8       vctrs_0.3.8        Rttf2pt1_1.3.8     cellranger_1.1.0  
+## [69] gtable_0.3.0       assertthat_0.2.1   xfun_0.26          broom_0.7.8       
+## [73] viridisLite_0.4.0  ellipsis_0.3.2&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div class=&#34;footnotes&#34;&gt;
+&lt;hr /&gt;
+&lt;ol&gt;
+&lt;li id=&#34;fn1&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://www.wiley.com/en-us/Statistical+Methods+for+Reliability+Data%2C+2nd+Edition-p-9781118115459&#34; class=&#34;uri&#34;&gt;https://www.wiley.com/en-us/Statistical+Methods+for+Reliability+Data%2C+2nd+Edition-p-9781118115459&lt;/a&gt;&lt;a href=&#34;#fnref1&#34; class=&#34;footnote-back&#34;&gt;↩︎&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn2&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://www2.lbl.gov/ritchie/Library/PDF/2020%20Cao-Nitinol%20HCF.pdf&#34; class=&#34;uri&#34;&gt;https://www2.lbl.gov/ritchie/Library/PDF/2020%20Cao-Nitinol%20HCF.pdf&lt;/a&gt;&lt;a href=&#34;#fnref2&#34; class=&#34;footnote-back&#34;&gt;↩︎&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn3&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://en.wikipedia.org/wiki/Neyer_d-optimal_test&#34; class=&#34;uri&#34;&gt;https://en.wikipedia.org/wiki/Neyer_d-optimal_test&lt;/a&gt;&lt;a href=&#34;#fnref3&#34; class=&#34;footnote-back&#34;&gt;↩︎&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn4&#34;&gt;&lt;p&gt;Neyer provided a commercial software called Sentest to facilitate practitioners who wanted to use D-optimal methods without developing their own software&lt;a href=&#34;#fnref4&#34; class=&#34;footnote-back&#34;&gt;↩︎&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn5&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://arxiv.org/ftp/arxiv/papers/2011/2011.11177.pdf&#34; class=&#34;uri&#34;&gt;https://arxiv.org/ftp/arxiv/papers/2011/2011.11177.pdf&lt;/a&gt;&lt;a href=&#34;#fnref5&#34; class=&#34;footnote-back&#34;&gt;↩︎&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn6&#34;&gt;&lt;p&gt;Since we only care about a 1-sided confidence interval, the 1-sided confidence bound on a specified quantile becomes analogous to a tolerance interval&lt;a href=&#34;#fnref6&#34; class=&#34;footnote-back&#34;&gt;↩︎&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
+</description>
+    </item>
     
     <item>
       <title>Trying to Trick Linear Regression - Estimating Coefficients for Variables in R</title>

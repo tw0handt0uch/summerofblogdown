@@ -3,19 +3,36 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
   <url>
-    <loc>/tags/linear-regression/</loc>
-    <lastmod>2021-08-04T00:00:00+00:00</lastmod>
-    <priority>0</priority>
+    <loc>/post/evaluating-the-gonogo-package-for-sensitivity-testing-in-r/</loc>
+    <lastmod>2021-11-27T00:00:00+00:00</lastmod>
   </url>
   
   <url>
     <loc>/post/</loc>
-    <lastmod>2021-08-04T00:00:00+00:00</lastmod>
+    <lastmod>2021-11-27T00:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>/tags/sensitivity-testing/</loc>
+    <lastmod>2021-11-27T00:00:00+00:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
     <loc>/tags/</loc>
+    <lastmod>2021-11-27T00:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>/</loc>
+    <lastmod>2021-11-27T00:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>/tags/linear-regression/</loc>
     <lastmod>2021-08-04T00:00:00+00:00</lastmod>
     <priority>0</priority>
   </url>
@@ -23,12 +40,6 @@
   <url>
     <loc>/post/linear-regression-is-smarter-than-i-thought-estimating-effect-sizes-for-variables-in-r/</loc>
     <lastmod>2021-08-04T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>/</loc>
-    <lastmod>2021-08-04T00:00:00+00:00</lastmod>
-    <priority>0</priority>
   </url>
   
   <url>

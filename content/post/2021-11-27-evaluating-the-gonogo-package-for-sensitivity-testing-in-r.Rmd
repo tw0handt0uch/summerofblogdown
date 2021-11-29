@@ -1,0 +1,380 @@
+---
+title: Durability Testing of Stents Using Sensitivity-Based Methods in R
+author: Riley
+date: '2021-11-27'
+categories:
+  - R
+tags:
+  - Sensitivity Testing
+slug: evaluating-the-gonogo-package-for-sensitivity-testing-in-r
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  out.width = "100%",
+  out.height = "500px",
+  fig.pos = "center",
+  dpi = 300
+)
+```
+
+The current industry protocol for durability testing of vascular stents and frames involves testing many implants simultaneously at a range of different stimulus magnitudes (typically strain or stress).  The test levels are spread out like a grid across the stimulus range of interest.  Each implant is tested to failure or run-out at its specified level and a model is fit to the data using methods similar to those described in Meeker and Escobar.^[https://www.wiley.com/en-us/Statistical+Methods+for+Reliability+Data%2C+2nd+Edition-p-9781118115459]  An example of a completed durability test of this type is shown below.^[https://www2.lbl.gov/ritchie/Library/PDF/2020%20Cao-Nitinol%20HCF.pdf] Of interest to the designer is the distribution of stimulus levels that would be expected to cause a failure at a specified cycle count like 400 million.  
+
+![](/post/2021-11-27-evaluating-the-gonogo-package-for-sensitivity-testing-in-r_files/sn_1.png){width=100%}
+
+This methodology works well if you have a large budget and is accepted by FDA.  However, blanketing the parameter space with enough samples to fit a robust model can be very costly and requires enough lab equipment to do many tests in parallel.  I recently learned that there is another way that has the potential to significantly reduce test burden and allows for some unique advantages.  I will attempt to describe it below.
+
+Sensitivity testing represents a different paradigm in which samples are tested sequentially rather than in parallel.  In such testing, the outcome of the first test informs the stimulus level of the second test and so on.  When an implant fails at a given stimulus, the next part is tested at a lower level. When it passes, the stimulus on the next is increased.  In this way, the latent distribution of part strength is converged upon with each additional test providing improved precision.  
+
+The key questions that must be answered to execute a sequential sensitivity test:
+
+>*  __"How to specify the test levels for subsequent runs in a principled and efficient way?"__
+>*  __"How to estimate the underlying failure strength distribution when the threshold for failure is not directly assessed on each run?"__  
+
+Neyer was the first to present a D-Optimal answer to the first question.^[https://en.wikipedia.org/wiki/Neyer_d-optimal_test] Implementation of the algorithm for determining sequential levels that minimize the test burden and converge on the true underlying strength distribution quickly is not trivial and historically has remained unavailable outside of pricey commercial software.^[Neyer provided a commercial software called Sentest to facilitate practitioners who wanted to use D-optimal methods without developing their own software]  Fortunately, generous and diligent researchers have recently created an open source tool in R called "gonogo" which can execute sequential testing according to the D-optimal Neyer algorithm (or its improved direct descendants).^[https://arxiv.org/ftp/arxiv/papers/2011/2011.11177.pdf]  
+
+In the remainder of this post I will show how to use gonogo to determine the underlying strength distribution of hypothetical vascular implant and visualize uncertainty about the estimate.
+
+```{r, echo=FALSE}
+# copied function to render table of contents anywhere in the doc
+render_toc <- function(
+                       filename,
+                       toc_header_name = "Table of Contents",
+                       base_level = NULL,
+                       toc_depth = 3) {
+  x <- readLines(filename, warn = FALSE)
+  x <- paste(x, collapse = "\n")
+  x <- paste0("\n", x, "\n")
+  for (i in 5:3) {
+    regex_code_fence <- paste0("\n[`]{", i, "}.+?[`]{", i, "}\n")
+    x <- gsub(regex_code_fence, "", x)
+  }
+  x <- strsplit(x, "\n")[[1]]
+  x <- x[grepl("^#+", x)]
+  if (!is.null(toc_header_name)) {
+    x <- x[!grepl(paste0("^#+ ", toc_header_name), x)]
+  }
+  if (is.null(base_level)) {
+    base_level <- min(sapply(gsub("(#+).+", "\\1", x), nchar))
+  }
+  start_at_base_level <- FALSE
+  x <- sapply(x, function(h) {
+    level <- nchar(gsub("(#+).+", "\\1", h)) - base_level
+    if (level < 0) {
+      stop(
+        "Cannot have negative header levels. Problematic header \"", h, '" ',
+        "was considered level ", level, ". Please adjust `base_level`."
+      )
+    }
+    if (level > toc_depth - 1) {
+      return("")
+    }
+    if (!start_at_base_level && level == 0) start_at_base_level <<- TRUE
+    if (!start_at_base_level) {
+      return("")
+    }
+    if (grepl("\\{#.+\\}(\\s+)?$", h)) {
+      # has special header slug
+      header_text <- gsub("#+ (.+)\\s+?\\{.+$", "\\1", h)
+      header_slug <- gsub(".+\\{\\s?#([-_.a-zA-Z]+).+", "\\1", h)
+    } else {
+      header_text <- gsub("#+\\s+?", "", h)
+      header_text <- gsub("\\s+?\\{.+\\}\\s*$", "", header_text) # strip { .tabset ... }
+      header_text <- gsub("^[^[:alpha:]]*\\s*", "", header_text) # remove up to first alpha char
+      header_slug <- paste(strsplit(header_text, " ")[[1]], collapse = "-")
+      header_slug <- tolower(header_slug)
+    }
+    paste0(strrep(" ", level * 4), "- [", header_text, "](#", header_slug, ")")
+  })
+  x <- x[x != ""]
+  knitr::asis_output(paste(x, collapse = "\n"))
+}
+```
+
+```{r toc, echo=FALSE} 
+render_toc("2021-11-27-evaluating-the-gonogo-package-for-sensitivity-testing-in-r.Rmd")
+```
+
+# Load Libraries
+
+```{r}
+library(tidyverse)
+library(gt)
+library(plotly)
+library(ggrepel)
+library(here)
+library(gonogo)
+library(ggalt)
+```
+
+# Accessing gonogo Functions
+
+The functions in gonogo can be accessed in 2 ways:
+
+>* Install and load the gonogo package using the instructions listed [HERE](https://rdrr.io/github/joncutting/gonogo/f/README.md) 
+>* Download and source the gonogo script from Jeff Wu's site [HERE](https://www2.isye.gatech.edu/~jeffwu/sensitivitytesting/) 
+
+I will be using the code sourced from Jeff's site as the functions are more readily editable.
+
+```{r}
+source(here("gonogoRiley.R"))
+```
+
+# Simulating A Sequential Sensitivity Experiment
+
+There are some nice built-in simulation features in gonogo using the gonogoSim function.  For our walkthrough though we'll simulate the data manually to have better visibility of what's happening under the hood.
+
+Suppose we have a part budget of n=25 stents from manufacturing and our goal is to estimate the underlying distribution of stress amplitude that causes fatigue fracture.  First, let's simulate the failure strength of the 25 parts using a known distribution (which is only available in the simulation).  We'll assume failure stress amplitude for these parts is normally distributed with a mean of 600 MPa and standard deviation of 13 MPa.
+
+
+## Simulate the Strength of Each Part
+
+```{r}
+set.seed(805)
+stent_strength_tbl <- tibble(part_strength_mpa = rnorm(n = 25, mean = 600, sd = 13))
+
+stent_strength_tbl %>%
+  gt_preview()
+```
+
+## See Test Levels and Input Test Results
+
+The gonogo() function will initiate the test plan for sequential testing that prescribes test levels based on the outcome of each run.  This operation happens in the console as shown in the screenshot below.
+
+![](/post/2021-11-27-evaluating-the-gonogo-package-for-sensitivity-testing-in-r_files/sn_console.png){width=100%}
+
+We'll use the Neyer option by setting the "test" argument equal to 2. One key feature of sequential testing is that high and low initial guesses for the mean must be provided at the onset of testing along with an initial guess for the standard deviation.  These guesses help set the scale.  We'll provide vague guesses that would be reasonable given our domain knowledge of cobalt-based alloys and their fatigue properties.  
+
+If we were really running the test on physical parts we'd want to set up a test at the prescribed stimulus level, then report the result to the console by inputing 2 numbers:  the level you actually ran the test at (should be the same as what was recommended) and the outcome (1 for failure or 0 for survival) separated by a single space.  After the results from the first test are entered, the recommended level of the next test is presented.  When all runs are complete, the results are stored in the assigned object.
+
+```{r}
+# z <- gonogo(mlo = 500, mhi = 700, sg = 10, test = 2, reso = 1) #input results in console
+```
+
+```{r include=FALSE}
+# write_rds(z, path = here("riley_sim.rds"))
+z <- read_rds(file = here("riley_sim.rds"))
+```
+
+The resulting object z is a list that has a lot of information.  The following code will pull the run history and clean it up nicely with tools and formatting from gt package.
+
+```{r}
+z$d0 %>%
+  gt() %>%
+  cols_align("center") %>%
+  opt_row_striping(row_striping = TRUE) %>%
+  tab_header(
+    title = "Run History of Sensitivity Test of n=25 Stents",
+    subtitle = "X and EX are Stimulus Levels, Y = Outcome (1 = part failed, 0 = part survived)"
+  ) %>%
+  cols_width(everything() ~ px(100)) %>%
+  tab_style(
+    style = list(
+      cell_text(weight = "bold")
+    ),
+    locations = cells_column_labels(columns = everything())
+  )
+```
+
+Gonogo has some really convenient built-in visualization tools.  The run history can be plotted using gonogo's ptest function with argument plt=1.  
+
+```{r}
+ptest(z, plt = 1)
+```
+The values we really care about are the estimates of the mean and sd of the latent failure strength distribution. Numerical MLE's for these parameters can be quickly extracted as follows:
+
+```{r}
+z$musig
+```
+
+__We see that these are quite close to the true parameters of mean = 600 MPa, sd = 13 MPa!__  That really impressive for only 25 parts and vague initial guesses.  
+
+I like to occasionally look under the hood and see how the outputs are generated.  I don't always understand it but it helps me learn. In this case, the calculations to extract an estimate are pretty simple.  gonogo is using a glm with probit link function.  The results are replicated here with manual calculations.  
+
+```{r}
+xglm <- glm(Y ~ X, family = binomial(link = probit), data = z$d0)
+
+ab <- as.vector(xglm$coef)
+muhat <- -ab[1] / ab[2]
+sighat <- 1 / ab[2]
+
+tibble(
+  true_parameter = c(600, 13),
+  gonogo_estimate = c(muhat, sighat)
+) %>%
+  mutate(gonogo_estimate = gonogo_estimate %>% round(1)) %>%
+  gt()
+```
+
+# Confidence, Reliability, and Visualization
+
+We just identified the MLE's for the latent strength distribution. But anytime we're working with medical devices we have to be conservative and respect the uncertainty in our methods.  We don't want to use the mean of the distribution to describe a design.  Instead, we identify a lower quantile of interest and then put a confidence interval on that to be extra conservative.^[Since we only care about a 1-sided confidence interval, the 1-sided confidence bound on a specified quantile becomes analogous to a tolerance interval] gonogo has some great tools and functions for helping us achieve these goals.  I prefer to use the tidyverse framework for my data analysis and visualization so I combine the built in functions from gonogo with some helper functions that I wrote to keep things tidy.  I present them here with some description of what they do but not much explanation of how they work.  Sorry.  
+
+I will note however that gonogo provides options for obtaining multiple forms of confidence intervals: Fisher Matrix, GLM, and Likelihood-Based.  For additional information on how it calculates each type, refer to [THIS DOCUMENTATION](https://www2.isye.gatech.edu/~jeffwu/sensitivitytesting/gonogo.pdf).  In the tests I ran, GLM and LR based CIs performed almost the same; FM was different.  I use GLM below for my purposes.
+
+In the following work, I assume we care about the 95% confidence bound on the .10 quantile.  gonogo calculates all intervals as 2-sided, so to get the 95% confidence bound (1-sided) we request the 90% 2-sided limits.
+
+## Extract a tibble of 2-sided, pointwise confidence limits about all quantiles
+
+This first function takes the output from the gonogo function and calculates 2-sided .90 confidence bounds on the various quantiles.   The lims() function is from gonogo.
+```{r}
+# helper function
+
+conf_limits_fcn <- function(tbl, conf = .9) {
+  conf_limits_tbl_full <- lims(ctyp = 2, dat = tbl, conf = conf, P = seq(from = .01, to = .99, by = .01)) %>%
+    as_tibble() %>%
+    rename(
+      ciq_lower = V1,
+      estimate_q = V2,
+      ciq_upper = V3,
+      ip_lower = V4,
+      estimate_p = V5,
+      cip_upper = V6
+    )
+}
+
+rileysim_conf_tbl <- conf_limits_fcn(z$d0)
+
+rileysim_conf_tbl %>%
+  gt_preview()
+```
+
+## Extract a point estimate for the lower 2-sided confidence limit for the .10 quantile.
+
+We present results to FDA using the terminology "confidence and reliability".  By extracting the lower end of the 2-sided 90% confidence band on the .10 quantile, we obtain an estimate of the 95/90 tolerance bound i.e. a bound above which we would expect 90% or more of the population to lie, with 95% confidence.  This would be a conservative estimate of the endurance limit for this stent design.
+
+```{r}
+lower_conf_fcn <- function(tbl, percentile) {
+  lower_scalar <- tbl %>%
+    mutate(qprobs = qnorm(estimate_p)) %>%
+    arrange(qprobs) %>%
+    filter(estimate_p == percentile) %>%
+    mutate(ciq_lower = ciq_lower %>% round(1)) %>%
+    pluck(1)
+
+  lower_qnorm <- tbl %>%
+    mutate(qprobs = qnorm(estimate_p)) %>%
+    arrange(qprobs) %>%
+    filter(estimate_p == percentile) %>%
+    pluck(7)
+
+  lower_tbl <- tibble(
+    estimate_q = lower_scalar,
+    estimate_p = percentile,
+    qprobs = lower_qnorm
+  )
+
+  return(lower_tbl)
+}
+
+lower_conf_fcn(rileysim_conf_tbl, percentile = .1) %>% pluck(1)
+```
+
+## Plot CDF
+
+Now some plotting functions to help visualize things.  First, we use our confidence limit dataframe from above to construct a cdf of failure strength.  With some clever use of geom_label_repel() and str_glue() we can embed our data right onto the plot for easy communication.  The estimated endurance limit from our test sequence is 580 MPa.
+
+```{r}
+plot_cdf_fcn <- function(tbl, percentile = .1, units = "MPa") {
+  tbl %>%
+    ggplot(aes(x = ciq_lower, y = estimate_p)) +
+    geom_line(size = 1.3) +
+    geom_line(aes(x = ciq_upper, y = estimate_p), size = 1.3) +
+    geom_line(aes(x = estimate_q, y = estimate_p), linetype = 2) +
+    geom_ribbon(aes(xmin = ciq_lower, xmax = ciq_upper), alpha = .1, fill = "purple") +
+    geom_point(data = lower_conf_fcn(tbl, percentile = percentile), aes(estimate_q, estimate_p), color = "purple", size = 2) +
+    geom_label_repel(
+      data = lower_conf_fcn(tbl, percentile = percentile),
+      aes(estimate_q, estimate_p),
+      label = str_glue("1-sided, 95% Confidence Bound:\n{lower_conf_fcn(rileysim_conf_tbl, percentile = .1) %>% pluck(1)} {units}"),
+      fill = "#8bd646ff",
+      color = "black",
+      segment.color = "black",
+      segment.size = .5,
+      nudge_y = .13,
+      nudge_x = -25
+    ) +
+    geom_segment(data = tbl %>%
+      filter(estimate_p == percentile), aes(x = ciq_lower, xend = ciq_upper, y = estimate_p, yend = estimate_p), linetype = 3) +
+    theme_bw() +
+    labs(
+      x = "Stress (MPa)",
+      y = "Percentile",
+      caption = "Dotted line is estimate of failure strength distribution\nConfidence bands are 2-sided 90% (i.e. 1-sided 95 for lower)",
+      title = "Sensitivity Testing of Stent Durability",
+      subtitle = str_glue("placeholder")
+    )
+}
+
+a <- plot_cdf_fcn(tbl = rileysim_conf_tbl, percentile = .1)
+
+a +
+  labs(subtitle = str_glue("Estimates: Mean = {muhat %>% round(1)} MPa, Sigma = {sighat %>% round(1)} MPa"))
+```
+
+## Normal Probability Plot
+
+Engineers in my industry have an unhealthy obsession to normal probability plots.  Personally I don't like them, but Minitab presents them by default and engineers in my industry will look for data in this format.  As part of this project I taught myself how to convert distributional data from a CFD into a normal probability plot.  I show the helper function here and the result.
+
+```{r}
+norm_probability_plt_fcn <- function(tbl, percentile, units = "MPa") {
+  conf_tbl <- tbl %>%
+    mutate(qprobs = qnorm(estimate_p)) %>%
+    arrange(qprobs)
+
+  probs_of_interest <- c(0.01, 0.05, seq(0.1, 0.9, by = 0.1), 0.95, 0.99)
+
+  probs_of_interest_tbl <- conf_tbl %>%
+    filter(estimate_p %in% probs_of_interest)
+
+  conf_tbl %>%
+    ggplot() +
+    geom_line(aes(x = ciq_lower, y = qprobs), size = 1.3) +
+    geom_line(aes(x = ciq_upper, y = qprobs), size = 1.3) +
+    geom_line(aes(x = estimate_q, y = qprobs), linetype = 2) +
+    geom_ribbon(aes(xmin = ciq_lower, xmax = ciq_upper, y = qprobs), alpha = .1, fill = "purple") +
+    geom_point(data = lower_conf_fcn(tbl, percentile = percentile), aes(estimate_q, qprobs), color = "purple", size = 2) +
+    geom_label_repel(
+      data = lower_conf_fcn(tbl, percentile = percentile),
+      aes(estimate_q, qprobs),
+      label = str_glue("1-sided, 95% Confidence Bound:\n{lower_conf_fcn(rileysim_conf_tbl, percentile = .1) %>% pluck(1)} {units}"),
+      fill = "#8bd646ff",
+      color = "black",
+      segment.color = "black",
+      segment.size = .5,
+      nudge_y = 1,
+      nudge_x = -20
+    ) +
+    geom_segment(data = conf_tbl %>%
+      filter(estimate_p == percentile), aes(x = ciq_lower, xend = ciq_upper, y = qprobs, yend = qprobs), linetype = 3) +
+    scale_y_continuous(limits = range(conf_tbl$qprobs), breaks = probs_of_interest_tbl$qprobs, labels = 100 * probs_of_interest_tbl$estimate_p) +
+    theme_bw() +
+    labs(
+      x = "Stress (MPa)",
+      y = "Percentile",
+      caption = "Dotted line is estimate of failure strength distribution\nConfidence bands are 2-sided 90%",
+      title = "Sensitivity Testing of Stent Durability",
+      subtitle = str_glue("TBD_2")
+    )
+}
+
+b <- norm_probability_plt_fcn(rileysim_conf_tbl, percentile = .1)
+
+b +
+  labs(subtitle = str_glue("Estimates: Mean = {muhat %>% round(1)} MPa, Sigma = {sighat %>% round(1)} MPa"))
+```
+
+
+# Conclusion and Thanks
+
+There you have it!  A way to determine failure strength distributions using principled, sequential testing techniques guided by gonogo.  If you've made it this far I really appreciate your attention.  I would like to thank __Paul Roediger__ for producing this amazing toolkit and for graciously offering your time to help me troubleshoot and work through some challenges on this project earlier this year.  I'll always be grateful to the open source community for making these things possible.  
+
+# Session Info 
+
+```{r}
+sessionInfo()
+```
+
