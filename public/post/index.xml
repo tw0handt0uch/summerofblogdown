@@ -6,10 +6,1504 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>&amp;copy; 2019. All rights reserved.</copyright>
-    <lastBuildDate>Sat, 27 Nov 2021 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Wed, 29 Dec 2021 00:00:00 +0000</lastBuildDate>
     
         <atom:link href="/post/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>A Real World Use Case for a Bayesian Reliability Model - How to Incorporate FEA into Risk Estimates</title>
+      <link>/post/a-real-world-use-case-for-a-bayesian-reliability-model/</link>
+      <pubDate>Wed, 29 Dec 2021 00:00:00 +0000</pubDate>
+      
+      <guid>/post/a-real-world-use-case-for-a-bayesian-reliability-model/</guid>
+      <description>
+&lt;script src=&#34;/rmarkdown-libs/header-attrs/header-attrs.js&#34;&gt;&lt;/script&gt;
+
+
+&lt;p&gt;Frequentist statistical methods, despite their flaws, are generally serviceable for a large suite of practical problems faced by engineers during product development of medical devices. But even in domains where simple models usually do the trick, there remain instances where a Bayesian approach is the best (and perhaps only logical) way to tackle a problem.&lt;/p&gt;
+&lt;p&gt;In the rest of this post, I will lay out a technical use-case and associated modeling workflow that is based on a real business problem encountered in the medical device industry. Note: specifics have been changed to respect the privacy of the company and the product. Here we go.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;#libraries&#34;&gt;Libraries&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#background&#34;&gt;Background&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#analysis&#34;&gt;Analysis&lt;/a&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;#data-for-probability-of-fracture-occurring-(p1)&#34;&gt;Data for Probability of Fracture Occurring (P1)&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#data-for-probability-of-fracture-leading-to-harm-(p2)&#34;&gt;Data for Probability of Fracture Leading to Harm (P2)&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#modeling&#34;&gt;Modeling&lt;/a&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;#model-for-p1&#34;&gt;Model for P1&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#model-for-p2&#34;&gt;Model for P2&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#model-for-ph&#34;&gt;Model for Ph&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;#sessioninfo&#34;&gt;SessionInfo&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div id=&#34;libraries&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Libraries&lt;/h1&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(tidyverse)
+library(gt)
+library(tidybayes)&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;background&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Background&lt;/h1&gt;
+&lt;p&gt;The problem background is this:&lt;/p&gt;
+&lt;p&gt;Vascular implants like stents and heart valves are tested extensively on the bench prior to approval for clinical use. When fractures (failures) occur, it is the job of the engineering team to determine if the failure was due to the design of the implant itself or a special cause and also assess the potential risk to the patient.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Assume that we have observed an &lt;em&gt;unanticipated fracture&lt;/em&gt; late in the design process - during the 3rd of 3 planned rounds of testing.&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;An investigation is unable to identify a special cause beyond the design of the implant. Management therefore wishes the understand the risk of a &lt;strong&gt;harm&lt;/strong&gt; occurring in a patient implanted with this product based solely on the test data available, plus any additional information that may help inform the analysis, assuming no special cause for the fracture.&lt;/p&gt;
+&lt;p&gt;The probability of a patient harm occurring due to a fracture can be broken down into two components as follows:&lt;a href=&#34;#fn1&#34; class=&#34;footnote-ref&#34; id=&#34;fnref1&#34;&gt;&lt;sup&gt;1&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[\mbox P_1 = \mbox{Probability of Fracture Occurring}\\\mbox P_2 = \mbox{Probability of Fracture Leading to a Harm}\]&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;Assuming independence, the probability of harm from the fracture is then:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[\mbox P_h = \mathrm{P}(P_1 \cap P_2) = \mbox P_1 \mbox{ x }\mbox P_2\]&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;Our challenge is: how to develop an estimate of &lt;span class=&#34;math inline&#34;&gt;\(\mbox P_1 \mbox{ , }\mbox P_2 \mbox{ , and }\mbox P_h\)&lt;/span&gt; that incorporates the benchtop test data and our domain knowledge while also propagating uncertainty throughout the calculation.&lt;a href=&#34;#fn2&#34; class=&#34;footnote-ref&#34; id=&#34;fnref2&#34;&gt;&lt;sup&gt;2&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;First, lets see what data and information we have available. Assume the following benchtop data and/or computer simulation (FEA) data are available to inform each estimate:&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;analysis&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Analysis&lt;/h1&gt;
+&lt;div id=&#34;data-for-probability-of-fracture-occurring-p1&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Data for Probability of Fracture Occurring (P1)&lt;/h2&gt;
+&lt;p&gt;To estimate &lt;span class=&#34;math inline&#34;&gt;\(\mbox P_1\)&lt;/span&gt; we have 3 rounds of benchtop data, where each outcome is a pass/fail representing fracture or no fracture.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;Round 1: 6 parts tested and all 6 passed (0 failures)&lt;/li&gt;
+&lt;li&gt;Round 2: 5 parts tested and all 5 passed (0 failures)&lt;/li&gt;
+&lt;li&gt;Round 3: 12 parts tested and 11 passed (1 failure). This is the failure that triggered the investigation.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+&lt;/div&gt;
+&lt;div id=&#34;data-for-probability-of-fracture-leading-to-harm-p2&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Data for Probability of Fracture Leading to Harm (P2)&lt;/h2&gt;
+&lt;p&gt;To simplify the problem, we’ll only consider one patient harm: embolism due to broken pieces of the implant migrating within the body. In order for this to happen, the first fracture (as observed on the bench in part 1, round 3) must cascade into additional fractures and eventual loss of overall implant integrity. In order to assess this &lt;span class=&#34;math inline&#34;&gt;\(\mbox P_2\)&lt;/span&gt; risk, we have 2 inputs:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;Input 1: A finite element analysis (FEA) simulation concluding that when 1 fracture occurs, the strain levels at other locations in the implant are not expected to rise to levels where we would anticipate additional fractures and loss of overall implant integrity&lt;/li&gt;
+&lt;li&gt;Input 2: A benchtop study in which 6 parts were intentionally fractured at the location of interest continued to cycle; none of the 6 showed any additional fractures after the first (0 failures)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Note: FEA is a way to simulate stresses and strain in a model under specific assumptions of boundary conditions, geometries, material properties, etc. See below for an example of predicted strain amplitudes in a nitinol component via FEA.&lt;a href=&#34;#fn3&#34; class=&#34;footnote-ref&#34; id=&#34;fnref3&#34;&gt;&lt;sup&gt;3&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-12-29-a-real-world-use-case-for-a-bayesian-reliability-model_files/superelastic%20nitinol.png&#34; style=&#34;width:100.0%&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;modeling&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Modeling&lt;/h2&gt;
+&lt;p&gt;We want a model that can use all the available information which includes several rounds of benchtop data and a computer simulation. A beta-binomial Bayesian model is a reasonable choice for both technical and business reasons, a few of which are shown below:&lt;a href=&#34;#fn4&#34; class=&#34;footnote-ref&#34; id=&#34;fnref4&#34;&gt;&lt;sup&gt;4&lt;/sup&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;The model is simple, with an analytic solution available (to avoid needing to validate an MCMC sampler and supporting code)&lt;/li&gt;
+&lt;li&gt;There is domain knowledge (FEA moel) available that needs to be incorporated into the analysis&lt;/li&gt;
+&lt;li&gt;The outcome can be easily understood by a general audience&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;To generate the posterior probabilities for &lt;span class=&#34;math inline&#34;&gt;\(\mbox P_1\)&lt;/span&gt; we need nothing more than addition. The two parameters in the model are the cumulative sum of the 1+passes and 1+fails, respectively.&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[\mbox P_1 \sim \mbox{Beta}(\alpha_0+\mbox{fails}, \beta_0+\mbox{passes})\]&lt;/span&gt;&lt;/p&gt;
+&lt;div id=&#34;model-for-p1&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;Model for P1&lt;/h3&gt;
+&lt;p&gt;For &lt;span class=&#34;math inline&#34;&gt;\(\mbox P_1\)&lt;/span&gt; we can choose to start with a flat prior where &lt;span class=&#34;math inline&#34;&gt;\(\alpha_0\)&lt;/span&gt; and &lt;span class=&#34;math inline&#34;&gt;\(\beta_0\)&lt;/span&gt; are 1. This implies we don’t know anything about whether or not the part may fracture.&lt;/p&gt;
+&lt;div id=&#34;before-seeing-data&#34; class=&#34;section level4&#34;&gt;
+&lt;h4&gt;Before Seeing Data&lt;/h4&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;p_1 &amp;lt;- tibble(x_canvas = c(0, 1))
+
+alpha &amp;lt;- 1
+beta &amp;lt;- 1
+
+plot_p1_fcn &amp;lt;- function(a, b) {
+  p_1 %&amp;gt;%
+    ggplot(aes(x = x_canvas)) +
+    stat_function(
+      fun = dbeta,
+      args = list(a, b),
+      color = &amp;quot;#2c3e50&amp;quot;,
+      size = 1,
+      alpha = .8
+    ) +
+    #  ylim(c(0, 1.5)) +
+    labs(
+      y = &amp;quot;&amp;quot;,
+      x = &amp;quot;P1: Probability of Fracture&amp;quot;,
+      title = &amp;quot;Credible Estimates for P1&amp;quot;,
+      subtitle = str_glue(&amp;quot;Beta ({a}, {b})&amp;quot;)
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank()
+    )
+}
+
+plot_p1_fcn(a = alpha, b = beta)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-12-29-a-real-world-use-case-for-a-bayesian-reliability-model_files/figure-html/unnamed-chunk-3-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;add-round-1-benchtop-data&#34; class=&#34;section level4&#34;&gt;
+&lt;h4&gt;Add Round 1 Benchtop Data&lt;/h4&gt;
+&lt;p&gt;Recall from above:&lt;/p&gt;
+&lt;p&gt;Round 1: 6 parts tested and all 6 passed (0 failures). So we add 6 to the cumulative sum for b and nothing to a.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;alpha &amp;lt;- 1
+beta &amp;lt;- 7
+
+plot_p1_fcn(a = alpha, b = beta)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-12-29-a-real-world-use-case-for-a-bayesian-reliability-model_files/figure-html/unnamed-chunk-4-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;add-round-2-benchtop-data&#34; class=&#34;section level4&#34;&gt;
+&lt;h4&gt;Add Round 2 Benchtop Data&lt;/h4&gt;
+&lt;p&gt;Recall from above:&lt;/p&gt;
+&lt;p&gt;Round 2: 5 parts tested and all 5 passed (0 failures). So we add 5 to the cumulative sum for b and nothing to a.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;alpha &amp;lt;- 1
+beta &amp;lt;- 12
+
+plot_p1_fcn(a = alpha, b = beta)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-12-29-a-real-world-use-case-for-a-bayesian-reliability-model_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;add-round-3-benchtop-data&#34; class=&#34;section level4&#34;&gt;
+&lt;h4&gt;Add Round 3 Benchtop Data&lt;/h4&gt;
+&lt;p&gt;Recall from above:&lt;/p&gt;
+&lt;p&gt;Round 3: 12 parts tested and all 11 passed (1 failure). So we add 11 to the cumulative sum for b and 1 to the cumulative sum for a.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;alpha &amp;lt;- 2
+beta &amp;lt;- 23
+
+plot_p1_fcn(a = alpha, b = beta)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-12-29-a-real-world-use-case-for-a-bayesian-reliability-model_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Pausing here to assess, we can see a wide range of values for P1 that are still consistent with the data, ranging from close to 0 up to around .25.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;model-for-p2&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;Model for P2&lt;/h3&gt;
+&lt;p&gt;Now we consider a model for &lt;span class=&#34;math inline&#34;&gt;\(\mbox P_2\)&lt;/span&gt;, the probability of a fracture resulting in a harm (embolism). We can use the same methodology but now we consider additional inputs that are not benchtop data - they are FEA simulations. &lt;strong&gt;FEA cannot be thought of as coming from a sampling distribution&lt;/strong&gt; - if we were to run the FEA simultaion a second time we would get the exact same results (recall that the FEA model suggested no cascading fractures we be expected as a result of the first). &lt;strong&gt;Yet this is important knowledge that must inform our risk assessment.&lt;/strong&gt; So do we give it the impact of a single benchtop data point? No, this would be too little respect for an engineering analysis of this type.&lt;/p&gt;
+&lt;p&gt;A way that we could incorporate the FEA output is to consider, as subject matter experts, how much weight we intend to place in the FEA simulation. On the one hand we know that FEA can sometimes yield strange predictions due to mesh sensitivities, material model inaccuracies, or assumptions about the boundary conditions. On the other hand, it is a rigorous piece of engineering information coming from validated software that we would be foolish to ignore.&lt;/p&gt;
+&lt;p&gt;Assume our team of risk modelers meets with the FEA simulation engineers, discusses potential limitations of the FEA, and aligns on a risk estimate centered around .05 but allowing for credible values down to around .2i ish. We could convert this domain knowledge, coming from our FEA, into a prior that reflects this uncertainty. Something like Beta(1,20) should work well.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Combining this knowledge of the FEA along with our benchtop results is how a Bayesian workflow can really shine in ways that our traditional ways can’t.&lt;/strong&gt;&lt;/p&gt;
+&lt;div id=&#34;prior-probability-based-on-fea-input-1&#34; class=&#34;section level4&#34;&gt;
+&lt;h4&gt;Prior Probability based on FEA (Input 1)&lt;/h4&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;p_2 &amp;lt;- tibble(x_canvas = c(0, 1))
+
+alpha &amp;lt;- 1
+beta &amp;lt;- 20
+
+plot_p2_fcn &amp;lt;- function(a, b) {
+  p_2 %&amp;gt;%
+    ggplot(aes(x = x_canvas)) +
+    stat_function(
+      fun = dbeta,
+      args = list(a, b),
+      color = &amp;quot;firebrick&amp;quot;,
+      size = 1,
+      alpha = .8
+    ) +
+    #  ylim(c(0, 1.5)) +
+    labs(
+      y = &amp;quot;&amp;quot;,
+      x = &amp;quot;P2: Probability of Fracture resulting in Harm&amp;quot;,
+      title = &amp;quot;Credible Estimates for P2&amp;quot;,
+      subtitle = str_glue(&amp;quot;Beta ({a}, {b})&amp;quot;)
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank()
+    )
+}
+
+plot_p2_fcn(a = alpha, b = beta) +
+  labs(caption = &amp;quot;prior probabilities assessed primarily from FEA&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-12-29-a-real-world-use-case-for-a-bayesian-reliability-model_files/figure-html/unnamed-chunk-7-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;add-input-2-benchtop-data&#34; class=&#34;section level4&#34;&gt;
+&lt;h4&gt;Add Input 2 (Benchtop Data)&lt;/h4&gt;
+&lt;p&gt;Now we add our study where we looked at 6 parts that were intentionally fractured and saw no propagation or cascading failures. So we add 6 to the cumulative sum for b and nothing to a.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;alpha &amp;lt;- 1
+beta &amp;lt;- 26
+
+plot_p2_fcn(alpha, beta)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-12-29-a-real-world-use-case-for-a-bayesian-reliability-model_files/figure-html/unnamed-chunk-8-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;model-for-ph&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;Model for Ph&lt;/h3&gt;
+&lt;p&gt;We now have posterior distributions for both &lt;span class=&#34;math inline&#34;&gt;\(\mbox P_1\)&lt;/span&gt;, &lt;span class=&#34;math inline&#34;&gt;\(\mbox P_2\)&lt;/span&gt;, and we need to multiply them together to estimate &lt;span class=&#34;math inline&#34;&gt;\(\mbox P_h\)&lt;/span&gt;. There is probably a way to do this analytically, but most engineers won’t know how beyond multiplying the point estimates. Fortunately we can sample from each of these distributions, multiply the samples together row-wise, and produce an estimate of the posterior for &lt;span class=&#34;math inline&#34;&gt;\(\mbox P_h\)&lt;/span&gt; that reflects the uncertainty in &lt;span class=&#34;math inline&#34;&gt;\(\mbox P_1\)&lt;/span&gt; and &lt;span class=&#34;math inline&#34;&gt;\(\mbox P_2\)&lt;/span&gt;.&lt;/p&gt;
+&lt;div id=&#34;sample-from-p1-posterior-and-visualize&#34; class=&#34;section level4&#34;&gt;
+&lt;h4&gt;Sample from P1 Posterior and Visualize&lt;/h4&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(123)
+n_draws &amp;lt;- 500000
+
+p1_post_draws_tbl &amp;lt;- tibble(draws = rbeta(n = n_draws, shape1 = 2, shape2 = 23))
+
+p1_post_draws_tbl %&amp;gt;%
+  gt_preview()&lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;hiigomxvmh&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;style&gt;html {
+  font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
+}
+
+#hiigomxvmh .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#hiigomxvmh .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#hiigomxvmh .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#hiigomxvmh .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#hiigomxvmh .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#hiigomxvmh .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#hiigomxvmh .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#hiigomxvmh .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#hiigomxvmh .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#hiigomxvmh .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#hiigomxvmh .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#hiigomxvmh .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#hiigomxvmh .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#hiigomxvmh .gt_from_md &gt; :first-child {
+  margin-top: 0;
+}
+
+#hiigomxvmh .gt_from_md &gt; :last-child {
+  margin-bottom: 0;
+}
+
+#hiigomxvmh .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#hiigomxvmh .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#hiigomxvmh .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#hiigomxvmh .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#hiigomxvmh .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#hiigomxvmh .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#hiigomxvmh .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#hiigomxvmh .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#hiigomxvmh .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#hiigomxvmh .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#hiigomxvmh .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#hiigomxvmh .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#hiigomxvmh .gt_left {
+  text-align: left;
+}
+
+#hiigomxvmh .gt_center {
+  text-align: center;
+}
+
+#hiigomxvmh .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#hiigomxvmh .gt_font_normal {
+  font-weight: normal;
+}
+
+#hiigomxvmh .gt_font_bold {
+  font-weight: bold;
+}
+
+#hiigomxvmh .gt_font_italic {
+  font-style: italic;
+}
+
+#hiigomxvmh .gt_super {
+  font-size: 65%;
+}
+
+#hiigomxvmh .gt_footnote_marks {
+  font-style: italic;
+  font-size: 65%;
+}
+&lt;/style&gt;
+&lt;table class=&#34;gt_table&#34;&gt;
+  
+  &lt;thead class=&#34;gt_col_headings&#34;&gt;
+    &lt;tr&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_left&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;draws&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody class=&#34;gt_table_body&#34;&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.04862055&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;2&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.06549307&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.30463148&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;4&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.08498940&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;5&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.08936808&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier; font-size: x-small; background-color: #E4E4E4;&#34;&gt;6..499999&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;500000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.02849358&lt;/td&gt;&lt;/tr&gt;
+  &lt;/tbody&gt;
+  
+  
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;p1_post_draws_tbl %&amp;gt;%
+  ggplot(aes(x = draws)) +
+  geom_histogram(
+    binwidth = .002,
+    color = &amp;quot;white&amp;quot;,
+    fill = &amp;quot;#2c3e50&amp;quot;,
+    alpha = 0.8
+  ) +
+  xlim(c(-0.05, .5)) +
+  labs(
+    y = &amp;quot;&amp;quot;,
+    title = &amp;quot;Samples from P1 Posterior&amp;quot;,
+    subtitle = &amp;quot;Current State of Belief&amp;quot;,
+    x = &amp;quot;P1: Probability of Fracture&amp;quot;
+  ) +
+  theme_bw() +
+  theme(
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-12-29-a-real-world-use-case-for-a-bayesian-reliability-model_files/figure-html/unnamed-chunk-10-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;sample-from-p2-posterior-and-visualize&#34; class=&#34;section level4&#34;&gt;
+&lt;h4&gt;Sample from P2 Posterior and Visualize&lt;/h4&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(123)
+n_draws &amp;lt;- 500000
+
+p2_post_draws_tbl &amp;lt;- tibble(draws = rbeta(n = n_draws, shape1 = 1, shape2 = 26))
+
+p2_post_draws_tbl %&amp;gt;%
+  gt_preview()&lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;ewlaiusdsg&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;style&gt;html {
+  font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
+}
+
+#ewlaiusdsg .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#ewlaiusdsg .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#ewlaiusdsg .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#ewlaiusdsg .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#ewlaiusdsg .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ewlaiusdsg .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#ewlaiusdsg .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#ewlaiusdsg .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#ewlaiusdsg .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#ewlaiusdsg .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#ewlaiusdsg .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#ewlaiusdsg .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#ewlaiusdsg .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#ewlaiusdsg .gt_from_md &gt; :first-child {
+  margin-top: 0;
+}
+
+#ewlaiusdsg .gt_from_md &gt; :last-child {
+  margin-bottom: 0;
+}
+
+#ewlaiusdsg .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#ewlaiusdsg .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#ewlaiusdsg .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ewlaiusdsg .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#ewlaiusdsg .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ewlaiusdsg .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#ewlaiusdsg .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#ewlaiusdsg .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ewlaiusdsg .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#ewlaiusdsg .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#ewlaiusdsg .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#ewlaiusdsg .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#ewlaiusdsg .gt_left {
+  text-align: left;
+}
+
+#ewlaiusdsg .gt_center {
+  text-align: center;
+}
+
+#ewlaiusdsg .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#ewlaiusdsg .gt_font_normal {
+  font-weight: normal;
+}
+
+#ewlaiusdsg .gt_font_bold {
+  font-weight: bold;
+}
+
+#ewlaiusdsg .gt_font_italic {
+  font-style: italic;
+}
+
+#ewlaiusdsg .gt_super {
+  font-size: 65%;
+}
+
+#ewlaiusdsg .gt_footnote_marks {
+  font-style: italic;
+  font-size: 65%;
+}
+&lt;/style&gt;
+&lt;table class=&#34;gt_table&#34;&gt;
+  
+  &lt;thead class=&#34;gt_col_headings&#34;&gt;
+    &lt;tr&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_left&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_right&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34;&gt;draws&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody class=&#34;gt_table_body&#34;&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;1&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.0526550965&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;2&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.0024287487&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;3&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.0332258372&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;4&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.0303373980&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;5&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.0017321513&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier; font-size: x-small; background-color: #E4E4E4;&#34;&gt;6..499999&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34; style=&#34;background-color: #E4E4E4;&#34;&gt;&lt;/td&gt;&lt;/tr&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_left gt_stub&#34; style=&#34;font-family: Courier;&#34;&gt;500000&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_right&#34;&gt;0.0002236549&lt;/td&gt;&lt;/tr&gt;
+  &lt;/tbody&gt;
+  
+  
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;p2_post_draws_tbl %&amp;gt;%
+  ggplot(aes(x = draws)) +
+  geom_histogram(
+    binwidth = .002,
+    color = &amp;quot;white&amp;quot;,
+    fill = &amp;quot;firebrick&amp;quot;,
+    alpha = 0.8
+  ) +
+  xlim(c(-0.05, .5)) +
+  labs(
+    y = &amp;quot;&amp;quot;,
+    title = &amp;quot;Samples from P2 Posterior&amp;quot;,
+    subtitle = &amp;quot;Current State of Belief&amp;quot;,
+    x = &amp;quot;P2: Probability of a Fracture Resulting in a Harm&amp;quot;
+  ) +
+  theme_bw() +
+  theme(
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-12-29-a-real-world-use-case-for-a-bayesian-reliability-model_files/figure-html/unnamed-chunk-12-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;combine-to-estimate-ph&#34; class=&#34;section level4&#34;&gt;
+&lt;h4&gt;Combine to Estimate Ph&lt;/h4&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;joint_post_tbl &amp;lt;- p1_post_draws_tbl %&amp;gt;%
+  bind_cols(p2_post_draws_tbl) %&amp;gt;%
+  rename(
+    p1_draws = draws...1,
+    p2_draws = draws...2
+  ) %&amp;gt;%
+  mutate(p1_x_p2 = p1_draws * p2_draws)
+
+joint_post_tbl %&amp;gt;%
+  ggplot(aes(x = p1_x_p2)) +
+  geom_histogram(
+    binwidth = .0001,
+    color = &amp;quot;white&amp;quot;,
+    fill = &amp;quot;purple&amp;quot;,
+    alpha = 0.8
+  ) +
+  labs(
+    y = &amp;quot;&amp;quot;,
+    title = &amp;quot;Ph - Probabilty Model of Fracture Occurring AND Resulting in Harm&amp;quot;,
+    subtitle = &amp;quot;Current State&amp;quot;,
+    x = &amp;quot;Ph: Probabilty of Fracture Occurring AND Resulting in Harm&amp;quot;
+  ) +
+  theme_bw() +
+  theme(
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  ) +
+  xlim(c(-.001, .03))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2021-12-29-a-real-world-use-case-for-a-bayesian-reliability-model_files/figure-html/unnamed-chunk-13-1.png&#34; width=&#34;100%&#34; height=&#34;500px&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;The above plot can also be summarized in tabular form.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;joint_post_tbl %&amp;gt;%
+  select(p1_x_p2) %&amp;gt;%
+  mutate_if(is.numeric, round, 4) %&amp;gt;%
+  median_qi(.width = .95) %&amp;gt;%
+  gt() %&amp;gt;%
+  cols_align(&amp;quot;center&amp;quot;) %&amp;gt;%
+  opt_row_striping(row_striping = TRUE) %&amp;gt;%
+  tab_header(
+    title = &amp;quot;Summary of Ph Posterior&amp;quot;,
+    subtitle = &amp;quot;Based on Bayesian Beta/Binomial Model&amp;quot;
+  ) %&amp;gt;%
+  cols_width(everything() ~ px(100)) %&amp;gt;%
+  tab_style(
+    style = list(
+      cell_text(weight = &amp;quot;bold&amp;quot;)
+    ),
+    locations = cells_column_labels(columns = everything())
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;iobhrrvdid&#34; style=&#34;overflow-x:auto;overflow-y:auto;width:auto;height:auto;&#34;&gt;
+&lt;style&gt;html {
+  font-family: -apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, Roboto, Oxygen, Ubuntu, Cantarell, &#39;Helvetica Neue&#39;, &#39;Fira Sans&#39;, &#39;Droid Sans&#39;, Arial, sans-serif;
+}
+
+#iobhrrvdid .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#iobhrrvdid .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#iobhrrvdid .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#iobhrrvdid .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#iobhrrvdid .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#iobhrrvdid .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#iobhrrvdid .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#iobhrrvdid .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#iobhrrvdid .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#iobhrrvdid .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#iobhrrvdid .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#iobhrrvdid .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#iobhrrvdid .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#iobhrrvdid .gt_from_md &gt; :first-child {
+  margin-top: 0;
+}
+
+#iobhrrvdid .gt_from_md &gt; :last-child {
+  margin-bottom: 0;
+}
+
+#iobhrrvdid .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#iobhrrvdid .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#iobhrrvdid .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#iobhrrvdid .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#iobhrrvdid .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#iobhrrvdid .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#iobhrrvdid .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#iobhrrvdid .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#iobhrrvdid .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#iobhrrvdid .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#iobhrrvdid .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#iobhrrvdid .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#iobhrrvdid .gt_left {
+  text-align: left;
+}
+
+#iobhrrvdid .gt_center {
+  text-align: center;
+}
+
+#iobhrrvdid .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#iobhrrvdid .gt_font_normal {
+  font-weight: normal;
+}
+
+#iobhrrvdid .gt_font_bold {
+  font-weight: bold;
+}
+
+#iobhrrvdid .gt_font_italic {
+  font-style: italic;
+}
+
+#iobhrrvdid .gt_super {
+  font-size: 65%;
+}
+
+#iobhrrvdid .gt_footnote_marks {
+  font-style: italic;
+  font-size: 65%;
+}
+&lt;/style&gt;
+&lt;table class=&#34;gt_table&#34; style=&#34;table-layout: fixed;; width: 0px&#34;&gt;
+  &lt;colgroup&gt;
+    &lt;col style=&#34;width:100px;&#34;/&gt;
+    &lt;col style=&#34;width:100px;&#34;/&gt;
+    &lt;col style=&#34;width:100px;&#34;/&gt;
+    &lt;col style=&#34;width:100px;&#34;/&gt;
+    &lt;col style=&#34;width:100px;&#34;/&gt;
+    &lt;col style=&#34;width:100px;&#34;/&gt;
+  &lt;/colgroup&gt;
+  &lt;thead class=&#34;gt_header&#34;&gt;
+    &lt;tr&gt;
+      &lt;th colspan=&#34;6&#34; class=&#34;gt_heading gt_title gt_font_normal&#34; style&gt;Summary of Ph Posterior&lt;/th&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;th colspan=&#34;6&#34; class=&#34;gt_heading gt_subtitle gt_font_normal gt_bottom_border&#34; style&gt;Based on Bayesian Beta/Binomial Model&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;thead class=&#34;gt_col_headings&#34;&gt;
+    &lt;tr&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34; style=&#34;font-weight: bold;&#34;&gt;p1_x_p2&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34; style=&#34;font-weight: bold;&#34;&gt;.lower&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34; style=&#34;font-weight: bold;&#34;&gt;.upper&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34; style=&#34;font-weight: bold;&#34;&gt;.width&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34; style=&#34;font-weight: bold;&#34;&gt;.point&lt;/th&gt;
+      &lt;th class=&#34;gt_col_heading gt_columns_bottom_border gt_center&#34; rowspan=&#34;1&#34; colspan=&#34;1&#34; style=&#34;font-weight: bold;&#34;&gt;.interval&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody class=&#34;gt_table_body&#34;&gt;
+    &lt;tr&gt;&lt;td class=&#34;gt_row gt_center&#34;&gt;0.0016&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.014&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;0.95&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;median&lt;/td&gt;
+&lt;td class=&#34;gt_row gt_center&#34;&gt;qi&lt;/td&gt;&lt;/tr&gt;
+  &lt;/tbody&gt;
+  
+  
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;p&gt;We have arrived at an estimate for Ph, the probability of the fracture occurring and resulting in a harm. A point estimate is .0016 or 16 out of 1000. A decision made off this single value may result in pushing a product that seems relatively safe. But the 95% credible interval covers up to .014 or 1.4 in 100 which would not be acceptable in most circumstances. The Bayesian approach has allowed us to carry that uncertainty all the way through the calculations to make a more informed decision.&lt;/p&gt;
+&lt;p&gt;This is the distillation of a lot of work to prepare the problem for a business decision: do nothing, initiate a redesign, or proceed with more testing.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;In this hypothetical example, credible risk values above 1% are likely too high to proceed without design changes or additional testing.&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;If you’ve made it this far, I thank you for your attention.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;sessioninfo&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;SessionInfo&lt;/h2&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;sessionInfo()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## R version 4.0.3 (2020-10-10)
+## Platform: x86_64-w64-mingw32/x64 (64-bit)
+## Running under: Windows 10 x64 (build 18363)
+## 
+## Matrix products: default
+## 
+## locale:
+## [1] LC_COLLATE=English_United States.1252 
+## [2] LC_CTYPE=English_United States.1252   
+## [3] LC_MONETARY=English_United States.1252
+## [4] LC_NUMERIC=C                          
+## [5] LC_TIME=English_United States.1252    
+## 
+## attached base packages:
+## [1] stats     graphics  grDevices utils     datasets  methods   base     
+## 
+## other attached packages:
+##  [1] tidybayes_2.3.1 gt_0.2.2        forcats_0.5.0   stringr_1.4.0  
+##  [5] dplyr_1.0.7     purrr_0.3.4     readr_1.4.0     tidyr_1.1.3    
+##  [9] tibble_3.1.4    ggplot2_3.3.5   tidyverse_1.3.0
+## 
+## loaded via a namespace (and not attached):
+##  [1] Rcpp_1.0.7           lattice_0.20-41      lubridate_1.7.9.2   
+##  [4] assertthat_0.2.1     digest_0.6.28        utf8_1.2.2          
+##  [7] plyr_1.8.6           R6_2.5.1             cellranger_1.1.0    
+## [10] backports_1.2.0      reprex_0.3.0         evaluate_0.14       
+## [13] coda_0.19-4          highr_0.9            httr_1.4.2          
+## [16] blogdown_0.15        pillar_1.6.2         rlang_0.4.11        
+## [19] readxl_1.3.1         rstudioapi_0.13      jquerylib_0.1.4     
+## [22] checkmate_2.0.0      rmarkdown_2.11       labeling_0.4.2      
+## [25] munsell_0.5.0        broom_0.7.8          compiler_4.0.3      
+## [28] modelr_0.1.8         xfun_0.26            pkgconfig_2.0.3     
+## [31] htmltools_0.5.2      tidyselect_1.1.1     bookdown_0.21       
+## [34] arrayhelpers_1.1-0   fansi_0.5.0          crayon_1.4.1        
+## [37] dbplyr_2.0.0         withr_2.4.2          distributional_0.2.1
+## [40] ggdist_2.3.0         grid_4.0.3           jsonlite_1.7.2      
+## [43] gtable_0.3.0         lifecycle_1.0.1      DBI_1.1.0           
+## [46] magrittr_2.0.1       scales_1.1.1         cli_3.0.1           
+## [49] stringi_1.7.4        farver_2.1.0         fs_1.5.0            
+## [52] xml2_1.3.2           bslib_0.3.0          ellipsis_0.3.2      
+## [55] generics_0.1.0       vctrs_0.3.8          tools_4.0.3         
+## [58] svUnit_1.0.3         glue_1.4.2           hms_0.5.3           
+## [61] fastmap_1.1.0        yaml_2.2.1           colorspace_2.0-2    
+## [64] rvest_0.3.6          knitr_1.34           haven_2.3.1         
+## [67] sass_0.4.0&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class=&#34;footnotes&#34;&gt;
+&lt;hr /&gt;
+&lt;ol&gt;
+&lt;li id=&#34;fn1&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://www.greenlight.guru/blog/en-iso-149712012-risk-assessment-explained&#34; class=&#34;uri&#34;&gt;https://www.greenlight.guru/blog/en-iso-149712012-risk-assessment-explained&lt;/a&gt;&lt;a href=&#34;#fnref1&#34; class=&#34;footnote-back&#34;&gt;↩︎&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn2&#34;&gt;&lt;p&gt;We will ignore the Severity adjustment typically involved in risk calculations per EN ISO 14971 for simplicity&lt;a href=&#34;#fnref2&#34; class=&#34;footnote-back&#34;&gt;↩︎&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn3&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://nitinol.com/wp-content/uploads/2017/11/a666400cdba78b589ce578e17fc2c3fd.pdf&#34; class=&#34;uri&#34;&gt;https://nitinol.com/wp-content/uploads/2017/11/a666400cdba78b589ce578e17fc2c3fd.pdf&lt;/a&gt;&lt;a href=&#34;#fnref3&#34; class=&#34;footnote-back&#34;&gt;↩︎&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li id=&#34;fn4&#34;&gt;&lt;p&gt;&lt;a href=&#34;https://www.bayesrulesbook.com/chapter-3.html&#34; class=&#34;uri&#34;&gt;https://www.bayesrulesbook.com/chapter-3.html&lt;/a&gt;&lt;a href=&#34;#fnref4&#34; class=&#34;footnote-back&#34;&gt;↩︎&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
+</description>
+    </item>
     
     <item>
       <title>Durability Testing of Stents Using Sensitivity-Based Methods in R</title>

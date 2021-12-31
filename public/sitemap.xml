@@ -3,30 +3,41 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
   <url>
-    <loc>/post/evaluating-the-gonogo-package-for-sensitivity-testing-in-r/</loc>
-    <lastmod>2021-11-27T00:00:00+00:00</lastmod>
+    <loc>/post/a-real-world-use-case-for-a-bayesian-reliability-model/</loc>
+    <lastmod>2021-12-29T00:00:00+00:00</lastmod>
   </url>
   
   <url>
     <loc>/post/</loc>
-    <lastmod>2021-11-27T00:00:00+00:00</lastmod>
+    <lastmod>2021-12-29T00:00:00+00:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>/tags/sensitivity-testing/</loc>
-    <lastmod>2021-11-27T00:00:00+00:00</lastmod>
+    <loc>/tags/r/</loc>
+    <lastmod>2021-12-29T00:00:00+00:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
     <loc>/tags/</loc>
-    <lastmod>2021-11-27T00:00:00+00:00</lastmod>
+    <lastmod>2021-12-29T00:00:00+00:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
     <loc>/</loc>
+    <lastmod>2021-12-29T00:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>/post/evaluating-the-gonogo-package-for-sensitivity-testing-in-r/</loc>
+    <lastmod>2021-11-27T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/tags/sensitivity-testing/</loc>
     <lastmod>2021-11-27T00:00:00+00:00</lastmod>
     <priority>0</priority>
   </url>
@@ -50,12 +61,6 @@
   <url>
     <loc>/post/exploring-frequentist-and-bayesian-tolerance-intervals-in-r/</loc>
     <lastmod>2021-06-22T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>/tags/r/</loc>
-    <lastmod>2021-06-22T00:00:00+00:00</lastmod>
-    <priority>0</priority>
   </url>
   
   <url>
