@@ -1,0 +1,261 @@
+---
+title: Learning from Failure - Nitinol Fracture Mechanics in R
+author: Riley
+date: '2022-06-21'
+slug: learning-from-failure-nitinol-fracture-mechanics-in-r
+categories:
+  - R
+tags: []
+description: ''
+topics: []
+---
+
+<script src="/rmarkdown-libs/header-attrs/header-attrs.js"></script>
+
+
+<p>Despite our best efforts, nitinol implants fracture and fail. Sometimes we want them to fail (on the bench, to learn). Other times they fail unexpectedly and we need find out why. When the failure is a fractured nitinol structural element, high magnification imaging of the fracture surface via optical microscopy and SEM is essential. A trained engineer can quickly identify the nature of the fracture (fatigue or overload) and the presence of obvious special causes like witness marks or foreign material transfer become apparent.</p>
+<p>Unfortunately the <strong>strain amplitude</strong>, a critical predictor of failure, is not directly observable from any imaging. In this post I will attempt to estimate the strain amplitude using a bit of math, some reasonable assumptions, and some observations of the fracture surface. R is basically used here as a fancy calculator, workflow manager, and for some basic visualization - but at the end I’ll throw in a little bit of sensitivity analysis using some basic functions that we derive along the way. If you are here just for fancy R stuff - feel free to skip this post. I won’t take it personal.</p>
+<p>As always, this is toy example with all images and source data taken from literature or made up.</p>
+<ul>
+<li><a href="#libraries">Libraries</a></li>
+<li><a href="#background-and-plan">Background and Plan</a>
+<ul>
+<li><a href="#initial-crack-size-and-crack-growth-rate">Initial Crack Size and Crack Growth Rate</a></li>
+</ul></li>
+<li><a href="#fracture-mechanics">Fracture Mechanics</a>
+<ul>
+<li><a href="#paris&#39;-law">Paris’ Law</a></li>
+<li><a href="#from-stress-intensity-to-stress">From Stress Intensity to Stress</a></li>
+<li><a href="#stress-range-to-strain-amplitude">Stress Range to Strain Amplitude</a></li>
+</ul></li>
+<li><a href="#sensitivity-testing">Sensitivity Testing</a>
+<ul>
+<li><a href="#strain-amp-function">Strain Amp Function</a></li>
+<li><a href="#map-the-function-over-some-inputs">Map the Function Over Some Inputs</a></li>
+<li><a href="#visualize">Visualize</a></li>
+</ul></li>
+<li><a href="#takeaway">Takeaway</a></li>
+</ul>
+<div id="libraries" class="section level2">
+<h2>Libraries</h2>
+<pre class="r"><code>library(tidyverse)
+library(ggrepel)</code></pre>
+</div>
+<div id="background-and-plan" class="section level2">
+<h2>Background and Plan</h2>
+<p>Our fracture imaging will allow us measure the following attributes of the fracture:</p>
+<blockquote>
+<ul>
+<li>Size of the initial crack (assumed to be equivalent to the size of the inclusion or void at origin)</li>
+<li>Crack growth rate in Paris regime (assumed to be equivalnet to the average striation distance from origin to fast fracture transition area)</li>
+</ul>
+</blockquote>
+<p>Let’s review some example images and create our fake data set:</p>
+<div id="initial-crack-size-and-crack-growth-rate" class="section level3">
+<h3>Initial Crack Size and Crack Growth Rate</h3>
+<p>Here is our toy fracture surface.<a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a></p>
+<p><img src="/post/2022-06-21-learning-from-failure-nitinol-fracture-mechanics-in-r_files/frac_face.png" style="width:100.0%" /></p>
+<p>Let <span class="math inline">\(a\)</span> equal the crack length (inclusion size) -&gt; 2.0 um.</p>
+<pre class="r"><code>a &lt;- 2E-6 # units: meters</code></pre>
+<p>Now we zoom in and measure the spacing of the fatigue striations.<a href="#fn2" class="footnote-ref" id="fnref2"><sup>2</sup></a></p>
+<p><img src="/post/2022-06-21-learning-from-failure-nitinol-fracture-mechanics-in-r_files/striations.png" style="width:100.0%" /></p>
+<p>Let <span class="math inline">\(da \over dN\)</span> equal the crack growth rate (striation width) -&gt; .007 um</p>
+<pre class="r"><code>da_dn &lt;- 7E-9</code></pre>
+</div>
+</div>
+<div id="fracture-mechanics" class="section level2">
+<h2>Fracture Mechanics</h2>
+<div id="paris-law" class="section level3">
+<h3>Paris’ Law</h3>
+<p>Paris’ Law gives the relationship between crack growth rate and stress intensity range <span class="math inline">\(\Delta K\)</span> during the period of constant crack growth. We actually want strain amplitude, but <span class="math inline">\(\Delta K\)</span> is an intermediate that we have to think about first.</p>
+<p><span class="math display">\[{da \over dN}=C(\Delta K)^{m}\]</span>
+On a log scale, this equation is a line where <span class="math inline">\(m\)</span> is the slope, <span class="math inline">\(C\)</span> is the y-intercept constant, <span class="math inline">\(\Delta K\)</span> is the predictor variable, and <span class="math inline">\(da \over dN\)</span> is the response variable. For nitinol and many other engineering materials, benevolent engineers have painstakingly established these parameters and shared them in literature for a variety of loading ratios. The fitted parameters can also be visually confirmed against the reference data using plots like below.<a href="#fn3" class="footnote-ref" id="fnref3"><sup>3</sup></a></p>
+<p><img src="/post/2022-06-21-learning-from-failure-nitinol-fracture-mechanics-in-r_files/si_range.png" style="width:100.0%" /></p>
+<p>Using the average reported for Load Ratios R = 0.1 and R = 0.5:</p>
+<p>Let <span class="math inline">\(m\)</span> equal the slope -&gt; 3.82</p>
+<p>Let <span class="math inline">\(C\)</span> equal the intercept -&gt; 1.574e-10</p>
+<pre class="r"><code>m &lt;- 3.82 # units: (m/cycle) / (MPa * m^.5)
+c &lt;- 1.574e-10 # units: m/cycle</code></pre>
+<p>Rearranging and solving for <span class="math inline">\(\Delta K\)</span>:</p>
+<pre class="r"><code>#  da_dn &lt;- c*(k^m)
+#  da_dn/c &lt;- k^m
+delta_k &lt;- (da_dn / c)^(1 / m) # MPa*sqrt(m)</code></pre>
+</div>
+<div id="from-stress-intensity-to-stress" class="section level3">
+<h3>From Stress Intensity to Stress</h3>
+<p>Now we have a stress intensity range but we want strain amplitude. By definition, the magnitude of <span class="math inline">\(\Delta K\)</span> depends on specimen geometry, size and location of crack, and magnitude of alternating stress. This where our measurement of inclusion size at crack origin <span class="math inline">\(a\)</span> in comes in (note: geometry factor of 0.65 taken from literature):<a href="#fn4" class="footnote-ref" id="fnref4"><sup>4</sup></a></p>
+<p><span class="math display">\[{\Delta K=0.65\Delta \sigma {\sqrt {\pi a}}}\]</span></p>
+</div>
+<div id="stress-range-to-strain-amplitude" class="section level3">
+<h3>Stress Range to Strain Amplitude</h3>
+<p>We also know that stress is related to strain via Hooke’s Law, so we need a material property for austenite modulus <span class="math inline">\(E\)</span>.<a href="#fn5" class="footnote-ref" id="fnref5"><sup>5</sup></a> These are easy to find or measure; we’ll use 66,000 MPa.</p>
+<pre class="r"><code>E &lt;- 66000 # units: MPa</code></pre>
+<p>Now we have everything we need to find the strain amplitude. Note that the strain amplitude will be half the strain range.</p>
+<pre class="r"><code># delta_k = 0.65 * delta_stress * (pi * a)^.5
+# delta_stress &lt;- delta_k * (1/0.65) / (pi * a)^.5
+
+delta_strain &lt;- (1 / E) * delta_k * (1 / 0.65) / (pi * a)^.5 # this is peak-to-peak strain amp or strain range
+strain_amp &lt;- delta_strain / 2
+
+strain_amp</code></pre>
+<pre><code>## [1] 0.01255627</code></pre>
+<p>To sum it up and make it easier next time: here is the full expression that gets you from the observed features of the fracture to the desired strain amplitude in 1 go (using all the assumptions previously stated):</p>
+<pre class="r"><code>strain_amp &lt;- (0.7692308 / E) * (da_dn / c)^(1 / m) / (pi * a)^.5
+strain_amp</code></pre>
+<pre><code>## [1] 0.01255628</code></pre>
+<p>So we have an estimated strain amplitude of 1.3%! This value passes the gut check because nitinol tends to fracture in the 0.2 - 0.7% range, depending on a variety of other factors like mean strain, compression strain, strain volume, etc. So no surprise that it fractured - but we could compare this number against our predictive FEA and try to figure out if our boundary conditions are reasonable for modeling or perhaps we missed on one of our modeling assumptions.</p>
+</div>
+</div>
+<div id="sensitivity-testing" class="section level2">
+<h2>Sensitivity Testing</h2>
+<p>To my mind, the trickiest part of the exercise is measuring the crack growth rate <span class="math inline">\(da \over dN\)</span> . It might be prudent to see how the numbers change if our measurement was off by a bit. First, we set up a function that returns the strain amplitude for a specified crack growth rate.</p>
+<div id="strain-amp-function" class="section level3">
+<h3>Strain Amp Function</h3>
+<pre class="r"><code>sens_fct &lt;- function(dadn, E = 66000, c = 1.574e-10, m = 3.82, a = 2E-6) {
+  de &lt;- (0.7692308 / E) * (dadn / c)^(1 / m) / (pi * a)^.5
+  return(de)
+}</code></pre>
+</div>
+<div id="map-the-function-over-some-inputs" class="section level3">
+<h3>Map the Function Over Some Inputs</h3>
+<p>First, we setup a sequence of crack growth rates that might represent a reasonable range given the measurement error of striations on our fracture surface. The range covers 2 orders of magnitude. Then, we map the strain function over the inputs.</p>
+<pre class="r"><code>sens_tbl &lt;- tibble(dadn = seq(from = 1E-10, to = 1E-8, length.out = 300)) %&gt;%
+  mutate(strain_amp = map_dbl(.x = dadn, .f = sens_fct))
+
+sens_tbl</code></pre>
+<pre><code>## # A tibble: 300 x 2
+##        dadn strain_amp
+##       &lt;dbl&gt;      &lt;dbl&gt;
+##  1 1   e-10    0.00413
+##  2 1.33e-10    0.00445
+##  3 1.66e-10    0.00472
+##  4 1.99e-10    0.00495
+##  5 2.32e-10    0.00515
+##  6 2.66e-10    0.00533
+##  7 2.99e-10    0.00550
+##  8 3.32e-10    0.00565
+##  9 3.65e-10    0.00579
+## 10 3.98e-10    0.00593
+## # ... with 290 more rows</code></pre>
+</div>
+<div id="visualize" class="section level3">
+<h3>Visualize</h3>
+<p>The plot below shows the sensitivity to crack growth rate measurement accuracy. The red dot represents our point estimate from the work above. A reference line at 0.6% is added to represent and approximate threshold where we might start to believe the implant should have survived. There’s a little vis trick here where you have to feed geom_rect() a 1 line dummy dataframe to get the alpha transparency down.</p>
+<pre class="r"><code>sens_plt &lt;- sens_tbl %&gt;%
+  ggplot(aes(x = dadn, y = strain_amp)) +
+  geom_rect(data = sens_tbl[1, ], aes(xmin = min(sens_tbl$dadn), xmax = max(sens_tbl$dadn), ymin = min(sens_tbl$strain_amp), ymax = .006), alpha = .6, fill = &quot;limegreen&quot;) +
+  geom_rect(data = sens_tbl[1, ], aes(xmin = min(sens_tbl$dadn), xmax = max(sens_tbl$dadn), ymin = .006, ymax = max(sens_tbl$strain_amp)), alpha = .6, fill = &quot;firebrick&quot;) +
+  geom_point(alpha = .3, color = &quot;#2c3e50&quot;) +
+  geom_line(size = .3) +
+  geom_point(data = tibble(dadn = 7E-9, strain_amp = 0.01255628), color = &quot;dodgerblue&quot;, size = 3) +
+  geom_hline(aes(yintercept = .006)) +
+  theme_bw() +
+  labs(
+    x = &quot;Crack Growth Rate (m/cycle)&quot;,
+    y = &quot;Strain Amplitude (%)&quot;,
+    title = &quot;Crack Growth Rate Measurement Sensitivity With Respect to Strain Amplitude&quot;,
+    subtitle = &quot;Blue dot is point estimate from example analysis above&quot;,
+    caption = &quot;valid only for the described case: E = 66000, c = 1.574e-10, m = 3.82, a = 2E-6&quot;
+  ) +
+  scale_x_continuous(expand = c(0, 0), trans = &quot;log10&quot;) +
+  scale_y_continuous(expand = c(0, 0), labels = scales::percent)
+
+sens_plt</code></pre>
+<p><img src="/post/2022-06-21-learning-from-failure-nitinol-fracture-mechanics-in-r_files/figure-html/unnamed-chunk-12-1.png" width="100%" height="500px" /></p>
+<p>Just for fun and practice, we could identify that point where the function intersects the .6% decision line. First, we modify our function slightly to return the distance from the function to the reference line.</p>
+<pre class="r"><code>sens_min_fcn &lt;- function(dadn, E = 66000, c = 1.574e-10, m = 3.82, a = 2E-6) {
+  de &lt;- ((0.7692308 / E) * (dadn / c)^(1 / m) / (pi * a)^.5) - .006
+  return(de)
+}</code></pre>
+<p>Now, we utilize the uniroot function to zero find. This function does not minimize - it looks for a zero. So we need an interval for which the function would return a negative number on one end and a positive on the other (bounding the zero target).</p>
+<pre class="r"><code>root &lt;- uniroot(f = sens_min_fcn, interval = c(1e-10, 1e-8), tol = 1E-11)
+root</code></pre>
+<pre><code>## $root
+## [1] 4.175116e-10
+## 
+## $f.root
+## [1] 2.463828e-06
+## 
+## $iter
+## [1] 5
+## 
+## $init.it
+## [1] NA
+## 
+## $estim.prec
+## [1] 6.70181e-12</code></pre>
+<p>Confirming visually:</p>
+<pre class="r"><code>sens_plt +
+  geom_vline(aes(xintercept = root$root), linetype = 2) +
+  geom_vline(aes(xintercept = 7E-9), linetype = 2) +
+  geom_label_repel(
+    data = tibble(dadn = root$root, strain_amp = .0115, label = str_glue({
+      root$root %&gt;% round(digits = 11)
+    })),
+    aes(label = label), min.segment.length = .05, nudge_x = .12, nudge_y = -.0005
+  ) +
+  geom_label_repel(
+    data = tibble(dadn = 7.0E-9, strain_amp = .0085, label = round(7.0E-9, digits = 11)),
+    aes(label = label), min.segment.length = .05, nudge_x = -.12, nudge_y = -.0005
+  )</code></pre>
+<p><img src="/post/2022-06-21-learning-from-failure-nitinol-fracture-mechanics-in-r_files/figure-html/unnamed-chunk-15-1.png" width="100%" height="500px" />
+The measurement error necessary to move us all the way to that .6% decision boundary is therefore:</p>
+<pre class="r"><code>7E-9 - 4.2E-10</code></pre>
+<pre><code>## [1] 6.58e-09</code></pre>
+</div>
+</div>
+<div id="takeaway" class="section level2">
+<h2>Takeaway</h2>
+<p>In this post we used a fracture image to estimate the strain amplitude acting on the nitinol frame in service during crack propagation through the Paris regime. We then checked our estimate’s sensitivity to our measurement for crack growth rate, knowing the striations may have been difficult to measure precisely at such small scales.</p>
+<p>We determined that it would have required a measurement error of 6.6E-9 m/cycle to change our interpretation of the situation from “fracture expected at the estimated strain level” to “fracture was surprising given the estimated strain level”. This is almost the same as the measurement itself and seems unlikely.</p>
+<p>If you’ve made it this far, thank you for your attention.</p>
+<p>Thank you Andrew R. for answering my questions about this workflow and inspiring the post.</p>
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>## R version 4.0.3 (2020-10-10)
+## Platform: x86_64-w64-mingw32/x64 (64-bit)
+## Running under: Windows 10 x64 (build 18363)
+## 
+## Matrix products: default
+## 
+## locale:
+## [1] LC_COLLATE=English_United States.1252 
+## [2] LC_CTYPE=English_United States.1252   
+## [3] LC_MONETARY=English_United States.1252
+## [4] LC_NUMERIC=C                          
+## [5] LC_TIME=English_United States.1252    
+## 
+## attached base packages:
+## [1] stats     graphics  grDevices utils     datasets  methods   base     
+## 
+## other attached packages:
+##  [1] ggrepel_0.9.1   forcats_0.5.1   stringr_1.4.0   dplyr_1.0.7    
+##  [5] purrr_0.3.4     readr_2.1.1     tidyr_1.1.4     tibble_3.1.6   
+##  [9] ggplot2_3.3.5   tidyverse_1.3.1
+## 
+## loaded via a namespace (and not attached):
+##  [1] Rcpp_1.0.7       lubridate_1.8.0  assertthat_0.2.1 digest_0.6.28   
+##  [5] utf8_1.2.2       R6_2.5.1         cellranger_1.1.0 backports_1.4.1 
+##  [9] reprex_2.0.1     evaluate_0.14    httr_1.4.2       highr_0.9       
+## [13] blogdown_0.15    pillar_1.6.4     rlang_0.4.11     readxl_1.3.1    
+## [17] rstudioapi_0.13  jquerylib_0.1.4  rmarkdown_2.11   labeling_0.4.2  
+## [21] munsell_0.5.0    broom_0.7.11     compiler_4.0.3   modelr_0.1.8    
+## [25] xfun_0.29        pkgconfig_2.0.3  htmltools_0.5.2  tidyselect_1.1.1
+## [29] bookdown_0.21    fansi_0.5.0      crayon_1.4.2     tzdb_0.2.0      
+## [33] dbplyr_2.1.1     withr_2.4.3      grid_4.0.3       jsonlite_1.7.2  
+## [37] gtable_0.3.0     lifecycle_1.0.1  DBI_1.1.2        magrittr_2.0.1  
+## [41] scales_1.1.1     cli_3.1.0        stringi_1.7.4    farver_2.1.0    
+## [45] fs_1.5.2         xml2_1.3.3       bslib_0.3.1      ellipsis_0.3.2  
+## [49] generics_0.1.1   vctrs_0.3.8      tools_4.0.3      glue_1.6.0      
+## [53] hms_1.1.1        fastmap_1.1.0    yaml_2.2.1       colorspace_2.0-2
+## [57] rvest_1.0.2      knitr_1.34       haven_2.4.3      sass_0.4.0</code></pre>
+</div>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Credit: Cao, Wu, Zhou, McMeeking, Ritchie; The influence of mean strain on the high-cycle fatigue of Nitinol with application to medical devices; Journal of the Mechanics and Physics of Solids 143 (2020); <a href="https://www.sciencedirect.com/science/article/pii/S002250962030291X?via%3Dihub" class="uri">https://www.sciencedirect.com/science/article/pii/S002250962030291X?via%3Dihub</a><a href="#fnref1" class="footnote-back">↩︎</a></p></li>
+<li id="fn2"><p>Credit: Robertson and Ritchie, Biomaterials 28 (2007) 700–709, <a href="https://www2.lbl.gov/ritchie/Library/PDF/NITI_Fatigue_Crack_Defining_Biomaterials.pdf" class="uri">https://www2.lbl.gov/ritchie/Library/PDF/NITI_Fatigue_Crack_Defining_Biomaterials.pdf</a><a href="#fnref2" class="footnote-back">↩︎</a></p></li>
+<li id="fn3"><p>Credit: Stankiewicz, Robertson, Ritchie; Fatigue-crack growth properties of thin-walled superelastic austenitic Nitinol tube for endovascular stents; Journal of Biomedical Materials Research Part A (2006) 685-691, <a href="https://www2.lbl.gov/ritchie/Library/PDF/thinwallnitifatigue.pdf" class="uri">https://www2.lbl.gov/ritchie/Library/PDF/thinwallnitifatigue.pdf</a><a href="#fnref3" class="footnote-back">↩︎</a></p></li>
+<li id="fn4"><p>Credit: Urbano, Coda, Beretta, Cadelli, Sczerzenie; The Effect of Inclusions on Fatigue Properties for Nitinol; Fatigue and Fracture Metallic Medical Materials and Devices; STP 1559, 2013; <a href="https://www.researchgate.net/profile/Stefano-Beretta/publication/260024797_The_Effect_of_Inclusions_on_Fatigue_Properties_for_Nitinol/links/5b24db00aca272277fb3f4ed/The-Effect-of-Inclusions-on-Fatigue-Properties-for-Nitinol.pdf" class="uri">https://www.researchgate.net/profile/Stefano-Beretta/publication/260024797_The_Effect_of_Inclusions_on_Fatigue_Properties_for_Nitinol/links/5b24db00aca272277fb3f4ed/The-Effect-of-Inclusions-on-Fatigue-Properties-for-Nitinol.pdf</a><a href="#fnref4" class="footnote-back">↩︎</a></p></li>
+<li id="fn5"><p>The assumption here is that the far field stress/strain are related linearly to the crack growth and local plasticity at the moving crack<a href="#fnref5" class="footnote-back">↩︎</a></p></li>
+</ol>
+</div>
