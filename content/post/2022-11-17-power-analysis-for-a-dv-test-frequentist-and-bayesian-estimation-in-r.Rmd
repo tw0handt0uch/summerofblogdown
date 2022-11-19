@@ -1,0 +1,483 @@
+---
+title: 'Power Analysis for a DV Test - Frequentist and Bayesian Estimation in R '
+author: Riley
+date: '2022-11-17'
+slug: power-analysis-for-a-dv-test-frequentist-and-bayesian-estimation-in-r
+categories:
+  - Bayesian
+  - Frequentist
+  - R
+  - Stats
+tags:
+  - R
+description: ''
+topics: []
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  out.width = "100%",
+  out.height = "500px",
+  fig.pos = "center",
+  dpi = 300
+)
+```
+
+When testing is costly or resource intensive, it's not uncommon for management to ask an engineer "what are the chances that we pass?". The answer will depend on the team's collection of domain knowledge around the product and requirement but also in how the question is interpreted.  It will also be sensitive to sample size considerations.  In this post, I will show how to conduct an analysis to inform the response from both a Frequentist and Bayesian perspective.  Simulation will be used whenever possible to avoid the need for external references and the predictions will be used to inform a recommendation of sample size.
+
+```{r, echo=FALSE}
+# copied function to render table of contents anywhere in the doc
+render_toc <- function(filename,
+                       toc_header_name = "Table of Contents",
+                       base_level = NULL,
+                       toc_depth = 3) {
+  x <- readLines(filename, warn = FALSE)
+  x <- paste(x, collapse = "\n")
+  x <- paste0("\n", x, "\n")
+  for (i in 5:3) {
+    regex_code_fence <- paste0("\n[`]{", i, "}.+?[`]{", i, "}\n")
+    x <- gsub(regex_code_fence, "", x)
+  }
+  x <- strsplit(x, "\n")[[1]]
+  x <- x[grepl("^#+", x)]
+  if (!is.null(toc_header_name)) {
+    x <- x[!grepl(paste0("^#+ ", toc_header_name), x)]
+  }
+  if (is.null(base_level)) {
+    base_level <- min(sapply(gsub("(#+).+", "\\1", x), nchar))
+  }
+  start_at_base_level <- FALSE
+  x <- sapply(x, function(h) {
+    level <- nchar(gsub("(#+).+", "\\1", h)) - base_level
+    if (level < 0) {
+      stop(
+        "Cannot have negative header levels. Problematic header \"", h, '" ',
+        "was considered level ", level, ". Please adjust `base_level`."
+      )
+    }
+    if (level > toc_depth - 1) {
+      return("")
+    }
+    if (!start_at_base_level && level == 0) start_at_base_level <<- TRUE
+    if (!start_at_base_level) {
+      return("")
+    }
+    if (grepl("\\{#.+\\}(\\s+)?$", h)) {
+      # has special header slug
+      header_text <- gsub("#+ (.+)\\s+?\\{.+$", "\\1", h)
+      header_slug <- gsub(".+\\{\\s?#([-_.a-zA-Z]+).+", "\\1", h)
+    } else {
+      header_text <- gsub("#+\\s+?", "", h)
+      header_text <- gsub("\\s+?\\{.+\\}\\s*$", "", header_text) # strip { .tabset ... }
+      header_text <- gsub("^[^[:alpha:]]*\\s*", "", header_text) # remove up to first alpha char
+      header_slug <- paste(strsplit(header_text, " ")[[1]], collapse = "-")
+      header_slug <- tolower(header_slug)
+    }
+    paste0(strrep(" ", level * 4), "- [", header_text, "](#", header_slug, ")")
+  })
+  x <- x[x != ""]
+  knitr::asis_output(paste(x, collapse = "\n"))
+}
+```
+
+```{r toc, echo=FALSE} 
+render_toc("2022-11-17-power-analysis-for-a-dv-test-frequentist-and-bayesian-estimation-in-r.Rmd")
+```
+
+## Libraries
+
+```{r}
+library(tidyverse)
+library(tolerance)
+library(patchwork)
+library(ggrepel)
+library(gt)
+library(ggExtra)
+library(brms)
+library(here)
+```
+
+## Background and Requirements
+
+We need some sort of performance test for this toy problem so let's consider pitting corrosion resistance.  Specifically, we are interested in data generated during cyclic potentiodynamic polarization (CPP) testing of a nitinol stent.  The data is expressed as the difference between the breakdown potential Eb the rest potential Er, both relative to a reference electrode.  The magnitude of this difference corresponds to the expected corrosion resistance in the body with larger values being better.^[For additional details about this testing, refer to ASTM F2129]
+
+## Assumptions and Plan
+
+
+We'll assume that our device has 1-sided, lower spec limit of *+300 mV* as a requirement.  We'll also assume that based on our risk analysis procedure, pitting corrosion falls in a zone mandating that at least 90% of the population will meet the requirement with 90% confidence. Thus, we need to use our test data to create a 1-sided, 90/90 tolerance interval to compare against the requirements.  If you are unfamiliar with tolerance intervals, refer to [this older post of mine](https://rileyking.netlify.app/post/exploring-frequentist-and-bayesian-tolerance-intervals-in-r/). We'll also assume that the default sample size would be n=9, chosen somewhat arbitrarily (we'll consider other sample sizes later on).
+
+
+## Predicate Data
+
+We would never go into any late-stage testing without some directional data from pilot studies or predicate devices.  These data are usually sparse and they come with caveats, but they inform the range or possible expectations.  In this example, let's assume we have n=3 data points from early feasibility testing of a early prototype for our product.  We'll throw them into a table and then quickly check some summary stats. From testing other products and reviewing literature, we also know that the population of Eb - Er data for a particular configuration tend to be normally distributed.
+
+```{r}
+legacy_data_tbl <- tibble(eb_minus_er = c(424, 543, 571))
+
+sum_data <- legacy_data_tbl %>%
+  summarize(mean = mean(eb_minus_er),
+            sd = sd(eb_minus_er)) %>%
+  mutate(across(is.numeric, round, digits = 1))
+
+sum_data %>%
+  gt_preview()
+```
+
+## Frequentist 
+
+### Simulated experiments with a single set of assumed parameters
+
+For the Frequentist simulation, our plan is to specify the parameters of the assumed population and then repeat a simulated experiment may times.  For each rep of the sim we assess the resultant tolerance limit against the requirement.  This tells us the long-run frequency (interpreted as probability in the frequentist framework) of passing the test based on our experimental setup and the assumed parameters.  Later on, we can adjust the sample size or the assumed population parameters to see how our chance of passing is affected.
+
+Let's do 1 full simulation using a sample size of n=9 and a mean and sd taken from our predicate data shown above. 
+
+#### Simulate the Data
+
+```{r}
+reps <- 1000
+set.seed(127)
+n <- 9
+
+
+single_sim_tbl <- 
+  tibble(
+  n = n,
+  mean = sum_data$mean, #mean from predicate data
+  sd = sum_data$sd) %>% #ds from predicate data
+  slice(rep(1:n(), each = reps)) %>%
+  mutate(replicate = seq(from = 1, to = reps)) %>%
+  mutate(sim_data = pmap(.l = list(n = n, mean = mean, sd = sd), .f = rnorm)) %>% #create the random data points, n=9 per sim
+  unnest() %>%
+  group_by(mean, sd, replicate) %>%
+  summarize(ltl = normtol.int(sim_data, P = .9, alpha = .1)) %>% #calculate 90/90 tolerance interval
+  unnest() %>%
+  ungroup() %>%
+  rename(ltl = "1-sided.lower") %>%
+  select(1:7) %>%
+  mutate(fail = case_when( 
+    ltl <= 300 ~ 1,
+    TRUE ~ 0)) %>% #flag failures
+  mutate(across(c(x.bar, ltl), round, digits = 1))
+
+
+single_sim_tbl %>%
+  gt_preview()
+```
+
+#### Calculate Frequency of Success
+
+Having generated and stored the above simulation, it is straightforward to calculate the predicted success rate. We see that the long run frequency of success is 84%, conditional on all of our strict assumptions about population parameters and fixed sample size:
+
+```{r}
+single_sim_tbl %>%
+  summarize(total_simulated_experiments = n(),
+            sum_pass = n() - sum(fail)) %>%
+  mutate(prop_pass = sum_pass/total_simulated_experiments) %>%
+  gt_preview()
+```
+
+#### Visualize
+
+Here we look at the means and lower tolerance limits (LTLs) from the simulation to help us gut check the conclusions and further understand what is going on.
+
+```{r}
+single_sim_tbl %>% 
+  pivot_longer(cols = c(x.bar, ltl), names_to = "param", values_to = "value") %>%
+  mutate(param = case_when(param == "x.bar" ~ "mean",
+                           TRUE ~ "lower_tolerance_limit")) %>%
+  ggplot(aes(x = param, y = value)) +
+  geom_line(aes(group = replicate), size = .1, alpha = .1) +
+  geom_jitter(aes(color = param), size = .4, alpha = .4, width = .01) +
+  geom_hline(yintercept = 300, color = "firebrick", linetype = 2) +
+  theme_classic() +
+  theme(legend.title=element_blank()) +
+  labs(title = "Means and Lower Tolerance Limits for 1000 Simulated Experiments",
+       subtitle = "Each sim: n=9 data points draws from a normal distribution",
+       x = "",
+       y = "Eb - Er [mV SCE]",
+       caption = "red dotted line indicates lower spec limit")
+```
+
+And here we look by simulation run number and add the marginal distributions for mean and sd.
+
+```{r}
+int_plot <- single_sim_tbl %>%
+  ggplot(aes(group = replicate)) +
+  geom_segment(aes(x = replicate, y = x.bar, xend = replicate, yend = ltl), size = .2, alpha = .2) +
+  geom_point(data = single_sim_tbl %>% 
+               pivot_longer(cols = c(x.bar, ltl), names_to = "param", values_to = "value") %>%
+               mutate(param = case_when(param == "x.bar" ~ "Sample Mean", TRUE ~ "1-Sided Lower Tolerance Limit")), 
+               aes(x = replicate, y = value, color = param), size = .6) +
+  geom_hline(yintercept = 300, linetype = 2, color = "firebrick") +
+  theme_classic() +
+  theme(legend.position = "bottom") +
+  labs(y = "Eb - Er (mV SCE)",
+       x = "Simulated Experiment Replicate Number",
+       title = "Means and Lower Tolerance Limits for 1000 Simulated Experiments",
+       subtitle = "Each sim: n=9 data points draws from a normal distribution") +
+  theme(legend.title=element_blank())
+
+ggMarginal(int_plot,
+  groupColour = TRUE,
+  groupFill = TRUE,
+  type = "density",
+  alpha = 0.7,
+  margins = "y"
+)
+```
+
+### Nested Simulation with Many Sets of Parameters
+
+The simulation above makes strict assumptions about the population parameters and uses only a single fixed sample size. we know intuitively that there is lot-to-lot variability and we have our choice of sample size, within reason, when we proceed with our eventual real-world test.  Thus, what we really want to understand is the probability of success for a wide range of parameter assumptions and sample sizes.  For that, we'll need a more complex simulation.
+
+In the code below, a grid of possibilities is explored for potential values of mean, sd, and sample size.  Each permutation is a nested simulation of n=1000.  Ranges explored (the range for mean goes mostly lower and the range for sd goes mostly higher as we really want to understand what happens if our predicate data was overly optimistic):
+
+*  mean: 300 to 500 mV 
+*  sd:   75 to 179 mV
+*  n:    5 to 17 parts
+
+#### Simulated the Data
+
+The workflow below is very similar to the single simulation section with a few exceptions. The expand_grid() function is what generated all combinations of the specified sequences for mean, sd, and n.  slice() is used to copy and append rows, and a "scenario" column is added to track each permutation of the 3 variables.
+
+```{r}
+set.seed(2015)
+reps <-  1000
+
+mean = c(seq(from = 300, to = 500, by = 50), sum_data$mean)
+sd = c(seq(from = 75, to = 175, by = 25), sum_data$sd)
+n = seq(from = 5, to = 17, by = 2)
+
+full_even_sim_tbl <-  expand_grid(mean, sd, n) %>%
+  mutate(mean = mean %>% round(0),
+         sd = sd %>% round(0)) %>%
+  mutate(scenario = seq(from = 1, to = nrow(.))) %>%
+  slice(rep(1:n(), each = reps)) %>%
+  mutate(replicate_number = rep(seq(from = 1, to = reps), nrow(.)/reps)) %>%
+  mutate(sim_data = pmap(.l = list(n = n, mean = mean, sd=sd), .f = rnorm)) %>%
+  unnest(cols = everything()) %>%
+  group_by(mean, sd, scenario, replicate_number, n) %>%
+  summarize(ltl = normtol.int(sim_data, P = .9, alpha = .1)) %>%
+  unnest(cols = everything()) %>%
+  ungroup() %>%
+  rename(ltl = '1-sided.lower',
+         utl = '1-sided.upper') %>%
+  mutate(fail = case_when(ltl <= 300 ~ 1,
+         TRUE ~ 0))
+
+full_even_sim_tbl %>% 
+  mutate(across(c(x.bar, ltl, utl), round, digits = 1)) %>%
+  gt_preview()
+```
+
+#### Calculate Frequency of Success
+
+Now, each scenario (combination of assumed mean, sd, and sample size) has its own probability (long run frequency) of passing: 
+
+```{r}
+summary_tbl <- full_even_sim_tbl %>%
+  group_by(mean, sd, n, max(replicate_number)) %>%
+  summarize(number_fail = sum(fail)) %>%
+  rename(reps = 'max(replicate_number)') %>%
+  mutate(avg = stringr::str_glue("mean Eb-Er = {as_factor(mean)} mV [SCE]")) %>%
+  mutate(prop_pass = 1-(number_fail / reps)) %>%
+  ungroup()
+
+summary_tbl %>%
+  gt_preview()
+```
+
+#### Visualize - Power Curves
+
+Plotting these data produce so-called power curves from which we can easily see trends for probability of passing based on the parameter assumptions and our choice of sample size.  Constructing these curves provide a principled way to select a reasonable sample size.
+
+```{r}
+summary_tbl %>%
+  ggplot(aes(x = sd, y = prop_pass)) +
+  geom_point(aes(color = as_factor(n))) +
+  geom_line(aes(color = as_factor(n))) +
+  geom_vline(xintercept = sum_data$sd, color = "firebrick", linetype = 2) +
+  facet_wrap(~ avg) +
+  lims(x = c(75, 175)) +
+  scale_color_discrete(name = "Sample Size") +
+#scale_color_viridis_d(option = "C", end = .8) +
+  labs(x = "Standard Deviation (mV [SCE])",
+       y = str_glue("Passing Proportion\nBased on n={reps} simulations each")) +
+  theme_bw() +
+  labs(title = "Predicted Power Curves for Simulated Corrosion Experiments",
+       subtitle = "as a function of mean, standard deviation, and sample size",
+       caption = "513 mV facet represents predicate mean, red dotted line represents predicate sd")
+```
+We note that at the lower means and higher sds we would have very low chance of passing.
+
+## Bayesian
+
+As engineers, we can look through the range of possible inputs and think about how plausible they might be based on our understanding of the product and domain.  But there is no formal way to leverage that knowledge in the frequentist framework. For that, we need a Bayesian approach. 
+
+### Priors
+
+In the code below, we want to ask ourselves what values are reasonable for the parameters of interest.  We happen to know from other devices and literature that the mean tends to fall in the 200-800 range.  We select a t distribution on this parameter centered at 500 with a few degrees of freedom.  This is conservative since it spreads our "belief" wider than a normal distribution, including more options in the tails.  For the sd, we apply a uniform distribution over a generous range, making sure to keep all values positive. 
+
+#### Specify Priors
+
+We put these into this table form because we'll want to plot these curves to confirm visually that our assumptions make sense.
+
+```{r}
+prior_pred_tbl <- tibble(
+  mu = rstudent_t(n = 300, df = 3, mu = 500, sigma = 100),
+  sig = runif(300, min = 20, max = 200) %>% abs()
+) %>%
+  mutate(row_id = row_number()) %>%
+  select(row_id, everything()) %>%
+  mutate(plotted_y_data = map2(mu, sig, ~ tibble(
+    x = seq(-200, 1000, length.out = 10000),
+    y = dnorm(x, .x, .y)
+  ))) %>%
+#  slice(1) %>%
+  unnest() %>%
+  mutate(model = "mu ~ student(3, 500, 100), sigma ~ unif(20,200)")
+
+prior_pred_tbl %>%
+  gt_preview()
+```
+#### Visualize Prior Pred
+
+This vis shows a variety of possible outcomes for Eb-Er before seeing the data.  
+
+```{r}
+prior_pred_tbl %>%
+  ggplot(aes(x = x, y = y, group = row_id)) +
+  geom_line(aes(x, y), size = .5, alpha = .2, color = "#2c3e50") +
+  labs(
+    x = "mV [SCE]",
+    y = "",
+    title = "Prior Predictive Simulations"
+  ) +
+  theme_minimal() + theme(
+  axis.text.y = element_blank(),
+  axis.ticks.y = element_blank())
+```
+
+### Data
+
+#### Specify Data
+
+We re-enter our legacy data.
+
+```{r}
+p_tbl <- tibble(p = c(424, 543, 571))
+```
+
+### Likelihood and Model Fitting
+
+#### Fit Model with brms
+
+Having specified our data and priors, we can assume a likelihood and brms can do the rest.   Here we assume Gaussian (normal) for the likelihood of the data and copy our priors from the previous section.  Once fit, we'll have access to a posterior in table form comprised of credible values for the mean and sd for many possible normal distributions.   This is similar to the grid of values we build manually in the frequentist section to generate power curve, but now now they are weighted by plausibility.
+
+```{r}
+pa_mod_1 <-
+ brm(
+   data = p_tbl, family = gaussian,
+   p ~ 1,
+  prior = c(
+    prior(student_t(3, 500, 100), class = Intercept),
+    prior(uniform(1, 200), class = sigma)),
+  iter = 41000, warmup = 40000, chains = 4, cores = 4,
+  seed = 4
+)
+
+summary(pa_mod_1)
+```
+
+#### Visualize Chains and Posterior 
+
+This section provided diagnostic plots for the Markov Chain Monte Carlo.  Chains look well dispersed and relatively similar (good) with a "fuzzy caterpillar" look that we want. 
+
+```{r}
+plot(pa_mod_1)
+```
+
+#### Examine Posterior Draws
+
+Let's take a peek at the table of samples from the posterior.  They look reasonable.
+
+```{r}
+pa_mod_1_post_tbl <- posterior_samples(pa_mod_1) %>%
+  select(-lp__) %>%
+  rename("mu" = b_Intercept)
+
+pa_mod_1_post_tbl %>%
+  gt_preview()
+```
+
+### Use Posterior to Estimate Probability of Passing with Various Sample Sizes
+
+Now that we have the posterior, we can repeat a series of simulations using parameters from each row of the sampled posterior.  This will preserve the uncertainty captured in the posterior and allow us to estimate the probability of passing, weighted by our beliefs and the informed by the data.
+
+#### Simulate the Data
+
+Knowing that the posterior draws represent credible values population mean and sd, our goal is to produce a new simulation that conducts and a simulated experiment over every credible combination.  This is very similar to our frequentist version above, but instead of just copying arbitrary combinations of parameters over a grid, here the posterior draws have already selected credible values for the parameters.  This is sort of like a "weighted" version of the frequentist simulation that is compatible with our pre-existing beliefs as established by the priors and then updated though the predicate data.
+
+```{r}
+set.seed(2015)
+reps <-  1000
+
+n = seq(from = 5, to = 17, by = 2)
+
+b_sim_tbl <- pa_mod_1_post_tbl %>%
+  rename(mean = mu,
+         sd = sigma) %>%
+  mutate(scenario = seq(from = 1, to = nrow(.))) %>%
+  slice(rep(1:n(), each = length(n))) %>%
+  mutate(num_draws = rep(x = n, times = nrow(.)/length(n))) %>%
+  mutate(dat = pmap(.l = list(n = num_draws, mean = mean, sd=sd), .f = rnorm)) %>%
+  unnest(cols = everything()) %>%
+  group_by(mean, sd, scenario, num_draws) %>%
+  summarize(ltl = normtol.int(dat, P = .9, alpha = .1)) %>%
+  unnest(cols = everything()) %>%
+  ungroup() %>%
+  arrange(scenario) %>%
+  rename(ltl = '1-sided.lower',
+         utl = '1-sided.upper') %>%
+  mutate(fail = case_when(ltl <= 300 ~ 1,
+         TRUE ~ 0)) %>%
+  select(-utl) %>%
+  mutate(across(is.numeric, round, digits = 1))
+  
+b_sim_tbl %>%
+  gt_preview()
+```
+
+## Aggregate Probability of Passing by Sample Size
+
+Count the number of simulations that pass/fail at each sample size condition:  
+
+```{r}
+agg_tbl <- b_sim_tbl %>%
+  group_by(num_draws) %>%
+  summarize(total_fail = sum(fail),
+            total_trials = 4000) %>%
+  ungroup() %>%
+  rename(sample_size = num_draws) %>%
+  mutate(prob_passing = 1-(total_fail / total_trials)) %>%
+  mutate(prob_passing = scales::percent(prob_passing, accuracy = 1))
+
+agg_tbl %>%
+  select(sample_size, prob_passing) %>%
+  gt()
+```
+
+Based on this estimate, the increase in probability of passing by going from, for example, n=9 to n=13 is 6% which does not seem significant enough to recommend the associated increase in cost and time for the larger sample size.  However, if testing is cheap and easy, then going from, for example, n=9 to n=15 provides an estimated 9% increase in probability of passing.  
+
+The Bayesian version of the workflow has allowed us to answer the question concisely:  'what are our chances of passing?'.  The Frequentist version gives a survey of possibilities but forces you to apply your domain knowledge after the fact in an unprincipled way to arrive at a decision.  
+
+Both are useful - and I hope this post was useful to somebody too! Thank you for reading.
+
+## SessionInfo
+
+```{r}
+sessionInfo()
+```
