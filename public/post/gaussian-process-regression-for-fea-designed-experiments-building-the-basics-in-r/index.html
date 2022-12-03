@@ -1,0 +1,1929 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="generator" content="Hugo 0.101.0" />
+
+  <title>Gaussian Process Regression for FEA Designed Experiments - Building the Basics in R &middot; [R]eliability</title>
+
+    
+
+  
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/pure-min.css">
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/grids-responsive-old-ie-min.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/1.0.0/grids-responsive-min.css">
+  <!--<![endif]-->
+
+  <!--[if lte IE 8]>
+  <link rel="stylesheet" href="/css/side-menu-old-ie.css">
+  <![endif]-->
+  <!--[if gt IE 8]><!-->
+  <link rel="stylesheet" href="/css/side-menu.css">
+  <!--<![endif]-->
+
+  <link rel="stylesheet" href="/css/blackburn.css">
+
+  
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.9.0/css/all.css">
+
+  
+  <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet" type="text/css">
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+ 
+  
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/androidstudio.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/r.min.js"></script>
+  
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/yaml.min.js"></script>
+  
+  <script>hljs.initHighlightingOnLoad();</script>
+  
+
+  <link rel="shortcut icon" href="/img/favicon.ico" type="image/x-icon" />
+
+  
+  
+
+</head>
+
+
+<body>
+<div id="layout">
+
+  
+<a href="#menu" id="menuLink" class="menu-link">
+  
+  <span></span>
+</a>
+<div id="menu">
+
+  
+  <a class="pure-menu-heading brand" href="/">Riley King</a>
+
+
+  <div class="pure-menu">
+    <ul class="pure-menu-list">
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/"><i class='fa fa-home fa-fw'></i>Home</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/post/"><i class='fa fa-list fa-fw'></i>Posts</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/about/"><i class='fa fa-user fa-fw'></i>About</a>
+      
+        </li>
+      
+      
+        <li class="pure-menu-item">
+          <a class="pure-menu-link" href="/contact/"><i class='fa fa-phone fa-fw'></i>Contact</a>
+      
+        </li>
+      
+    </ul>
+  </div>
+
+  <div class="pure-menu social">
+  <ul class="pure-menu-list">
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://twitter.com/tw0handt0uch1" rel="me" target="_blank"><i class="fab fa-twitter-square fa-fw"></i>Twitter</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://linkedin.com/in/riley-king-9594247" rel="me" target="_blank"><i class="fab fa-linkedin"></i></i>LinkedIn</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://github.com/tw0handt0uch" rel="me" target="_blank"><i class="fab fa-github-square fa-fw"></i>GitHub</a>
+    </li>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+ <li class="pure-menu-item">
+      <a class="pure-menu-link" href="https://www.r-bloggers.com/"><i class="fa fa-rss fa-fw"></i>R-Bloggers</a>
+    </li>
+
+  </ul>
+</div>
+
+
+  <div>
+  <div class="small-print">
+    <small>&copy; 2019. All rights reserved.</small>
+  </div>
+  <div class="small-print">
+    <small>Built with&nbsp;<a href="https://gohugo.io/" target="_blank">Hugo</a></small>
+    <small>Theme&nbsp;<a href="https://github.com/yoshiharuyamashita/blackburn" target="_blank">Blackburn</a></small>
+  </div>
+</div>
+
+</div>
+
+
+  <div id="main">
+
+
+<div class="header">
+  <h1>Gaussian Process Regression for FEA Designed Experiments - Building the Basics in R</h1>
+  <h2></h2>
+</div>
+<div class="content">
+
+  <div class="post-meta">
+
+  <div>
+    <i class="fa fa-calendar fa-fw"></i>
+    <time>02 Dec 2022</time>
+  </div>
+
+  
+
+  
+  
+  
+  
+
+  
+  
+  
+  <div>
+    <i class="fa fa-tags fa-fw"></i>
+    
+      <a class="post-taxonomy-tag" href="/tags/tutorial">tutorial</a>&nbsp;&#47;
+    
+      <a class="post-taxonomy-tag" href="/tags/r">R</a>
+    
+  </div>
+  
+  
+
+</div>
+
+  
+<script src="/rmarkdown-libs/header-attrs/header-attrs.js"></script>
+
+
+<p>A Google search for ‘Gaussian Process Regression’ returns some intimidating material for a non-statistician. After filtering away the obscure stuff I’ll never understand and digging around within the code that makes GPR happen, I’m proud to say that I feel I’ve gotten my arms around the basics of GPR. The only way to confirm if this is true or not is for me to try to explain it - so that’s what I plan to do in this post. For reference, the educational resource that resonated most with my style of learning is the wonderful text “Surrogates - Gaussian process modeling, design and optimization for the applied sciences” by Robert B. Gramacy.<a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a> My thanks go out to the author for making his work freely available on bookdown.org. Much of this post is a Tidyverse-centric re-framing and expansion of ideas presented in Chapter 5 of Surrogates.</p>
+<p>But this isn’t just a whimsical exploration of a random algorithm - GPR has an elegant use-case right here in the medical device development domain: fitting predictive models for designed experiments (DOE) in which Finite Element Analysis (FEA) is used to make predictions about an output of interest. Essentially, GPR can replace and improve upon the traditional regression techniques used in Response Surface Modeling (RSM).</p>
+<p>Why would GPR be a good choice for modeling data produced by FEA? Well FEA is a deterministic modeling process - the prediction for any set of inputs (boundary conditions) is unique and repeatable. There is no noise or experimental error. This means a transfer function that passes through every point in the training data would be preferred. With a traditional regression model, the flexibility needed hit every data point would require many high order terms, sabotaging the model’s predictive ability on new data. But GPR has the amazing ability to swerve gently and fluidly between data points, meeting each one perfectly on its way to the next. This allows GPR to make perfect predictions on the training data while providing sound predictions in the areas in between the training points.</p>
+<p>As if that wasn’t enough, GPR is consistent with a Bayesian framework whereby priors and are asserted (informed by domain knowledge where applicable) and a posterior distribution is generated after conditioning on the observed training data. And just like any Bayesian posterior, uncertainty intervals are easily available and their meaning is intuitive.</p>
+<p>Please note - I won’t actually be working through an example of fitting FEA data from a DOE here today - I’ll get to that in a follow up post. Today it’s just the basics.</p>
+<ul>
+<li><a href="#libraries">Libraries</a></li>
+<li><a href="#plan-and-background">Plan and Background</a>
+<ul>
+<li><a href="#consider-many-possible-functions">Consider Many Possible Functions</a></li>
+<li><a href="#from-randomly-drawn-points-to-traces">From Randomly Drawn Points to Traces</a></li>
+</ul></li>
+<li><a href="#priors---random-traces-with-a-few-built-in-assumptions">Priors - Random Traces with a Few Built in Assumptions</a>
+<ul>
+<li><a href="#uniform-to-gaussian">Uniform to Gaussian</a></li>
+<li><a href="#calculate-distance-between-any-combination-of-points">Calculate Distance Between any combination of points</a></li>
+<li><a href="#interlude:--a-little-nudge">Interlude: A little nudge</a></li>
+<li><a href="#get-covariance-matrix-sigma">Get Covariance Matrix Sigma</a></li>
+<li><a href="#draw-y-values">Draw Y-Values</a></li>
+<li><a href="#combine-the-x&#39;s-and-the-y&#39;s">Combine the x’s and the y’s</a></li>
+<li><a href="#plot-1-realization">Plot 1 Realization</a></li>
+<li><a href="#define-function-to-make-a-random-trace">Define Function to Make a Random Trace</a></li>
+<li><a href="#map-the-function-over-a-setup-tbl-to-create-multiple-traces">Map the Function Over a Setup Tbl to Create Multiple Traces</a></li>
+</ul></li>
+<li><a href="#conditioning-and-predicting">Conditioning and Predicting</a>
+<ul>
+<li><a href="#the-data-points">The Data Points</a></li>
+<li><a href="#calculating-the-necessary-distances-and-covariance-matrices">Calculating the Necessary Distances and Covariance Matrices</a>
+<ul>
+<li><a href="#calculate:-inverse-of-covariance-matrix-between-x-values-in-vector-of-training-data-(observed-datapoints):">Calculate: Inverse of Covariance matrix between x values in vector of training data (observed datapoints):</a></li>
+<li><a href="#calculate:--covariance-matrix-between-x-values-in-vector-of-desired-test-points-(the-x-range-of-interest-where-the-gaussians-are-positioned):">Calculate: Covariance matrix between x values in vector of desired test points (the x range of interest where the Gaussians are positioned):</a></li>
+<li><a href="#calculate:-covariance-matrix-between-x-values-in-vector-of-training-data-(observed-datapoints)-and-x-values-in-vector-of-desired-test-points-(the-x-range-of-interest-where-the-gaussians-are-positioned-):">Calculate: Covariance matrix between x values in vector of training data (observed datapoints) and x values in vector of desired test points (the x range of interest where the Gaussians are positioned ):</a></li>
+</ul></li>
+<li><a href="#combine-per-the-conditioning-equations-above">Combine Per the Conditioning Equations Above</a></li>
+<li><a href="#draw-from-the-updated-gaussians">Draw from the Updated Gaussians</a></li>
+<li><a href="#plot-the-draws">Plot the Draws</a></li>
+<li><a href="#function-for-many-posterior-draws">Function for Many Posterior Draws</a></li>
+<li><a href="#generate-many-draws-for-posterior-traces">Generate Many Draws for Posterior Traces</a></li>
+<li><a href="#visualize">Visualize</a></li>
+<li><a href="#more-visualize">More Visualize</a></li>
+</ul></li>
+<li><a href="#conclusion">Conclusion</a></li>
+<li><a href="#sessioninfo">sessionInfo</a></li>
+</ul>
+<div id="libraries" class="section level1">
+<h1>Libraries</h1>
+<pre class="r"><code>library(tidyverse)
+library(here)
+library(gt)
+library(plgp) #to calculate distance between points
+library(mvtnorm) #to draw from multivariate normal 
+library(tidybayes)
+library(patchwork)
+
+theme_set(theme_classic())</code></pre>
+</div>
+<div id="plan-and-background" class="section level1">
+<h1>Plan and Background</h1>
+<p>The plan for setting up Gaussian Process Regression sounds pretty absurd until you actually see it work, so bear with me. In this example, we’ll consider the scenario where we have one input variable x and we wish to predict the output y.</p>
+<div id="consider-many-possible-functions" class="section level2">
+<h2>Consider Many Possible Functions</h2>
+<p>Rather than assuming some parametric model and then fitting parameters to it, in GPR we start by considering many possible functions that could occupy the x-y space. In our case, we can think of the functions as squiggly traces on a 2d plot. Before seeing any data, our possible functions could take just about any course or path in the space. Our first goal in GPR is to find a way to construct a bunch of random squiggly functions across a range of interest for x and over an assumed scale of y.</p>
+</div>
+<div id="from-randomly-drawn-points-to-traces" class="section level2">
+<h2>From Randomly Drawn Points to Traces</h2>
+<p>One way to construct a trace from left to right in 2d space would be to partition the x range up in to discrete intervals, draw a random y value at each x interval, and then connect the resulting points with lines. This would provide traces across the 2d space, but if the random draws were from a grid of y values or a uniform distribution in y, each draw’s position in y would be random and our trace would swing wildly up and down, displaying none of the cohesion or “smoothness” that we think of in functions. It would look like random noise.</p>
+<pre class="r"><code>n_uniforms &lt;- 50
+x_tbl &lt;- tibble(x = seq(from = 0, to = 10, length = n_uniforms))</code></pre>
+<p>This function draws y values from a uniform [-3, 3] distribution at any specified x location. We then plot and take a look.</p>
+<pre class="r"><code>centered_unif_draws_fcn &lt;- function(x_loc, n_draws){
+  temp &lt;- tibble(x = x_loc, y = runif(n_draws, -3, 3))
+  return(temp)
+}
+
+unif_tbl &lt;- x_tbl %&gt;%
+  mutate(y_draws = map(.x = x, .f = centered_unif_draws_fcn, n_draws = 600)) %&gt;%
+  select(-x) %&gt;%
+  unnest()
+
+single_set &lt;- x_tbl %&gt;%
+  mutate(y_draws = map(.x = x, .f = centered_unif_draws_fcn, n_draws = 1)) %&gt;%
+  select(-x) %&gt;%
+  unnest()
+
+unif_tbl %&gt;%
+  ggplot(aes(x = x, y = y)) +
+  geom_jitter(size = .1, alpha = .4, width = .02, color = &quot;#2c3e50&quot;) +
+  geom_point(data = single_set, aes(x = x, y = y), size = 2, color = &quot;firebrick&quot;) +
+  geom_line(data = single_set, aes(x = x, y = y), size = 1.5, color = &quot;firebrick&quot;, alpha = .8) +
+  labs(title = &quot;Draws from Uniform Distributions&quot;,
+       subtitle = &quot;Positioned at x intervals&quot;,
+       caption = &quot;red line represents trace created by connecting a single draw from each distribtion&quot;)</code></pre>
+<p><img src="/post/2022-12-02-gaussian-process-regression-for-fea-designed-experiments-building-the-basics-in-r_files/figure-html/unnamed-chunk-4-1.png" width="100%" height="500px" /></p>
+<p>Now here’s the amazing part - suppose that instead of drawing the y values from uniform distributions and creating noise, we use a normal (Gaussian) distribution instead. If we then asserted the Gaussians were actually part of a multi-variate normal distribution with a shared covariance matrix, we could control the nature of the draws such that points nearby each other (on the x axis) were highly correlated but points far from each other (on the x axis) were not highly correlated. It turns out that random points drawn and connected under these conditions yield a smooth trace.</p>
+<p>A 2nd draw from the MVN produces another set of points that connect to form a 2nd random trace with a different path but similar smoothness and scale to the first. In this way, the stacking of normal curves in the x dimension allows random draws to produce random curves of specified scale and smoothness. We tailor the covariance matrix to give us the scale and smoothness to produce a range of various possible curves that could plausibly be the function that we want. These are our priors.</p>
+</div>
+</div>
+<div id="priors---random-traces-with-a-few-built-in-assumptions" class="section level1">
+<h1>Priors - Random Traces with a Few Built in Assumptions</h1>
+<p>We choose 50 Gaussians, 1 for each of the 50 desired partitions of the x range [0,10] that spans the region of interest.</p>
+<pre class="r"><code>n_gaussians &lt;- 50</code></pre>
+<p>Partition the x range of interest with the number of partitions equal to the number of specified Gaussians.</p>
+<pre class="r"><code>x_tbl &lt;- tibble(x = seq(from = 0, to = 10, length = n_gaussians))
+x_tbl %&gt;%
+  gt_preview()</code></pre>
+<div id="ajikturiiq" style="overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>html {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
+}
+
+#ajikturiiq .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#ajikturiiq .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#ajikturiiq .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#ajikturiiq .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 6px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#ajikturiiq .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ajikturiiq .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#ajikturiiq .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#ajikturiiq .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#ajikturiiq .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#ajikturiiq .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#ajikturiiq .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#ajikturiiq .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#ajikturiiq .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#ajikturiiq .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#ajikturiiq .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#ajikturiiq .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#ajikturiiq .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#ajikturiiq .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ajikturiiq .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#ajikturiiq .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ajikturiiq .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#ajikturiiq .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#ajikturiiq .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ajikturiiq .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#ajikturiiq .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#ajikturiiq .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#ajikturiiq .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#ajikturiiq .gt_left {
+  text-align: left;
+}
+
+#ajikturiiq .gt_center {
+  text-align: center;
+}
+
+#ajikturiiq .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#ajikturiiq .gt_font_normal {
+  font-weight: normal;
+}
+
+#ajikturiiq .gt_font_bold {
+  font-weight: bold;
+}
+
+#ajikturiiq .gt_font_italic {
+  font-style: italic;
+}
+
+#ajikturiiq .gt_super {
+  font-size: 65%;
+}
+
+#ajikturiiq .gt_footnote_marks {
+  font-style: italic;
+  font-weight: normal;
+  font-size: 65%;
+}
+</style>
+<table class="gt_table">
+  
+  <thead class="gt_col_headings">
+    <tr>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1"></th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1">x</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">1</td>
+<td class="gt_row gt_right">0.0000000</td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">2</td>
+<td class="gt_row gt_right">0.2040816</td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">3</td>
+<td class="gt_row gt_right">0.4081633</td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">4</td>
+<td class="gt_row gt_right">0.6122449</td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">5</td>
+<td class="gt_row gt_right">0.8163265</td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier; font-size: x-small; background-color: #E4E4E4;">6..49</td>
+<td class="gt_row gt_right" style="background-color: #E4E4E4;"></td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">50</td>
+<td class="gt_row gt_right">10.0000000</td></tr>
+  </tbody>
+  
+  
+</table>
+</div>
+<div id="uniform-to-gaussian" class="section level2">
+<h2>Uniform to Gaussian</h2>
+<p>This function draws y values from a standard normal distribution at any specified x location. We then plot and take a look.</p>
+<pre class="r"><code>centered_norm_draws_fcn &lt;- function(x_loc){
+  temp &lt;- tibble(x = x_loc, y = rnorm(600, 0, 1))
+  return(temp)
+}
+
+pretty_norm_tbl &lt;- x_tbl %&gt;%
+  mutate(y_draws = map(.x = x, .f = centered_norm_draws_fcn)) %&gt;%
+  select(-x) %&gt;%
+  unnest() 
+
+pp1 &lt;- pretty_norm_tbl %&gt;%
+  ggplot(aes(x = x, y = y)) +
+  geom_jitter(size = .1, alpha = .4, width = .02, color = &quot;limegreen&quot;) 
+
+pp2 &lt;- pretty_norm_tbl %&gt;%
+  ggplot(aes(x = x, y = y)) +
+  stat_halfeye(fill = &quot;limegreen&quot;, alpha = .5)
+
+pp1 / pp2 + plot_annotation(
+  title = &#39;(Multivariate) Normal Distributions Positioned at Intervals on the X Axis&#39;,
+  subtitle = &#39;Each Normal Distribution has mean = 0 and sd = 1&#39;
+)</code></pre>
+<p><img src="/post/2022-12-02-gaussian-process-regression-for-fea-designed-experiments-building-the-basics-in-r_files/figure-html/unnamed-chunk-7-1.png" width="100%" height="500px" /></p>
+</div>
+<div id="calculate-distance-between-any-combination-of-points" class="section level2">
+<h2>Calculate Distance Between any combination of points</h2>
+<p>The key idea to creating functions from random draws of a MVN is that points nearby each other are highly correlated while points farther away are less so. The distance() function (plgp library) calculates the distance of the partitioned x-range points from each other and outputs a matrix.</p>
+<pre class="r"><code>d_mat &lt;- distance(x_tbl)</code></pre>
+</div>
+<div id="interlude-a-little-nudge" class="section level2">
+<h2>Interlude: A little nudge</h2>
+<p>We need to create a very small (negligible) numerical value to eventually add to the diagonal. This is a mathematical formality and things work fine without it in our simple case, but we add it here to be consistent with the reference materials. Don’t think too much about it.</p>
+<pre class="r"><code>diag_jitter &lt;- sqrt(.Machine$double.eps) 
+diag_jitter</code></pre>
+<pre><code>## [1] 1.490116e-08</code></pre>
+</div>
+<div id="get-covariance-matrix-sigma" class="section level2">
+<h2>Get Covariance Matrix Sigma</h2>
+<p>We exponentiate the distances to give use the relationship between proximity of points to each other and their correlation. That’s all that is needed to make the covariance matrix!</p>
+<pre class="r"><code>sigma &lt;- exp(-d_mat) + diag(diag_jitter, n_gaussians)</code></pre>
+</div>
+<div id="draw-y-values" class="section level2">
+<h2>Draw Y-Values</h2>
+<p>Draw 1 value each from a bunch of normal distributions linked by the covariance matrix described above.</p>
+<pre class="r"><code>y_tbl &lt;- tibble(y_draws = as.vector(rmvnorm(n = 1, mean = rep(0, length = nrow(x_tbl)), sigma = sigma))) 
+y_tbl</code></pre>
+<pre><code>## # A tibble: 50 x 1
+##    y_draws
+##      &lt;dbl&gt;
+##  1   1.56 
+##  2   1.49 
+##  3   1.31 
+##  4   1.08 
+##  5   0.902
+##  6   0.816
+##  7   0.818
+##  8   0.822
+##  9   0.712
+## 10   0.422
+## # ... with 40 more rows</code></pre>
+</div>
+<div id="combine-the-xs-and-the-ys" class="section level2">
+<h2>Combine the x’s and the y’s</h2>
+<p>Make a tibble to facilitate plotting.</p>
+<pre class="r"><code>gp_prior_tbl &lt;- x_tbl %&gt;%
+  bind_cols(y_tbl)
+
+gp_prior_tbl</code></pre>
+<pre><code>## # A tibble: 50 x 2
+##        x y_draws
+##    &lt;dbl&gt;   &lt;dbl&gt;
+##  1 0       1.56 
+##  2 0.204   1.49 
+##  3 0.408   1.31 
+##  4 0.612   1.08 
+##  5 0.816   0.902
+##  6 1.02    0.816
+##  7 1.22    0.818
+##  8 1.43    0.822
+##  9 1.63    0.712
+## 10 1.84    0.422
+## # ... with 40 more rows</code></pre>
+</div>
+<div id="plot-1-realization" class="section level2">
+<h2>Plot 1 Realization</h2>
+<p>By overlaying our randomly drawn points on the underlying Gaussians and connecting the dots, we see how the correlation matrix, based on distance in x, ensures that the points form a smooth but bumpy curve. The diagonal of the covariance matrix is 1, corresponding to ~95% of the green y values being between -2 and +2.</p>
+<pre class="r"><code>gp_prior_tbl %&gt;%
+  ggplot(aes(x = x, y = y_draws)) +
+  geom_jitter(data = pretty_norm_tbl, aes(x = x, y = y), size = .1, alpha = .4, width = .02, color = &quot;limegreen&quot;) +
+  geom_point(size = 1, color = &quot;black&quot;, alpha = .7) +
+  geom_line(color = &quot;black&quot;)+
+  theme_classic() +
+  labs(title = &quot;Single Random Curve&quot;,
+        subtitle = &quot;Created Using Random Draw From MVN Distribution&quot;)</code></pre>
+<p><img src="/post/2022-12-02-gaussian-process-regression-for-fea-designed-experiments-building-the-basics-in-r_files/figure-html/unnamed-chunk-13-1.png" width="100%" height="500px" /></p>
+</div>
+<div id="define-function-to-make-a-random-trace" class="section level2">
+<h2>Define Function to Make a Random Trace</h2>
+<p>The above steps are converted to a function so that we can repeat our draws easily and create many traces.</p>
+<pre class="r"><code>generate_y_fcn &lt;- function(sim_number){
+  
+x &lt;- seq(from = 0, to = 10, length = n_gaussians)
+d &lt;- distance(x)
+dj &lt;- sqrt(.Machine$double.eps) 
+sig &lt;- exp(-d) + diag(dj, n_gaussians)
+y &lt;- tibble(x = x,
+            y_draws = as.vector(rmvnorm(n = 1, mean = rep(0, length = length(x)), sigma = sig)),
+            sim_number = sim_number)
+return(y)
+}</code></pre>
+</div>
+<div id="map-the-function-over-a-setup-tbl-to-create-multiple-traces" class="section level2">
+<h2>Map the Function Over a Setup Tbl to Create Multiple Traces</h2>
+<p>Generate and plot 12 instances of random curves over the background of Gaussians.</p>
+<pre class="r"><code>n_sim_traces &lt;- 12
+
+multi_trace_prior_tbl &lt;- tibble(trace_num = seq(from = 1, to = n_sim_traces, by = 1) %&gt;% as_factor()) %&gt;%
+  mutate(dat = map(.x = trace_num, .f = generate_y_fcn)) %&gt;%
+  unnest() 
+
+multi_trace_prior_tbl %&gt;% 
+  ggplot(aes(x = x, y = y_draws)) +
+  geom_jitter(data = pretty_norm_tbl, aes(x = x, y = y), size = .1, alpha = .9, width = .02, color = &quot;grey&quot;) +
+  geom_line(aes(color = trace_num), size = 1.3, alpha = .7) +
+  geom_point(size = 1) +
+  theme_classic() +
+  theme(legend.position = &quot;none&quot;) +
+  scale_color_viridis_d(option = &quot;Plasma&quot;) +
+  labs(title = &quot;Multiple Curves Representing Prior Possibilities&quot;,
+       subtitle = &quot;Created Using Random Draw From MVN Distribution&quot;)</code></pre>
+<p><img src="/post/2022-12-02-gaussian-process-regression-for-fea-designed-experiments-building-the-basics-in-r_files/figure-html/unnamed-chunk-15-1.png" width="100%" height="500px" /></p>
+<p>Cool! We explored a clever way to create random functions from multi-normal draws and we specified a covariance matrix the controls the bumpiness and y-scale. Our priors are in place.</p>
+</div>
+</div>
+<div id="conditioning-and-predicting" class="section level1">
+<h1>Conditioning and Predicting</h1>
+<p>There’s one important aspect of drawing the random points this way that I haven’t yet discussed: by using a multivariate normal distribution, we make available a formal way of conditioning on the data and updating the parameters of our normal curves based on their location in x.</p>
+<p>Put another way, the model has a way to learn from the data and modify the mean and variance of each normal distribution in the MVN. This does the job of reducing the range of credible curves that are consistent with the data. This process is consistent with the Bayesian workflow of starting with priors, conditioning on data, and producing a posterior of jointly credible possibilities.</p>
+<p>The derivations for how this works are beyond the scope of this post (and I wouldn’t be a good candidate to explain them well), but they are available <a href="https://en.wikipedia.org/wiki/Multivariate_normal_distribution#Conditional_distributions">HERE</a>. The TLDR is this: we need the following component parts to be able to update our estimates of the mean and variance of each Gaussian, which in turn decreases the dispersion of our randomly generated traces and thereby increases the precision of our predictions.</p>
+<p><img src="/post/2022-12-02-gaussian-process-regression-for-fea-designed-experiments-building-the-basics-in-r_files/joint_predictive_equations_annotated.png" style="width:100.0%" /></p>
+<p>The code that follows goes about constructing each of the component parts in the above equations that will facilitate our predictions.</p>
+<div id="the-data-points" class="section level2">
+<h2>The Data Points</h2>
+<p>Generate a set of n=8 data point. In practice these would be supplied to us via an experiment or some other means.</p>
+<pre class="r"><code>n_dat &lt;- 8
+x_dat &lt;- matrix(seq(0, 2*pi, length=n_dat), ncol=1)
+y_dat &lt;- sin(x_dat)
+
+data_tbl &lt;- tibble(x = x_dat, 
+                   y = y_dat)
+
+data_tbl %&gt;%
+  gt()</code></pre>
+<div id="rsxfjhkhtr" style="overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>html {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
+}
+
+#rsxfjhkhtr .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#rsxfjhkhtr .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#rsxfjhkhtr .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#rsxfjhkhtr .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 6px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#rsxfjhkhtr .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#rsxfjhkhtr .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#rsxfjhkhtr .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#rsxfjhkhtr .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#rsxfjhkhtr .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#rsxfjhkhtr .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#rsxfjhkhtr .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#rsxfjhkhtr .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#rsxfjhkhtr .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#rsxfjhkhtr .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#rsxfjhkhtr .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#rsxfjhkhtr .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#rsxfjhkhtr .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#rsxfjhkhtr .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#rsxfjhkhtr .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#rsxfjhkhtr .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#rsxfjhkhtr .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#rsxfjhkhtr .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#rsxfjhkhtr .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#rsxfjhkhtr .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#rsxfjhkhtr .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#rsxfjhkhtr .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#rsxfjhkhtr .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#rsxfjhkhtr .gt_left {
+  text-align: left;
+}
+
+#rsxfjhkhtr .gt_center {
+  text-align: center;
+}
+
+#rsxfjhkhtr .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#rsxfjhkhtr .gt_font_normal {
+  font-weight: normal;
+}
+
+#rsxfjhkhtr .gt_font_bold {
+  font-weight: bold;
+}
+
+#rsxfjhkhtr .gt_font_italic {
+  font-style: italic;
+}
+
+#rsxfjhkhtr .gt_super {
+  font-size: 65%;
+}
+
+#rsxfjhkhtr .gt_footnote_marks {
+  font-style: italic;
+  font-weight: normal;
+  font-size: 65%;
+}
+</style>
+<table class="gt_table">
+  
+  <thead class="gt_col_headings">
+    <tr>
+      <th class="gt_col_heading gt_columns_bottom_border gt_center" rowspan="1" colspan="1">x</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_center" rowspan="1" colspan="1">y</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td class="gt_row gt_center">0.0000000</td>
+<td class="gt_row gt_center">0.000000e+00</td></tr>
+    <tr><td class="gt_row gt_center">0.8975979</td>
+<td class="gt_row gt_center">7.818315e-01</td></tr>
+    <tr><td class="gt_row gt_center">1.7951958</td>
+<td class="gt_row gt_center">9.749279e-01</td></tr>
+    <tr><td class="gt_row gt_center">2.6927937</td>
+<td class="gt_row gt_center">4.338837e-01</td></tr>
+    <tr><td class="gt_row gt_center">3.5903916</td>
+<td class="gt_row gt_center">-4.338837e-01</td></tr>
+    <tr><td class="gt_row gt_center">4.4879895</td>
+<td class="gt_row gt_center">-9.749279e-01</td></tr>
+    <tr><td class="gt_row gt_center">5.3855874</td>
+<td class="gt_row gt_center">-7.818315e-01</td></tr>
+    <tr><td class="gt_row gt_center">6.2831853</td>
+<td class="gt_row gt_center">-2.449213e-16</td></tr>
+  </tbody>
+  
+  
+</table>
+</div>
+</div>
+<div id="calculating-the-necessary-distances-and-covariance-matrices" class="section level2">
+<h2>Calculating the Necessary Distances and Covariance Matrices</h2>
+<div id="calculate-inverse-of-covariance-matrix-between-x-values-in-vector-of-training-data-observed-datapoints" class="section level3">
+<h3>Calculate: Inverse of Covariance matrix between x values in vector of training data (observed datapoints):</h3>
+<pre class="r"><code>d_dat &lt;- distance(x_dat) 
+sigma_dat &lt;- exp(-d_dat) + diag(diag_jitter, ncol(d_dat))
+inv_sigma_dat &lt;- solve(sigma_dat) #solve() finds inverse</code></pre>
+</div>
+<div id="calculate-covariance-matrix-between-x-values-in-vector-of-desired-test-points-the-x-range-of-interest-where-the-gaussians-are-positioned" class="section level3">
+<h3>Calculate: Covariance matrix between x values in vector of desired test points (the x range of interest where the Gaussians are positioned):</h3>
+<pre class="r"><code>x_pred_range &lt;- matrix(seq(-0.5, 2*pi + 0.5, length=100), ncol=1)
+
+d_x_pred_range &lt;- distance(x_pred_range)
+sigma_x_pred_range &lt;- exp(-d_x_pred_range) + diag(diag_jitter, ncol(d_x_pred_range))</code></pre>
+</div>
+<div id="calculate-covariance-matrix-between-x-values-in-vector-of-training-data-observed-datapoints-and-x-values-in-vector-of-desired-test-points-the-x-range-of-interest-where-the-gaussians-are-positioned" class="section level3">
+<h3>Calculate: Covariance matrix between x values in vector of training data (observed datapoints) and x values in vector of desired test points (the x range of interest where the Gaussians are positioned ):</h3>
+<pre class="r"><code>d_x_dat &lt;- distance(x_pred_range, x_dat)
+sigma_x_dat &lt;- exp(-d_x_dat) </code></pre>
+</div>
+</div>
+<div id="combine-per-the-conditioning-equations-above" class="section level2">
+<h2>Combine Per the Conditioning Equations Above</h2>
+<p>Bring it together by combining the above inputs into the predictive equations. The output will be trained means and (reduced) variances from which to draw new points to create new traces.</p>
+<pre class="r"><code>mu_pred &lt;- sigma_x_dat %*% inv_sigma_dat %*% y_dat
+
+sigma_pred &lt;- sigma_x_pred_range - sigma_x_dat %*% inv_sigma_dat %*% t(sigma_x_dat)</code></pre>
+</div>
+<div id="draw-from-the-updated-gaussians" class="section level2">
+<h2>Draw from the Updated Gaussians</h2>
+<pre class="r"><code>y_draws &lt;- rmvnorm(1, mu_pred, sigma_pred)
+
+y_draws %&gt;% as.vector()</code></pre>
+<pre><code>##   [1] -0.11135178 -0.13414543 -0.14125646 -0.13384335 -0.11310097 -0.08032221
+##   [7] -0.03869301  0.01008520  0.06426747  0.12167776  0.18125818  0.24235780
+##  [13]  0.30473905  0.36878655  0.43483034  0.50286496  0.57276290  0.64341048
+##  [19]  0.71394154  0.78186652  0.84577472  0.90297749  0.95168825  0.99017006
+##  [25]  1.01800993  1.03518813  1.04214564  1.04042284  1.03171212  1.01776905
+##  [31]  0.99957608  0.97924481  0.95714576  0.93327439  0.90739967  0.87885348
+##  [37]  0.84624283  0.80916023  0.76606525  0.71690098  0.66145810  0.59996973
+##  [43]  0.53349461  0.46304360  0.38937083  0.31415990  0.23807037  0.16243279
+##  [49]  0.08706189  0.01247238 -0.06049590 -0.13256227 -0.20299983 -0.27120336
+##  [55] -0.33690887 -0.39869342 -0.45653362 -0.50974602 -0.55842531 -0.60249705
+##  [61] -0.64369848 -0.68291472 -0.72150414 -0.76086850 -0.80247216 -0.84637868
+##  [67] -0.89223759 -0.93883876 -0.98369467 -1.02455925 -1.05798305 -1.08237703
+##  [73] -1.09435116 -1.09289825 -1.07770612 -1.04977391 -1.00965956 -0.96046396
+##  [79] -0.90481696 -0.84427854 -0.78205657 -0.71951229 -0.65718008 -0.59550566
+##  [85] -0.53379511 -0.47180457 -0.40834782 -0.34347059 -0.27688415 -0.20952401
+##  [91] -0.14200053 -0.07558342 -0.01236511  0.04618189  0.09857431  0.14360497
+##  [97]  0.18013374  0.20735434  0.22425309  0.23046425</code></pre>
+</div>
+<div id="plot-the-draws" class="section level2">
+<h2>Plot the Draws</h2>
+<p>Plot the single trace drawn from posterior.</p>
+<pre class="r"><code>tibble(x = x_pred_range,
+       y = as.vector(y_draws)) %&gt;%
+  ggplot(aes(x = x, y = y)) +
+  geom_point(color = &quot;purple&quot;) +
+  geom_line(color = &quot;purple&quot;) +
+  labs(title = &quot;Single Trace Generated from Draws of Posterior&quot;,
+       subtitle = &quot;Gaussians conditioned on n=8 data points&quot;)</code></pre>
+<p><img src="/post/2022-12-02-gaussian-process-regression-for-fea-designed-experiments-building-the-basics-in-r_files/figure-html/unnamed-chunk-22-1.png" width="100%" height="500px" /></p>
+</div>
+<div id="function-for-many-posterior-draws" class="section level2">
+<h2>Function for Many Posterior Draws</h2>
+<p>Now that we’ve shown how to create a set of draws to construct a posterior trace, let’s make it a function so that we can plot many traces. The function below is just all the same steps of the last section but combined into a tibble as the last step. This let’s us map the function easily as we expand the simulation.</p>
+<pre class="r"><code>generate_ypred_fcn &lt;- function(sim_number){
+
+#distance and sigma
+d_dat &lt;- distance(x_dat) 
+sigma_dat &lt;- exp(-d_dat) + diag(diag_jitter, ncol(d_dat))
+
+#x range
+x_pred_range &lt;- matrix(seq(-0.5, 2*pi + 0.5, length=50), ncol=1)
+
+#x point distance and sigma
+d_x_pred_range &lt;- distance(x_pred_range)
+sigma_x_pred_range &lt;- exp(-d_x_pred_range) + diag(diag_jitter, ncol(d_x_pred_range))
+
+#distance and sigma between x points and x data points
+d_x_dat &lt;- distance(x_pred_range, x_dat)
+sigma_x_dat &lt;- exp(-d_x_dat) 
+
+#inverse sigma for distance between x data points
+inv_sigma_dat &lt;- solve(sigma_dat)
+
+#mu and sigma pred
+mu_pred &lt;- sigma_x_dat %*% inv_sigma_dat %*% y_dat
+sigma_pred &lt;- sigma_x_pred_range - sigma_x_dat %*% inv_sigma_dat %*% t(sigma_x_dat)
+
+#y preds at x pred range points
+y_draws &lt;- rmvnorm(1, mu_pred, sigma_pred)
+
+y &lt;- tibble(x = x_pred_range,
+            mu_y_pred = as.vector(mu_pred),
+            y_draws = as.vector(rmvnorm(n = 1, mean = mu_pred, sigma = sigma_pred)),
+            sim_number = sim_number)
+return(y)
+}</code></pre>
+</div>
+<div id="generate-many-draws-for-posterior-traces" class="section level2">
+<h2>Generate Many Draws for Posterior Traces</h2>
+<p>Simply specify the number of desired traces and use the newly created function to start drawing that many from the MVN.</p>
+<pre class="r"><code>n_sim_traces &lt;- 500
+
+multi_trace_post_tbl &lt;- tibble(trace_num = seq(from = 1, to = n_sim_traces, by = 1) %&gt;% as_factor()) %&gt;%
+  mutate(dat = map(.x = trace_num, .f = generate_ypred_fcn)) %&gt;%
+  unnest() %&gt;%
+  select(-sim_number)
+
+multi_trace_post_tbl %&gt;%
+  gt_preview()</code></pre>
+<div id="emmwxbyhsn" style="overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>html {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
+}
+
+#emmwxbyhsn .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#emmwxbyhsn .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#emmwxbyhsn .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#emmwxbyhsn .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 6px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#emmwxbyhsn .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#emmwxbyhsn .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#emmwxbyhsn .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#emmwxbyhsn .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#emmwxbyhsn .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#emmwxbyhsn .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#emmwxbyhsn .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#emmwxbyhsn .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#emmwxbyhsn .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#emmwxbyhsn .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#emmwxbyhsn .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#emmwxbyhsn .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#emmwxbyhsn .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#emmwxbyhsn .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#emmwxbyhsn .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#emmwxbyhsn .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#emmwxbyhsn .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#emmwxbyhsn .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#emmwxbyhsn .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#emmwxbyhsn .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#emmwxbyhsn .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#emmwxbyhsn .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#emmwxbyhsn .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#emmwxbyhsn .gt_left {
+  text-align: left;
+}
+
+#emmwxbyhsn .gt_center {
+  text-align: center;
+}
+
+#emmwxbyhsn .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#emmwxbyhsn .gt_font_normal {
+  font-weight: normal;
+}
+
+#emmwxbyhsn .gt_font_bold {
+  font-weight: bold;
+}
+
+#emmwxbyhsn .gt_font_italic {
+  font-style: italic;
+}
+
+#emmwxbyhsn .gt_super {
+  font-size: 65%;
+}
+
+#emmwxbyhsn .gt_footnote_marks {
+  font-style: italic;
+  font-weight: normal;
+  font-size: 65%;
+}
+</style>
+<table class="gt_table">
+  
+  <thead class="gt_col_headings">
+    <tr>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1"></th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1">trace_num</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_center" rowspan="1" colspan="1">x</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1">mu_y_pred</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1">y_draws</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">1</td>
+<td class="gt_row gt_left">1</td>
+<td class="gt_row gt_center">-0.50000000</td>
+<td class="gt_row gt_right">-0.15088553</td>
+<td class="gt_row gt_right">-0.41433594</td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">2</td>
+<td class="gt_row gt_left">1</td>
+<td class="gt_row gt_center">-0.35136357</td>
+<td class="gt_row gt_right">-0.13638869</td>
+<td class="gt_row gt_right">-0.23805775</td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">3</td>
+<td class="gt_row gt_left">1</td>
+<td class="gt_row gt_center">-0.20272713</td>
+<td class="gt_row gt_right">-0.09766208</td>
+<td class="gt_row gt_right">-0.10048631</td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">4</td>
+<td class="gt_row gt_left">1</td>
+<td class="gt_row gt_center">-0.05409070</td>
+<td class="gt_row gt_right">-0.03122685</td>
+<td class="gt_row gt_right">-0.01702983</td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">5</td>
+<td class="gt_row gt_left">1</td>
+<td class="gt_row gt_center">0.09454574</td>
+<td class="gt_row gt_right">0.06321976</td>
+<td class="gt_row gt_right">0.01810016</td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier; font-size: x-small; background-color: #E4E4E4;">6..24999</td>
+<td class="gt_row gt_left" style="background-color: #E4E4E4;"></td>
+<td class="gt_row gt_center" style="background-color: #E4E4E4;"></td>
+<td class="gt_row gt_right" style="background-color: #E4E4E4;"></td>
+<td class="gt_row gt_right" style="background-color: #E4E4E4;"></td></tr>
+    <tr><td class="gt_row gt_left gt_stub" style="font-family: Courier;">25000</td>
+<td class="gt_row gt_left">500</td>
+<td class="gt_row gt_center">6.78318531</td>
+<td class="gt_row gt_right">0.15088553</td>
+<td class="gt_row gt_right">0.45732248</td></tr>
+  </tbody>
+  
+  
+</table>
+</div>
+</div>
+<div id="visualize" class="section level2">
+<h2>Visualize</h2>
+<p>Structuring the data this way allows for plotting many traces of the posterior draws. In the figure below, the black line represents predictions, the red points are the training data, and the “bubbles” represent uncertainty. Notice how the uncertainty collapses near the observed data - just like we would want for FEA!</p>
+<pre class="r"><code>multi_trace_post_tbl %&gt;% 
+  ggplot(aes(x = x, y = y_draws)) +
+  geom_line(aes(color = trace_num)) +
+  geom_line(aes(x = x, y = mu_y_pred), size = 2) +
+  geom_point(size = .5) +
+  geom_point(dat = data_tbl, aes(x = x, y = y), size = 4, color = &quot;firebrick&quot;) +
+  theme(legend.position = &quot;none&quot;) +
+  scale_color_viridis_d() +
+  labs(title = &quot;Credible Posterior Traces&quot;,
+       subtitle = &quot;Gaussians trained on n=8 data points&quot;,
+       caption = &quot;Red points are observed data\nBlack line is predictions&quot;)</code></pre>
+<p><img src="/post/2022-12-02-gaussian-process-regression-for-fea-designed-experiments-building-the-basics-in-r_files/figure-html/unnamed-chunk-25-1.png" width="100%" height="500px" /></p>
+</div>
+<div id="more-visualize" class="section level2">
+<h2>More Visualize</h2>
+<p>Just for fun, let’s just observe how the Gaussians collapse from prior to posterior, based on the data:</p>
+<pre class="r"><code>x_pred_range_new &lt;- matrix(seq(-0.5, 2*pi + 0.5, length=50), ncol=1)
+
+pretty_norm_tbl_2 &lt;- tibble(x = x_pred_range_new) %&gt;%
+  mutate(y_draws = map(.x = x, .f = centered_norm_draws_fcn)) %&gt;%
+  select(-x) %&gt;%
+  unnest() 
+
+prior_gaussians &lt;- pretty_norm_tbl_2 %&gt;% 
+  ggplot(aes(x = x, y = y)) +
+  geom_jitter(size = .1, alpha = .4, width = .01, color = &quot;limegreen&quot;) 
+
+
+post_gaussians &lt;- multi_trace_post_tbl %&gt;% 
+  ggplot(aes(x = x, y = y_draws)) +
+  geom_jitter(size = .1, alpha = .4, width = .01, color = &quot;firebrick&quot;) +
+  geom_point(dat = data_tbl, aes(x = x, y = y), size = 2, color = &quot;black&quot;) 
+
+prior_gaussians / post_gaussians +
+  plot_annotation(title = &quot;Gaussian Process Regression&quot;,
+                  subtitle = &quot;Image represents stacking of multivariate normal dimensions across an X-range of interest&quot;,
+                  caption = &quot;Upper Panel: Prior\nLower Panel: Posterior&quot;)</code></pre>
+<p><img src="/post/2022-12-02-gaussian-process-regression-for-fea-designed-experiments-building-the-basics-in-r_files/figure-html/unnamed-chunk-26-1.png" width="100%" height="500px" /></p>
+</div>
+</div>
+<div id="conclusion" class="section level1">
+<h1>Conclusion</h1>
+<p>In this walk through we built up a Gaussian Process Regression model from scratch and showed how to train it and use it for predictions. I hope I was able to communicate the unique features of this model type: specifying priors over a range of many different functions, building and training a large multi-variate normal distribution to create credible functions across a range of interest, and representing uncertainty while still collapsing on the observed data. In a future post I promise we’ll circle back to the unique use-case that was the motivation for my learning in the first place: fitting a GPR to FEA generated DOE data. If you’ve made it this far, thank you for your attention.</p>
+</div>
+<div id="sessioninfo" class="section level1">
+<h1>sessionInfo</h1>
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>## R version 4.0.3 (2020-10-10)
+## Platform: x86_64-w64-mingw32/x64 (64-bit)
+## Running under: Windows 10 x64 (build 18363)
+## 
+## Matrix products: default
+## 
+## locale:
+## [1] LC_COLLATE=English_United States.1252 
+## [2] LC_CTYPE=English_United States.1252   
+## [3] LC_MONETARY=English_United States.1252
+## [4] LC_NUMERIC=C                          
+## [5] LC_TIME=English_United States.1252    
+## 
+## attached base packages:
+## [1] stats     graphics  grDevices utils     datasets  methods   base     
+## 
+## other attached packages:
+##  [1] patchwork_1.1.1 tidybayes_3.0.2 plgp_1.1-10     tgp_2.4-18     
+##  [5] mvtnorm_1.1-3   gt_0.3.1        here_1.0.1      forcats_0.5.1  
+##  [9] stringr_1.4.0   dplyr_1.0.7     purrr_0.3.4     readr_2.1.1    
+## [13] tidyr_1.1.4     tibble_3.1.6    ggplot2_3.3.5   tidyverse_1.3.1
+## 
+## loaded via a namespace (and not attached):
+##  [1] fs_1.5.2             lubridate_1.8.0      httr_1.4.2          
+##  [4] rprojroot_2.0.2      tensorA_0.36.2       tools_4.0.3         
+##  [7] backports_1.4.1      bslib_0.3.1          utf8_1.2.2          
+## [10] R6_2.5.1             rpart_4.1-15         DBI_1.1.2           
+## [13] colorspace_2.0-2     ggdist_3.0.1         withr_2.4.3         
+## [16] tidyselect_1.1.1     compiler_4.0.3       cli_3.1.0           
+## [19] rvest_1.0.2          arrayhelpers_1.1-0   xml2_1.3.3          
+## [22] labeling_0.4.2       bookdown_0.21        posterior_1.2.0     
+## [25] sass_0.4.0           scales_1.1.1         checkmate_2.0.0     
+## [28] digest_0.6.28        rmarkdown_2.11       pkgconfig_2.0.3     
+## [31] htmltools_0.5.2      highr_0.9            dbplyr_2.1.1        
+## [34] fastmap_1.1.0        rlang_0.4.11         readxl_1.3.1        
+## [37] rstudioapi_0.13      jquerylib_0.1.4      farver_2.1.0        
+## [40] generics_0.1.1       svUnit_1.0.6         jsonlite_1.7.2      
+## [43] distributional_0.3.0 magrittr_2.0.1       Rcpp_1.0.7          
+## [46] munsell_0.5.0        fansi_0.5.0          maptree_1.4-8       
+## [49] abind_1.4-5          lifecycle_1.0.1      stringi_1.7.4       
+## [52] yaml_2.2.1           grid_4.0.3           crayon_1.4.2        
+## [55] lattice_0.20-45      haven_2.4.3          hms_1.1.1           
+## [58] knitr_1.34           pillar_1.6.4         reprex_2.0.1        
+## [61] glue_1.6.0           evaluate_0.14        blogdown_0.15       
+## [64] modelr_0.1.8         vctrs_0.3.8          tzdb_0.2.0          
+## [67] cellranger_1.1.0     gtable_0.3.0         assertthat_0.2.1    
+## [70] xfun_0.29            broom_0.7.11         coda_0.19-4         
+## [73] viridisLite_0.4.0    cluster_2.1.2        ellipsis_0.3.2</code></pre>
+</div>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p><a href="https://bookdown.org/rbg/surrogates/" class="uri">https://bookdown.org/rbg/surrogates/</a><a href="#fnref1" class="footnote-back">↩︎</a></p></li>
+</ol>
+</div>
+
+  
+
+  
+<div class="prev-next-post pure-g">
+  <div class="pure-u-1-24" style="text-align: left;">
+    
+    <a href="/post/power-analysis-for-a-dv-test-frequentist-and-bayesian-estimation-in-r/"><i class="fa fa-chevron-left"></i></a>
+    
+  </div>
+  <div class="pure-u-10-24">
+    
+    <nav class="prev">
+      <a href="/post/power-analysis-for-a-dv-test-frequentist-and-bayesian-estimation-in-r/">Power Analysis for a DV Test - Frequentist and Bayesian Estimation in R </a>
+    </nav>
+    
+  </div>
+  <div class="pure-u-2-24">
+    &nbsp;
+  </div>
+  <div class="pure-u-10-24">
+    
+  </div>
+  <div class="pure-u-1-24" style="text-align: right;">
+    
+  </div>
+</div>
+
+
+
+
+</div>
+
+</div>
+</div>
+<script src="/js/ui.js"></script>
+<script src="/js/menus.js"></script>
+
+
+<script>
+  
+  if (window.location.hostname != "localhost") {
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+    ga('create', 'Your Google Analytics tracking ID', 'auto');
+    ga('send', 'pageview');
+  }
+</script>
+
+
+
+
+
+<script src="/js/math-code.js"></script>
+  <script async src="//cdn.bootcss.com/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+  
+
+
+</body>
+</html>
+

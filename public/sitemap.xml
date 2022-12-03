@@ -3,33 +3,39 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>/</loc>
-    <lastmod>2022-11-17T00:00:00+00:00</lastmod>
-  </url><url>
-    <loc>/categories/bayesian/</loc>
-    <lastmod>2022-11-17T00:00:00+00:00</lastmod>
+    <lastmod>2022-12-02T00:00:00+00:00</lastmod>
   </url><url>
     <loc>/categories/</loc>
+    <lastmod>2022-12-02T00:00:00+00:00</lastmod>
+  </url><url>
+    <loc>/post/gaussian-process-regression-for-fea-designed-experiments-building-the-basics-in-r/</loc>
+    <lastmod>2022-12-02T00:00:00+00:00</lastmod>
+  </url><url>
+    <loc>/post/</loc>
+    <lastmod>2022-12-02T00:00:00+00:00</lastmod>
+  </url><url>
+    <loc>/tags/r/</loc>
+    <lastmod>2022-12-02T00:00:00+00:00</lastmod>
+  </url><url>
+    <loc>/categories/r/</loc>
+    <lastmod>2022-12-02T00:00:00+00:00</lastmod>
+  </url><url>
+    <loc>/categories/stats/</loc>
+    <lastmod>2022-12-02T00:00:00+00:00</lastmod>
+  </url><url>
+    <loc>/tags/</loc>
+    <lastmod>2022-12-02T00:00:00+00:00</lastmod>
+  </url><url>
+    <loc>/tags/tutorial/</loc>
+    <lastmod>2022-12-02T00:00:00+00:00</lastmod>
+  </url><url>
+    <loc>/categories/bayesian/</loc>
     <lastmod>2022-11-17T00:00:00+00:00</lastmod>
   </url><url>
     <loc>/categories/frequentist/</loc>
     <lastmod>2022-11-17T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>/post/</loc>
-    <lastmod>2022-11-17T00:00:00+00:00</lastmod>
-  </url><url>
     <loc>/post/power-analysis-for-a-dv-test-frequentist-and-bayesian-estimation-in-r/</loc>
-    <lastmod>2022-11-17T00:00:00+00:00</lastmod>
-  </url><url>
-    <loc>/tags/r/</loc>
-    <lastmod>2022-11-17T00:00:00+00:00</lastmod>
-  </url><url>
-    <loc>/categories/r/</loc>
-    <lastmod>2022-11-17T00:00:00+00:00</lastmod>
-  </url><url>
-    <loc>/categories/stats/</loc>
-    <lastmod>2022-11-17T00:00:00+00:00</lastmod>
-  </url><url>
-    <loc>/tags/</loc>
     <lastmod>2022-11-17T00:00:00+00:00</lastmod>
   </url><url>
     <loc>/post/learning-from-failure-nitinol-fracture-mechanics-in-r/</loc>
@@ -57,9 +63,6 @@
     <lastmod>2021-06-22T00:00:00+00:00</lastmod>
   </url><url>
     <loc>/tags/solidworks/</loc>
-    <lastmod>2021-04-01T00:00:00+00:00</lastmod>
-  </url><url>
-    <loc>/tags/tutorial/</loc>
     <lastmod>2021-04-01T00:00:00+00:00</lastmod>
   </url><url>
     <loc>/post/tutorial-design-study-in-solidworks-with-data-analysis-in-r/</loc>

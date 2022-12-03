@@ -1,0 +1,510 @@
+---
+title: Gaussian Process Regression for FEA Designed Experiments - Building the Basics
+  in R
+author: Riley
+date: '2022-12-02'
+slug: gaussian-process-regression-for-fea-designed-experiments-building-the-basics-in-r
+categories:
+  - Stats
+  - R
+tags:
+  - tutorial
+  - R
+description: ''
+topics: []
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  out.width = "100%",
+  out.height = "500px",
+  fig.pos = "center",
+  dpi = 300
+)
+```
+
+
+A Google search for 'Gaussian Process Regression' returns some intimidating material for a non-statistician.  After filtering away the obscure stuff I'll never understand and digging around within the code that makes GPR happen, I'm proud to say that I feel I've gotten my arms around the basics of GPR.  The only way to confirm if this is true or not is for me to try to explain it - so that's what I plan to do in this post. For reference, the educational resource that resonated most with my style of learning is the wonderful text "Surrogates - Gaussian process modeling, design and optimization for the applied sciences" by Robert B. Gramacy.^[https://bookdown.org/rbg/surrogates/]  My thanks go out to the author for making his work freely available on bookdown.org. Much of this post is a Tidyverse-centric re-framing and expansion of ideas presented in Chapter 5 of Surrogates.
+
+But this isn't just a whimsical exploration of a random algorithm - GPR has an elegant use-case right here in the medical device development domain: fitting predictive models for designed experiments (DOE) in which Finite Element Analysis (FEA) is used to make predictions about an output of interest.  Essentially, GPR can replace and improve upon the traditional regression techniques used in Response Surface Modeling (RSM).  
+
+Why would GPR be a good choice for modeling data produced by FEA?  Well FEA is a deterministic modeling process - the prediction for any set of inputs (boundary conditions) is unique and repeatable.  There is no noise or experimental error.  This means a transfer function that passes through every point in the training data would be preferred.  With a traditional regression model, the flexibility needed hit every data point would require many high order terms, sabotaging the model's predictive ability on new data.  But GPR has the amazing ability to swerve gently and fluidly between data points, meeting each one perfectly on its way to the next.  This allows GPR to make perfect predictions on the training data while providing sound predictions in the areas in between the training points.  
+
+As if that wasn't enough, GPR is consistent with a Bayesian framework whereby priors and are asserted (informed by domain knowledge where applicable) and a posterior distribution is generated after conditioning on the observed training data.  And just like any Bayesian posterior, uncertainty intervals are easily available and their meaning is intuitive. 
+
+Please note - I won't actually be working through an example of fitting FEA data from a DOE here today - I'll get to that in a follow up post. Today it's just the basics.
+
+```{r, echo=FALSE}
+# copied function to render table of contents anywhere in the doc
+render_toc <- function(filename,
+                       toc_header_name = "Table of Contents",
+                       base_level = NULL,
+                       toc_depth = 3) {
+  x <- readLines(filename, warn = FALSE)
+  x <- paste(x, collapse = "\n")
+  x <- paste0("\n", x, "\n")
+  for (i in 5:3) {
+    regex_code_fence <- paste0("\n[`]{", i, "}.+?[`]{", i, "}\n")
+    x <- gsub(regex_code_fence, "", x)
+  }
+  x <- strsplit(x, "\n")[[1]]
+  x <- x[grepl("^#+", x)]
+  if (!is.null(toc_header_name)) {
+    x <- x[!grepl(paste0("^#+ ", toc_header_name), x)]
+  }
+  if (is.null(base_level)) {
+    base_level <- min(sapply(gsub("(#+).+", "\\1", x), nchar))
+  }
+  start_at_base_level <- FALSE
+  x <- sapply(x, function(h) {
+    level <- nchar(gsub("(#+).+", "\\1", h)) - base_level
+    if (level < 0) {
+      stop(
+        "Cannot have negative header levels. Problematic header \"", h, '" ',
+        "was considered level ", level, ". Please adjust `base_level`."
+      )
+    }
+    if (level > toc_depth - 1) {
+      return("")
+    }
+    if (!start_at_base_level && level == 0) start_at_base_level <<- TRUE
+    if (!start_at_base_level) {
+      return("")
+    }
+    if (grepl("\\{#.+\\}(\\s+)?$", h)) {
+      # has special header slug
+      header_text <- gsub("#+ (.+)\\s+?\\{.+$", "\\1", h)
+      header_slug <- gsub(".+\\{\\s?#([-_.a-zA-Z]+).+", "\\1", h)
+    } else {
+      header_text <- gsub("#+\\s+?", "", h)
+      header_text <- gsub("\\s+?\\{.+\\}\\s*$", "", header_text) # strip { .tabset ... }
+      header_text <- gsub("^[^[:alpha:]]*\\s*", "", header_text) # remove up to first alpha char
+      header_slug <- paste(strsplit(header_text, " ")[[1]], collapse = "-")
+      header_slug <- tolower(header_slug)
+    }
+    paste0(strrep(" ", level * 4), "- [", header_text, "](#", header_slug, ")")
+  })
+  x <- x[x != ""]
+  knitr::asis_output(paste(x, collapse = "\n"))
+}
+```
+
+```{r toc, echo=FALSE} 
+render_toc("2022-12-02-gaussian-process-regression-for-fea-designed-experiments-building-the-basics-in-r.Rmd")
+```
+
+# Libraries
+
+```{r}
+library(tidyverse)
+library(here)
+library(gt)
+library(plgp) #to calculate distance between points
+library(mvtnorm) #to draw from multivariate normal 
+library(tidybayes)
+library(patchwork)
+
+theme_set(theme_classic())
+```
+
+# Plan and Background
+
+The plan for setting up Gaussian Process Regression sounds pretty absurd until you actually see it work, so bear with me. In this example, we'll consider the scenario where we have one input variable x and we wish to predict the output y.
+
+## Consider Many Possible Functions
+
+Rather than assuming some parametric model and then fitting parameters to it, in GPR we start by considering many possible functions that could occupy the x-y space.  In our case, we can think of the functions as squiggly traces on a 2d plot.  Before seeing any data, our possible functions could take just about any course or path in the space.  Our first goal in GPR is to find a way to construct a bunch of random squiggly functions across a range of interest for x and over an assumed scale of y.  
+
+## From Randomly Drawn Points to Traces
+
+One way to construct a trace from left to right in 2d space would be to partition the x range up in to discrete intervals, draw a random y value at each x interval, and then connect the resulting points with lines.  This would provide traces across the 2d space, but if the random draws were from a grid of y values or a uniform distribution in y, each draw's position in y would be random and our trace would swing wildly up and down, displaying none of the cohesion or "smoothness" that we think of in functions. It would look like random noise.
+
+```{r}
+n_uniforms <- 50
+x_tbl <- tibble(x = seq(from = 0, to = 10, length = n_uniforms))
+```
+
+This function draws y values from a uniform [-3, 3] distribution at any specified x location.  We then plot and take a look.
+
+```{r}
+centered_unif_draws_fcn <- function(x_loc, n_draws){
+  temp <- tibble(x = x_loc, y = runif(n_draws, -3, 3))
+  return(temp)
+}
+
+unif_tbl <- x_tbl %>%
+  mutate(y_draws = map(.x = x, .f = centered_unif_draws_fcn, n_draws = 600)) %>%
+  select(-x) %>%
+  unnest()
+
+single_set <- x_tbl %>%
+  mutate(y_draws = map(.x = x, .f = centered_unif_draws_fcn, n_draws = 1)) %>%
+  select(-x) %>%
+  unnest()
+
+unif_tbl %>%
+  ggplot(aes(x = x, y = y)) +
+  geom_jitter(size = .1, alpha = .4, width = .02, color = "#2c3e50") +
+  geom_point(data = single_set, aes(x = x, y = y), size = 2, color = "firebrick") +
+  geom_line(data = single_set, aes(x = x, y = y), size = 1.5, color = "firebrick", alpha = .8) +
+  labs(title = "Draws from Uniform Distributions",
+       subtitle = "Positioned at x intervals",
+       caption = "red line represents trace created by connecting a single draw from each distribtion")
+
+```
+
+Now here's the amazing part - suppose that instead of drawing the y values from uniform distributions and creating noise, we use a normal (Gaussian) distribution instead.  If we then asserted the Gaussians were actually part of a multi-variate normal distribution with a shared covariance matrix, we could control the nature of the draws such that points nearby each other (on the x axis) were highly correlated but points far from each other (on the x axis) were not highly correlated.  It turns out that random points drawn and connected under these conditions yield a smooth trace.
+
+A 2nd draw from the MVN produces another set of points that connect to form a 2nd random trace with a different path but similar smoothness and scale to the first.  In this way, the stacking of normal curves in the x dimension allows random draws to produce random curves of specified scale and smoothness. We tailor the covariance matrix to give us the scale and smoothness to produce a range of various possible curves that could plausibly be the function that we want.  These are our priors.  
+
+# Priors - Random Traces with a Few Built in Assumptions
+
+We choose 50 Gaussians, 1 for each of the 50 desired partitions of the x range [0,10] that spans the region of interest.
+
+```{r}
+n_gaussians <- 50
+```
+
+Partition the x range of interest with the number of partitions equal to the number of specified Gaussians.
+
+```{r}
+x_tbl <- tibble(x = seq(from = 0, to = 10, length = n_gaussians))
+x_tbl %>%
+  gt_preview()
+```
+
+## Uniform to Gaussian
+
+This function draws y values from a standard normal distribution at any specified x location.  We then plot and take a look.
+
+```{r}
+centered_norm_draws_fcn <- function(x_loc){
+  temp <- tibble(x = x_loc, y = rnorm(600, 0, 1))
+  return(temp)
+}
+
+pretty_norm_tbl <- x_tbl %>%
+  mutate(y_draws = map(.x = x, .f = centered_norm_draws_fcn)) %>%
+  select(-x) %>%
+  unnest() 
+
+pp1 <- pretty_norm_tbl %>%
+  ggplot(aes(x = x, y = y)) +
+  geom_jitter(size = .1, alpha = .4, width = .02, color = "limegreen") 
+
+pp2 <- pretty_norm_tbl %>%
+  ggplot(aes(x = x, y = y)) +
+  stat_halfeye(fill = "limegreen", alpha = .5)
+
+pp1 / pp2 + plot_annotation(
+  title = '(Multivariate) Normal Distributions Positioned at Intervals on the X Axis',
+  subtitle = 'Each Normal Distribution has mean = 0 and sd = 1'
+)
+  
+```
+
+## Calculate Distance Between any combination of points 
+
+The key idea to creating functions from random draws of a MVN is that points nearby each other are highly correlated while points farther away are less so.  The distance() function (plgp library) calculates the distance of the partitioned x-range points from each other and outputs a matrix.
+
+```{r}
+d_mat <- distance(x_tbl)
+```
+
+## Interlude:  A little nudge 
+
+We need to create a very small (negligible) numerical value to eventually add to the diagonal.  This is a mathematical formality and things work fine without it in our simple case, but we add it here to be consistent with the reference materials.  Don't think too much about it.
+
+```{r}
+diag_jitter <- sqrt(.Machine$double.eps) 
+diag_jitter
+```
+
+## Get Covariance Matrix Sigma
+
+We exponentiate the distances to give use the relationship between proximity of points to each other and their correlation.  That's all that is needed to make the covariance matrix!
+
+```{r}
+sigma <- exp(-d_mat) + diag(diag_jitter, n_gaussians)
+```
+
+## Draw Y-Values
+
+Draw 1 value each from a bunch of normal distributions linked by the covariance matrix described above.  
+
+```{r}
+
+y_tbl <- tibble(y_draws = as.vector(rmvnorm(n = 1, mean = rep(0, length = nrow(x_tbl)), sigma = sigma))) 
+y_tbl
+```
+
+## Combine the x's and the y's
+
+Make a tibble to facilitate plotting.
+
+```{r}
+gp_prior_tbl <- x_tbl %>%
+  bind_cols(y_tbl)
+
+gp_prior_tbl
+```
+
+## Plot 1 Realization
+
+By overlaying our randomly drawn points on the underlying Gaussians and connecting the dots, we see how the correlation matrix, based on distance in x, ensures that the points form a smooth but bumpy curve. The diagonal of the covariance matrix is 1, corresponding to ~95% of the green y values being between -2 and +2.
+
+```{r}
+gp_prior_tbl %>%
+  ggplot(aes(x = x, y = y_draws)) +
+  geom_jitter(data = pretty_norm_tbl, aes(x = x, y = y), size = .1, alpha = .4, width = .02, color = "limegreen") +
+  geom_point(size = 1, color = "black", alpha = .7) +
+  geom_line(color = "black")+
+  theme_classic() +
+  labs(title = "Single Random Curve",
+        subtitle = "Created Using Random Draw From MVN Distribution")
+
+```
+
+## Define Function to Make a Random Trace
+
+The above steps are converted to a function so that we can repeat our draws easily and create many traces. 
+
+```{r}
+generate_y_fcn <- function(sim_number){
+  
+x <- seq(from = 0, to = 10, length = n_gaussians)
+d <- distance(x)
+dj <- sqrt(.Machine$double.eps) 
+sig <- exp(-d) + diag(dj, n_gaussians)
+y <- tibble(x = x,
+            y_draws = as.vector(rmvnorm(n = 1, mean = rep(0, length = length(x)), sigma = sig)),
+            sim_number = sim_number)
+return(y)
+}
+```
+
+## Map the Function Over a Setup Tbl to Create Multiple Traces
+
+Generate and plot 12 instances of random curves over the background of Gaussians.
+
+```{r}
+n_sim_traces <- 12
+
+multi_trace_prior_tbl <- tibble(trace_num = seq(from = 1, to = n_sim_traces, by = 1) %>% as_factor()) %>%
+  mutate(dat = map(.x = trace_num, .f = generate_y_fcn)) %>%
+  unnest() 
+
+multi_trace_prior_tbl %>% 
+  ggplot(aes(x = x, y = y_draws)) +
+  geom_jitter(data = pretty_norm_tbl, aes(x = x, y = y), size = .1, alpha = .9, width = .02, color = "grey") +
+  geom_line(aes(color = trace_num), size = 1.3, alpha = .7) +
+  geom_point(size = 1) +
+  theme_classic() +
+  theme(legend.position = "none") +
+  scale_color_viridis_d(option = "Plasma") +
+  labs(title = "Multiple Curves Representing Prior Possibilities",
+       subtitle = "Created Using Random Draw From MVN Distribution")
+  
+```
+
+Cool!  We explored a clever way to create random functions from multi-normal draws and we specified a covariance matrix the controls the bumpiness and y-scale.  Our priors are in place. 
+
+# Conditioning and Predicting
+
+There's one important aspect of drawing the random points this way that I haven't yet discussed:  by using a multivariate normal distribution, we make available a formal way of conditioning on the data and updating the parameters of our normal curves based on their location in x.  
+
+Put another way, the model has a way to learn from the data and modify the mean and variance of each normal distribution in the MVN.  This does the job of reducing the range of credible curves that are consistent with the data. This process is consistent with the Bayesian workflow of starting with priors, conditioning on data, and producing a posterior of jointly credible possibilities.
+
+The derivations for how this works are beyond the scope of this post (and I wouldn't be a good candidate to explain them well), but they are available [HERE](https://en.wikipedia.org/wiki/Multivariate_normal_distribution#Conditional_distributions).  The TLDR is this: we need the following component parts to be able to update our estimates of the mean and variance of each Gaussian, which in turn decreases the dispersion of our randomly generated traces and thereby increases the precision of our predictions. 
+
+![](/post/2022-12-02-gaussian-process-regression-for-fea-designed-experiments-building-the-basics-in-r_files/joint_predictive_equations_annotated.png){width=100%}
+
+The code that follows goes about constructing each of the component parts in the above equations that will facilitate our predictions.  
+
+## The Data Points
+
+Generate a set of n=8 data point.  In practice these would be supplied to us via an experiment or some other means.
+
+```{r}
+n_dat <- 8
+x_dat <- matrix(seq(0, 2*pi, length=n_dat), ncol=1)
+y_dat <- sin(x_dat)
+
+data_tbl <- tibble(x = x_dat, 
+                   y = y_dat)
+
+data_tbl %>%
+  gt()
+```
+
+## Calculating the Necessary Distances and Covariance Matrices
+
+### Calculate: Inverse of Covariance matrix between x values in vector of training data (observed datapoints):
+
+```{r}
+d_dat <- distance(x_dat) 
+sigma_dat <- exp(-d_dat) + diag(diag_jitter, ncol(d_dat))
+inv_sigma_dat <- solve(sigma_dat) #solve() finds inverse
+```
+
+### Calculate:  Covariance matrix between x values in vector of desired test points (the x range of interest where the Gaussians are positioned):
+
+```{r}
+x_pred_range <- matrix(seq(-0.5, 2*pi + 0.5, length=100), ncol=1)
+
+d_x_pred_range <- distance(x_pred_range)
+sigma_x_pred_range <- exp(-d_x_pred_range) + diag(diag_jitter, ncol(d_x_pred_range))
+```
+
+### Calculate: Covariance matrix between x values in vector of training data (observed datapoints) and x values in vector of desired test points (the x range of interest where the Gaussians are positioned ):
+
+```{r}
+d_x_dat <- distance(x_pred_range, x_dat)
+sigma_x_dat <- exp(-d_x_dat) 
+```
+
+## Combine Per the Conditioning Equations Above
+
+Bring it together by combining the above inputs into the predictive equations.  The output will be trained means and (reduced) variances from which to draw new points to create new traces.
+
+```{r}
+mu_pred <- sigma_x_dat %*% inv_sigma_dat %*% y_dat
+
+sigma_pred <- sigma_x_pred_range - sigma_x_dat %*% inv_sigma_dat %*% t(sigma_x_dat)
+```
+
+## Draw from the Updated Gaussians
+
+```{r}
+y_draws <- rmvnorm(1, mu_pred, sigma_pred)
+
+y_draws %>% as.vector()
+```
+## Plot the Draws
+
+Plot the single trace drawn from posterior.
+
+```{r}
+tibble(x = x_pred_range,
+       y = as.vector(y_draws)) %>%
+  ggplot(aes(x = x, y = y)) +
+  geom_point(color = "purple") +
+  geom_line(color = "purple") +
+  labs(title = "Single Trace Generated from Draws of Posterior",
+       subtitle = "Gaussians conditioned on n=8 data points")
+```
+
+
+## Function for Many Posterior Draws
+
+Now that we've shown how to create a set of draws to construct a posterior trace, let's make it a function so that we can plot many traces.  The function below is just all the same steps of the last section but combined into a tibble as the last step. This let's us map the function easily as we expand the simulation.
+
+```{r}
+generate_ypred_fcn <- function(sim_number){
+
+#distance and sigma
+d_dat <- distance(x_dat) 
+sigma_dat <- exp(-d_dat) + diag(diag_jitter, ncol(d_dat))
+
+#x range
+x_pred_range <- matrix(seq(-0.5, 2*pi + 0.5, length=50), ncol=1)
+
+#x point distance and sigma
+d_x_pred_range <- distance(x_pred_range)
+sigma_x_pred_range <- exp(-d_x_pred_range) + diag(diag_jitter, ncol(d_x_pred_range))
+
+#distance and sigma between x points and x data points
+d_x_dat <- distance(x_pred_range, x_dat)
+sigma_x_dat <- exp(-d_x_dat) 
+
+#inverse sigma for distance between x data points
+inv_sigma_dat <- solve(sigma_dat)
+
+#mu and sigma pred
+mu_pred <- sigma_x_dat %*% inv_sigma_dat %*% y_dat
+sigma_pred <- sigma_x_pred_range - sigma_x_dat %*% inv_sigma_dat %*% t(sigma_x_dat)
+
+#y preds at x pred range points
+y_draws <- rmvnorm(1, mu_pred, sigma_pred)
+
+y <- tibble(x = x_pred_range,
+            mu_y_pred = as.vector(mu_pred),
+            y_draws = as.vector(rmvnorm(n = 1, mean = mu_pred, sigma = sigma_pred)),
+            sim_number = sim_number)
+return(y)
+}
+```
+
+## Generate Many Draws for Posterior Traces
+
+Simply specify the number of desired traces and use the newly created function to start drawing that many from the MVN.
+
+```{r}
+n_sim_traces <- 500
+
+multi_trace_post_tbl <- tibble(trace_num = seq(from = 1, to = n_sim_traces, by = 1) %>% as_factor()) %>%
+  mutate(dat = map(.x = trace_num, .f = generate_ypred_fcn)) %>%
+  unnest() %>%
+  select(-sim_number)
+
+multi_trace_post_tbl %>%
+  gt_preview()
+```
+## Visualize
+
+Structuring the data this way allows for plotting many traces of the posterior draws.  In the figure below, the black line represents predictions, the red points are the training data, and the "bubbles" represent uncertainty. Notice how the uncertainty collapses near the observed data - just like we would want for FEA!  
+
+```{r}
+multi_trace_post_tbl %>% 
+  ggplot(aes(x = x, y = y_draws)) +
+  geom_line(aes(color = trace_num)) +
+  geom_line(aes(x = x, y = mu_y_pred), size = 2) +
+  geom_point(size = .5) +
+  geom_point(dat = data_tbl, aes(x = x, y = y), size = 4, color = "firebrick") +
+  theme(legend.position = "none") +
+  scale_color_viridis_d() +
+  labs(title = "Credible Posterior Traces",
+       subtitle = "Gaussians trained on n=8 data points",
+       caption = "Red points are observed data\nBlack line is predictions")
+```
+
+## More Visualize
+
+Just for fun, let's just observe how the Gaussians collapse from prior to posterior, based on the data:
+
+```{r}
+x_pred_range_new <- matrix(seq(-0.5, 2*pi + 0.5, length=50), ncol=1)
+
+pretty_norm_tbl_2 <- tibble(x = x_pred_range_new) %>%
+  mutate(y_draws = map(.x = x, .f = centered_norm_draws_fcn)) %>%
+  select(-x) %>%
+  unnest() 
+
+prior_gaussians <- pretty_norm_tbl_2 %>% 
+  ggplot(aes(x = x, y = y)) +
+  geom_jitter(size = .1, alpha = .4, width = .01, color = "limegreen") 
+
+
+post_gaussians <- multi_trace_post_tbl %>% 
+  ggplot(aes(x = x, y = y_draws)) +
+  geom_jitter(size = .1, alpha = .4, width = .01, color = "firebrick") +
+  geom_point(dat = data_tbl, aes(x = x, y = y), size = 2, color = "black") 
+
+prior_gaussians / post_gaussians +
+  plot_annotation(title = "Gaussian Process Regression",
+                  subtitle = "Image represents stacking of multivariate normal dimensions across an X-range of interest",
+                  caption = "Upper Panel: Prior\nLower Panel: Posterior")
+```
+
+# Conclusion
+
+In this walk through we built up a Gaussian Process Regression model from scratch and showed how to train it and use it for predictions.  I hope I was able to communicate the unique features of this model type: specifying priors over a range of many different functions, building and training a large multi-variate normal distribution to create credible functions across a range of interest, and representing uncertainty while still collapsing on the observed data.  In a future post I promise we'll circle back to the unique use-case that was the motivation for my learning in the first place: fitting a GPR to FEA generated DOE data.  If you've made it this far, thank you for your attention.
+
+# sessionInfo
+
+```{r}
+sessionInfo()
+```
