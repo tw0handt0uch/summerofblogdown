@@ -1,4 +1,4 @@
-baseurl = "https://rileyking.netlify.com/"
+baseurl = "https://rileyking.netlify.app/"
 languageCode = "en-us"
 title = "[R]eliability"
 theme = "blackburn"
